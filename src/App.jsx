@@ -1,18 +1,10 @@
 import React from 'react'
 import { Helmet } from 'react-helmet-async'
-import { motion } from 'framer-motion'
 import RoutesIndex from './routes'
-import { io } from 'socket.io-client'
+import { motion } from 'framer-motion'
 
-const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:4000', {
-  autoConnect: true
-})
 
 export default function App() {
-  React.useEffect(() => {
-    socket.on('connect', () => console.log('socket connected', socket.id))
-    return () => socket.off('connect')
-  }, [])
 
   return (
     <>
