@@ -1,25 +1,28 @@
 import React from 'react'
-import { Routes, Route, Link } from 'react-router-dom'
-import Home from '../pages/Home.jsx'
-import Charts from '../pages/Chart.jsx'
-import Upload from '../pages/Upload.jsx'
-import Demo from '../components/ui/Example.jsx'
+import { Routes, Route } from 'react-router-dom'
+import MainLayout from '../components/layout/MainLayout'
+import Dashboard from '../pages/Dashboard'
+import RCADashboard from '../pages/RCADashboard'
+import AIRCAGuidance from '../pages/AIRCAGuidance'
+import PatternDetector from '../pages/PatternDetector'
+import PlaybookRecommender from '../pages/PlaybookRecommender'
+import CustomerRCASummary from '../pages/CustomerRCASummary'
+import AlertCorrelation from '../pages/AlertCorrelation'
+import ComplianceAudit from '../pages/ComplianceAudit'
+
 export default function RoutesIndex() {
   return (
-    <>
-      <nav className="flex gap-4 mb-6">
-        <Link to="/" className="btn-primary">Home</Link>
-        <Link to="/charts" className="btn">Charts</Link>
-        <Link to="/upload" className="btn">Upload</Link>
-        <Link to="/ui" className="btn">UI</Link>
-      </nav>
-
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/charts" element={<Charts />} />
-        <Route path="/upload" element={<Upload />} />
-        <Route path="/ui" element={<Demo />} />
-      </Routes>
-    </>
+    <Routes>
+      <Route path="/" element={<MainLayout />}>
+        <Route index element={<Dashboard />} />
+        <Route path="rca-dashboard" element={<RCADashboard />} />
+        <Route path="ai-rca-guidance" element={<AIRCAGuidance />} />
+        <Route path="pattern-detector" element={<PatternDetector />} />
+        <Route path="playbook-recommender" element={<PlaybookRecommender />} />
+        <Route path="customer-rca-summary" element={<CustomerRCASummary />} />
+        <Route path="alert-correlation" element={<AlertCorrelation />} />
+        <Route path="compliance-audit" element={<ComplianceAudit />} />
+      </Route>
+    </Routes>
   )
 }
