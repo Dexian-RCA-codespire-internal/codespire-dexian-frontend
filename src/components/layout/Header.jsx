@@ -1,8 +1,76 @@
-import React from "react";
-import { motion } from "framer-motion";
-import { BellIcon } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { BellIcon, X, User, Mail, Phone, LogOut } from "lucide-react";
 
 const Header = () => {
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const notificationRef = useRef(null);
+  const userMenuRef = useRef(null);
+
+  const notifications = [
+    {
+      id: 1,
+      title: "New RCA Created",
+      message: "Service outage RCA #1234 has been created",
+      time: "2 minutes ago",
+      type: "info"
+    },
+    {
+      id: 2,
+      title: "Integration Alert",
+      message: "Jira connection status changed to connected",
+      time: "15 minutes ago",
+      type: "success"
+    }
+  ];
+
+  const userProfile = {
+    name: "John Doe",
+    email: "john.doe@codespire.com",
+    phone: "+1 (555) 123-4567"
+  };
+
+  const toggleNotifications = () => {
+    setIsNotificationOpen(!isNotificationOpen);
+    setIsUserMenuOpen(false); // Close user menu when opening notifications
+  };
+
+  const closeNotifications = () => {
+    setIsNotificationOpen(false);
+  };
+
+  const toggleUserMenu = () => {
+    setIsUserMenuOpen(!isUserMenuOpen);
+    setIsNotificationOpen(false); // Close notifications when opening user menu
+  };
+
+  const closeUserMenu = () => {
+    setIsUserMenuOpen(false);
+  };
+
+  const handleLogout = () => {
+    // Add logout logic here
+    console.log("Logout clicked");
+    setIsUserMenuOpen(false);
+  };
+
+  // Close popups when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setIsNotificationOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
   return (
     <motion.header
       className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm"
@@ -19,15 +87,152 @@ const Header = () => {
         </div>
         {/* before proofile I want a notification icon 2 as notification number*/}
 
-        <div className="flex items-center space-x-4 gap-4 cursor-pointer">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center">
-            <span className="text-gray-600 text-sm relative">
-              <BellIcon className="w-6 h-6 p-1 text-gray-600" />
-              <span className="text-white rounded-full px-[4px] bg-red-600 text-xs absolute left-3 bottom-3">2</span>
-            </span>
+        <div className="flex items-center space-x-4 gap-4">
+          <div className="relative" ref={notificationRef}>
+            <button
+              onClick={toggleNotifications}
+              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
+            >
+              <span className="text-gray-600 text-sm relative">
+                <BellIcon className="w-6 h-6 p-1 text-gray-600" />
+                <span className="text-white rounded-full px-[4px] bg-red-600 text-xs absolute left-3 bottom-3">2</span>
+              </span>
+            </button>
+
+            {/* Notification Popup */}
+            <AnimatePresence>
+              {isNotificationOpen && (
+                <motion.div
+                  className="absolute right-0 top-10 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
+                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="p-4 border-b border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-gray-900">Notifications</h3>
+                      <button
+                        onClick={closeNotifications}
+                        className="p-1 hover:bg-gray-100 rounded-md transition-colors"
+                      >
+                        <X className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="max-h-96 overflow-y-auto">
+                    {notifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-start space-x-3">
+                          <div className={`w-2 h-2 rounded-full mt-2 ${
+                            notification.type === 'success' ? 'bg-green-500' : 'bg-blue-500'
+                          }`}></div>
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 text-sm">{notification.title}</h4>
+                            <p className="text-gray-600 text-sm mt-1">{notification.message}</p>
+                            <p className="text-gray-400 text-xs mt-2">{notification.time}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="p-3 border-t border-gray-200">
+                    <button className="w-full text-center text-sm text-blue-600 hover:text-blue-800 font-medium">
+                      View All Notifications
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-          <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-            <span className="text-gray-600 text-sm">👤</span>
+          
+          <div className="relative" ref={userMenuRef}>
+            <button
+              onClick={toggleUserMenu}
+              className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
+            >
+              <span className="text-gray-600 text-sm">👤</span>
+            </button>
+
+            {/* User Profile Popup */}
+            <AnimatePresence>
+              {isUserMenuOpen && (
+                <motion.div
+                  className="absolute right-0 top-10 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
+                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="p-4 border-b border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-gray-900">Profile</h3>
+                      <button
+                        onClick={closeUserMenu}
+                        className="p-1 hover:bg-gray-100 rounded-md transition-colors"
+                      >
+                        <X className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 space-y-4">
+                    {/* User Info */}
+                    <div className="flex items-center space-x-3 pb-3 border-b border-gray-100">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <User className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{userProfile.name}</p>
+                        <p className="text-sm text-gray-500">Administrator</p>
+                      </div>
+                    </div>
+
+                    {/* Profile Options */}
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-md transition-colors">
+                        <User className="w-4 h-4 text-gray-500" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Name</p>
+                          <p className="text-xs text-gray-500">{userProfile.name}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-md transition-colors">
+                        <Mail className="w-4 h-4 text-gray-500" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Email</p>
+                          <p className="text-xs text-gray-500">{userProfile.email}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-md transition-colors">
+                        <Phone className="w-4 h-4 text-gray-500" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Phone Number</p>
+                          <p className="text-xs text-gray-500">{userProfile.phone}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-3 border-t border-gray-200">
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center justify-center space-x-2 px-3 py-2 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>

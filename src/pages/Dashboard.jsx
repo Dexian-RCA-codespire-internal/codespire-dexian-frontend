@@ -1,17 +1,66 @@
 import React from 'react'
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { FiAlertTriangle } from "react-icons/fi";
 import { PiUsersThree } from "react-icons/pi";
 import { AiOutlineLineChart } from "react-icons/ai";
 import { IoSpeedometerOutline } from "react-icons/io5";
+import { 
+  SiJira, 
+  SiZendesk 
+} from "react-icons/si";
+import { 
+  MdOutlineSupportAgent 
+} from "react-icons/md";
+import { 
+  FiTool 
+} from "react-icons/fi";
 
 const Dashboard = () => {
+  const navigate = useNavigate()
+  
   const stats = [
     { title: 'Total RCAs', value: '24', icon: IoSpeedometerOutline, color: 'text-blue-500' },
     { title: 'Active Investigations', value: '8', icon: AiOutlineLineChart, color: 'text-green-500' },
     { title: 'Team Members', value: '12', icon: PiUsersThree, color: 'text-purple-500' },
     { title: 'Critical Issues', value: '3', icon: FiAlertTriangle, color: 'text-red-500' }
   ]
+
+  const integrations = [
+    { 
+      name: 'Jira', 
+      icon: SiJira, 
+      connected: true, 
+      pinned: true,
+      pinStatus: '40ms'
+    },
+    { 
+      name: 'Service Desk', 
+      icon: MdOutlineSupportAgent, 
+      connected: false, 
+      pinned: false,
+      pinStatus: '40ms'
+    },
+    { 
+      name: 'Zendesk', 
+      icon: SiZendesk, 
+      connected: true, 
+      pinned: true,
+      pinStatus: '40ms'
+    },
+    { 
+      name: 'Remedy', 
+      icon: FiTool, 
+      connected: false, 
+      pinned: false,
+      pinStatus: '40ms'
+    }
+  ]
+
+  const handleIntegrationClick = () => {
+    navigate('/ai-rca-guidance/add-integration')
+  }
+
 
   return (
     <div className="space-y-6">
@@ -49,11 +98,70 @@ const Dashboard = () => {
         })}
       </div>
 
+      {/* Integration Cards */}
       <motion.div
         className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.4 }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-900">Integrations</h2>
+          <button
+            onClick={handleIntegrationClick}
+            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+          >
+            Manage All →
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {integrations.map((integration, index) => {
+            const IconComponent = integration.icon
+            return (
+              <motion.div
+                key={integration.name}
+                className="bg-gray-50 rounded-lg border border-gray-200 p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
+                onClick={handleIntegrationClick}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <IconComponent className="w-6 h-6 text-gray-700" />
+                    <span className="font-medium text-gray-900">{integration.name}</span>
+                  </div>
+                  {integration.pinned && (
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Connection Status</span>
+                    <span className={`text-sm font-medium ${
+                      integration.connected ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {integration.connected ? 'Connected' : 'Not Connected'}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Pin Status</span>
+                    <span className="text-sm font-medium text-gray-900">{integration.pinStatus}</span>
+                  </div>
+                </div>
+              </motion.div>
+            )
+          })}
+        </div>
+      </motion.div>
+
+      <motion.div
+        className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.8 }}
       >
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Activity</h2>
         <div className="space-y-3">

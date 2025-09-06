@@ -11,6 +11,7 @@ import ComplianceAudit from '../pages/ComplianceAudit'
 import Item1 from '../pages/ai-rca-guidance/Item1'
 import Item2 from '../pages/ai-rca-guidance/Item2'
 import Item3 from '../pages/ai-rca-guidance/Item3'
+import AddIntegration from '../pages/ai-rca-guidance/AddIntegration'
 
 export default function RoutesIndex() {
   return (
@@ -21,6 +22,7 @@ export default function RoutesIndex() {
         <Route path="ai-rca-guidance/item1" element={<Item1 />} />
         <Route path="ai-rca-guidance/item2" element={<Item2 />} />
         <Route path="ai-rca-guidance/item3" element={<Item3 />} />
+        <Route path="ai-rca-guidance/add-integration" element={<AddIntegration />} />
         <Route path="pattern-detector" element={<PatternDetector />} />
         <Route path="playbook-recommender" element={<PlaybookRecommender />} />
         <Route path="customer-rca-summary" element={<CustomerRCASummary />} />
