@@ -119,9 +119,9 @@ const Sidebar = ({ onSubSidebarToggle }) => {
                 ) : (
                   <button
                     onClick={(e) => handleItemClick(item, e)}
-                    className={`flex items-center justify-center px-1 py-2 rounded-lg transition-colors duration-200 relative w-full ${
+                    className={`flex items-center justify-center px-1 py-2 transition-colors duration-200 relative w-full ${
                       item.label === "AI RCA Guidance" && isAIRCAGuidanceActive
-                        ? "text-green-600"
+                        ? "text-green-600 border-l-2 border-green-600 "
                         : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                     }`}
                   >
