@@ -1,10 +1,27 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import Header from './Header'
 import Sidebar from './Sidebar'
+import SubSidebar from './SubSidebar'
 
 const MainLayout = () => {
+  const [isSubSidebarOpen, setIsSubSidebarOpen] = useState(false)
+
+  const subItems = [
+    { path: '/ai-rca-guidance/item1', label: 'Item 1' },
+    { path: '/ai-rca-guidance/item2', label: 'Item 2' },
+    { path: '/ai-rca-guidance/item3', label: 'Item 3' }
+  ]
+
+  const handleSubSidebarToggle = (isOpen) => {
+    setIsSubSidebarOpen(isOpen)
+  }
+
+  const handleSubSidebarClose = () => {
+    setIsSubSidebarOpen(false)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Fixed Header */}
@@ -13,10 +30,17 @@ const MainLayout = () => {
       {/* Main Content Area with Sidebar */}
       <div className="flex pt-16">
         {/* Fixed Sidebar */}
-        <Sidebar />
+        <Sidebar onSubSidebarToggle={handleSubSidebarToggle} />
+        
+        {/* Sub Sidebar */}
+        <SubSidebar 
+          isOpen={isSubSidebarOpen} 
+          onClose={handleSubSidebarClose}
+          subItems={subItems}
+        />
         
         {/* Main Content */}
-        <main className="flex-1 ml-64 p-6">
+        <main className="flex-1 ml-16 p-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

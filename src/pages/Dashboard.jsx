@@ -1,13 +1,16 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { FaTachometerAlt, FaChartLine, FaUsers, FaExclamationTriangle } from 'react-icons/fa'
+import { FiAlertTriangle } from "react-icons/fi";
+import { PiUsersThree } from "react-icons/pi";
+import { AiOutlineLineChart } from "react-icons/ai";
+import { IoSpeedometerOutline } from "react-icons/io5";
 
 const Dashboard = () => {
   const stats = [
-    { title: 'Total RCAs', value: '24', icon: FaTachometerAlt, color: 'bg-blue-500' },
-    { title: 'Active Investigations', value: '8', icon: FaChartLine, color: 'bg-green-500' },
-    { title: 'Team Members', value: '12', icon: FaUsers, color: 'bg-purple-500' },
-    { title: 'Critical Issues', value: '3', icon: FaExclamationTriangle, color: 'bg-red-500' }
+    { title: 'Total RCAs', value: '24', icon: IoSpeedometerOutline, color: 'text-blue-500' },
+    { title: 'Active Investigations', value: '8', icon: AiOutlineLineChart, color: 'text-green-500' },
+    { title: 'Team Members', value: '12', icon: PiUsersThree, color: 'text-purple-500' },
+    { title: 'Critical Issues', value: '3', icon: FiAlertTriangle, color: 'text-red-500' }
   ]
 
   return (
@@ -38,7 +41,7 @@ const Dashboard = () => {
                   <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
                 </div>
                 <div className={`${stat.color} p-3 rounded-lg`}>
-                  <IconComponent className="w-6 h-6 text-white" />
+                  <IconComponent className="w-6 h-6" />
                 </div>
               </div>
             </motion.div>

@@ -23,7 +23,7 @@ const Header = () => {
           <div className="w-8 h-8 rounded-full flex items-center justify-center">
             <span className="text-gray-600 text-sm relative">
               <BellIcon className="w-6 h-6 p-1 text-gray-600" />
-              <span className="text-white rounded-full px-[6px] bg-red-600 text-sm absolute left-4 bottom-4">2</span>
+              <span className="text-white rounded-full px-[4px] bg-red-600 text-xs absolute left-3 bottom-3">2</span>
             </span>
           </div>
           <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
