@@ -1,25 +1,34 @@
 import React from 'react'
-import { Routes, Route, Link } from 'react-router-dom'
-import Home from '../pages/Home.jsx'
-import Charts from '../pages/Chart.jsx'
-import Upload from '../pages/Upload.jsx'
-import Demo from '../components/ui/Example.jsx'
+import { Routes, Route } from 'react-router-dom'
+import MainLayout from '../components/layout/MainLayout'
+import Dashboard from '../pages/Dashboard'
+import RCADashboard from '../pages/RCADashboard'
+import PatternDetector from '../pages/PatternDetector'
+import PlaybookRecommender from '../pages/PlaybookRecommender'
+import CustomerRCASummary from '../pages/CustomerRCASummary'
+import AlertCorrelation from '../pages/AlertCorrelation'
+import ComplianceAudit from '../pages/ComplianceAudit'
+import Item1 from '../pages/ai-rca-guidance/Item1'
+import Item2 from '../pages/ai-rca-guidance/Item2'
+import Item3 from '../pages/ai-rca-guidance/Item3'
+import AddIntegration from '../pages/ai-rca-guidance/AddIntegration'
+
 export default function RoutesIndex() {
   return (
-    <>
-      <nav className="flex gap-4 mb-6">
-        <Link to="/" className="btn-primary">Home</Link>
-        <Link to="/charts" className="btn">Charts</Link>
-        <Link to="/upload" className="btn">Upload</Link>
-        <Link to="/ui" className="btn">UI</Link>
-      </nav>
-
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/charts" element={<Charts />} />
-        <Route path="/upload" element={<Upload />} />
-        <Route path="/ui" element={<Demo />} />
-      </Routes>
-    </>
+    <Routes>
+      <Route path="/" element={<MainLayout />}>
+        <Route index element={<Dashboard />} />
+        <Route path="rca-dashboard" element={<RCADashboard />} />
+        <Route path="ai-rca-guidance/item1" element={<Item1 />} />
+        <Route path="ai-rca-guidance/item2" element={<Item2 />} />
+        <Route path="ai-rca-guidance/item3" element={<Item3 />} />
+        <Route path="ai-rca-guidance/add-integration" element={<AddIntegration />} />
+        <Route path="pattern-detector" element={<PatternDetector />} />
+        <Route path="playbook-recommender" element={<PlaybookRecommender />} />
+        <Route path="customer-rca-summary" element={<CustomerRCASummary />} />
+        <Route path="alert-correlation" element={<AlertCorrelation />} />
+        <Route path="compliance-audit" element={<ComplianceAudit />} />
+      </Route>
+    </Routes>
   )
 }
