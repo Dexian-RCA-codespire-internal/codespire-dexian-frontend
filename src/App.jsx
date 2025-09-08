@@ -8,7 +8,10 @@ export default function App() {
       <Helmet>
         <title>Codespire RCA Dashboard</title>
       </Helmet>
-      <RoutesIndex />
+
+      <main className="h-full">
+        <RoutesIndex />
+      </main>
     </>
   )
 }
