@@ -6,7 +6,7 @@ export default function App() {
   return (
     <>
       <Helmet>
-        <title>Codespire RCA Dashboard</title>
+        <title>Dexian RCA Dashboard</title>
       </Helmet>
 
       <main className="h-full">

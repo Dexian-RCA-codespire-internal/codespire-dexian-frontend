@@ -11,7 +11,7 @@ import {
   AiOutlineSend,
 } from "react-icons/ai";
 import { LuChartLine, LuFolderOpen, LuUser } from "react-icons/lu";
-import { RiRobot2Line } from "react-icons/ri";
+import { RiAiGenerate2 } from "react-icons/ri";
 import { FiShield } from "react-icons/fi";
 import { FaRegFile } from "react-icons/fa";
 import { ChevronRight, BellIcon } from "lucide-react";
@@ -30,7 +30,7 @@ const Sidebar = ({ onSubSidebarToggle }) => {
     {
       path: null,
       label: "AI RCA Guidance",
-      icon: RiRobot2Line,
+      icon: RiAiGenerate2,
       hasSubItems: true,
     },
     {
@@ -103,7 +103,7 @@ const Sidebar = ({ onSubSidebarToggle }) => {
                     className={({ isActive }) =>
                       `flex flex-col items-center justify-center px-1 py-2 transition-colors duration-200 relative ${
                         isActive
-                          ? "text-green-600 border-l-2 border-green-600 "
+                          ? "text-lime-500 border-l-4 border-lime-500 font-bold "
                           : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                       }`
                     }
@@ -121,7 +121,7 @@ const Sidebar = ({ onSubSidebarToggle }) => {
                     onClick={(e) => handleItemClick(item, e)}
                     className={`flex items-center justify-center px-1 py-2 transition-colors duration-200 relative w-full ${
                       item.label === "AI RCA Guidance" && isAIRCAGuidanceActive
-                        ? "text-green-600 border-l-2 border-green-600 "
+                        ? "text-lime-500 border-l-4 border-lime-500 font-bold "
                         : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                     }`}
                   >

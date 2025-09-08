@@ -14,11 +14,13 @@ import Item3 from '../pages/ai-rca-guidance/Item3'
 import AddIntegration from '../pages/ai-rca-guidance/AddIntegration'
 
 import Login from '../pages/Auth/Login.jsx'
+import Register from '../pages/Auth/Register.jsx'
 export default function RoutesIndex() {
   return (
     <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
       <Route path="/" element={<MainLayout />}>
-        <Route path="/login" element={<Login />} />
         <Route index element={<Dashboard />} />
         <Route path="rca-dashboard" element={<RCADashboard />} />
         <Route path="ai-rca-guidance/item1" element={<Item1 />} />
