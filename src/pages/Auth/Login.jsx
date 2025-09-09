@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, CardFooter, Checkbox } from '../../components/ui'
 import { MdEmail, MdLock, MdVisibility, MdVisibilityOff } from 'react-icons/md'
+import { Link } from 'react-router-dom'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -28,7 +29,7 @@ export default function Login() {
             <div className="flex items-center space-x-3">
               {/* Logo Image */}
               <img 
-                src="/assets/dexian-logo.png" 
+                src="/logos/dexian-logo.png" 
                 alt="Dexian Logo" 
                 className="w-12 h-12 object-contain"
               />
@@ -111,7 +112,7 @@ export default function Login() {
                              {/* Login Button */}
                                <Button
                   type="submit"
-                  className="w-full h-12 bg-gradient-to-r from-teal-300 to-teal-900 hover:from-teal-400 hover:to-teal-800 text-white font-semibold rounded-lg transition-all duration-1000 ease-in-out shadow-lg hover:shadow-xl"
+                  className="w-full h-12 bg-gradient-to-r from-teal-500 to-teal-900 hover:from-teal-600 hover:to-teal-800 text-white font-semibold rounded-lg transition-all duration-1000 ease-in-out shadow-lg hover:shadow-xl"
                 >
                   Log in
                 </Button>
@@ -123,9 +124,9 @@ export default function Login() {
         <div className="text-center mt-6">
           <p className="text-gray-600">
             Don't have an account?{' '}
-            <a href="#" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link to="/register" className="text-blue-600 hover:text-blue-700 font-medium">
               Create an account
-            </a>
+            </Link>
           </p>
         </div>
         </div>

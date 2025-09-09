@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BellIcon, X, User, Mail, Phone, LogOut } from "lucide-react";
+import { Bell, X, User, Mail, Phone, LogOut } from "lucide-react";
 
 const Header = () => {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -80,10 +80,21 @@ const Header = () => {
     >
       <div className="h-16 flex items-center justify-between px-6">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">C</span>
+          <div className="relative group flex items-center space-x-2">
+            <div className="relative overflow-hidden rounded-l-md">
+              <img 
+                src="/logos/dexian-logo.png" 
+                alt="Dexian Logo" 
+                className="h-10 w-auto object-contain transition-all duration-300 group-hover:scale-105 group-hover:brightness-110"
+              />
+            </div>
+            <img 
+              src="/logos/dexiannavbar-text.png" 
+              alt="Dexian Text" 
+              className="h-8 w-auto object-contain transition-all duration-300 group-hover:scale-105 group-hover:brightness-110"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           </div>
-          <h1 className="text-xl font-semibold text-gray-900">Codespire RCA</h1>
         </div>
         {/* before proofile I want a notification icon 2 as notification number*/}
 
@@ -94,7 +105,7 @@ const Header = () => {
               className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
             >
               <span className="text-gray-600 text-sm relative">
-                <BellIcon className="w-6 h-6 p-1 text-gray-600" />
+                <Bell className="w-6 h-6 p-1 text-gray-600" />
                 <span className="text-white rounded-full px-[4px] bg-red-600 text-xs absolute left-3 bottom-3">2</span>
               </span>
             </button>
@@ -156,7 +167,7 @@ const Header = () => {
               onClick={toggleUserMenu}
               className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
             >
-              <span className="text-gray-600 text-sm">👤</span>
+              <User className="w-5 h-5 text-gray-600" />
             </button>
 
             {/* User Profile Popup */}

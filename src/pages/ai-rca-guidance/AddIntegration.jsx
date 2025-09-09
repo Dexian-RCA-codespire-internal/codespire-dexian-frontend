@@ -1,42 +1,32 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { 
-  SiJira, 
-  SiZendesk 
-} from "react-icons/si";
-import { 
-  MdOutlineSupportAgent 
-} from "react-icons/md";
-import { 
-  FiTool 
-} from "react-icons/fi";
 
 const AddIntegration = () => {
   const [integrations, setIntegrations] = useState([
     { 
       name: 'Jira', 
-      icon: SiJira, 
+      logo: '/logos/jira-logo.jpg', 
       connected: true, 
       pinned: true,
       pinStatus: '40ms'
     },
     { 
-      name: 'Service Desk', 
-      icon: MdOutlineSupportAgent, 
+      name: 'Service Now', 
+      logo: '/logos/servicenow-logo.png', 
       connected: false, 
       pinned: false,
       pinStatus: '40ms'
     },
     { 
       name: 'Zendesk', 
-      icon: SiZendesk, 
+      logo: '/logos/zendesk-logo.png', 
       connected: true, 
       pinned: true,
       pinStatus: '40ms'
     },
     { 
       name: 'Remedy', 
-      icon: FiTool, 
+      logo: '/logos/remedy-logo.png', 
       connected: false, 
       pinned: false,
       pinStatus: '40ms'
@@ -75,7 +65,6 @@ const AddIntegration = () => {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Available Integrations</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {integrations.map((integration, index) => {
-            const IconComponent = integration.icon
             return (
               <motion.div
                 key={integration.name}
@@ -86,7 +75,17 @@ const AddIntegration = () => {
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-3">
-                    <IconComponent className="w-6 h-6 text-gray-700" />
+                    <div className="relative">
+                      <img 
+                        src={integration.logo} 
+                        alt={`${integration.name} logo`}
+                        className={`w-16 h-16 object-contain bg-white rounded-lg shadow-sm border border-gray-100 p-2 hover:shadow-md transition-all duration-200 ${
+                          integration.name === 'Service Now' || integration.name === 'Zendesk' || integration.name === 'Remedy'
+                            ? 'hover:scale-110 transform'
+                            : ''
+                        }`}
+                      />
+                    </div>
                     <span className="font-medium text-gray-900">{integration.name}</span>
                   </div>
                   {integration.pinned && (
@@ -105,8 +104,8 @@ const AddIntegration = () => {
                   </div>
                   
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Pin Status</span>
-                    <span className="text-sm font-medium text-gray-900">{integration.pinStatus}</span>
+                    <span className="text-sm text-gray-600">Ping Status</span>
+                    <span className="text-sm font-medium text-gray-600">{integration.pinStatus}</span>
                   </div>
                   
                   <div className="flex space-x-2 pt-2">
