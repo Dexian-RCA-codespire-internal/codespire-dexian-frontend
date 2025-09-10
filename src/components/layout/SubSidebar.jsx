@@ -2,8 +2,23 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ChevronLeft } from 'lucide-react'
+import { LuChartLine, LuPlus } from 'react-icons/lu'
+import { FiSettings } from 'react-icons/fi'
 
 const SubSidebar = ({ isOpen, onClose, subItems }) => {
+  // Icon mapping for sub-items
+  const getIconForItem = (label) => {
+    switch (label) {
+      case 'RCA Dashboard':
+        return LuChartLine
+      case 'New Tickets':
+        return LuPlus
+      case 'Add Integration':
+        return FiSettings
+      default:
+        return LuChartLine
+    }
+  }
 
   return (
     <AnimatePresence>
@@ -49,30 +64,33 @@ const SubSidebar = ({ isOpen, onClose, subItems }) => {
 
               {/* Navigation Items */}
               <nav className="flex-1 p-4">
-                <ul className="space-y-2">
-                  {subItems.map((item, index) => (
-                    <motion.li
-                      key={item.path}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3, delay: index * 0.1 }}
-                    >
-                      <NavLink
-                        to={item.path}
-                        className={({ isActive }) =>
-                          `flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors duration-200 ${
-                            isActive
-                              ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
-                              : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                          }`
-                        }
-                        onClick={onClose}
+                <ul className="space-y-1">
+                  {subItems.map((item, index) => {
+                    const IconComponent = getIconForItem(item.label)
+                    return (
+                      <motion.li
+                        key={item.path}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.3, delay: index * 0.1 }}
                       >
-                        <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0" />
-                        <span className="text-sm font-medium">{item.label}</span>
-                      </NavLink>
-                    </motion.li>
-                  ))}
+                        <NavLink
+                          to={item.path}
+                          className={({ isActive }) =>
+                            `flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors duration-200 relative ${
+                              isActive
+                                ? 'text-lime-500 border-l-4 border-lime-500 font-bold bg-lime-50'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                            }`
+                          }
+                          onClick={onClose}
+                        >
+                          <IconComponent className="w-5 h-5 flex-shrink-0" />
+                          <span className="text-sm font-medium font-sans">{item.label}</span>
+                        </NavLink>
+                      </motion.li>
+                    )
+                  })}
                 </ul>
               </nav>
             </div>

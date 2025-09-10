@@ -3,15 +3,17 @@ import { Routes, Route } from 'react-router-dom'
 import MainLayout from '../components/layout/MainLayout'
 import Dashboard from '../pages/Dashboard'
 import RCADashboard from '../pages/RCADashboard'
+import Complaint from '../pages/Complaint'
+import Investigation from '../pages/Investigation'
+import Analysis from '../pages/Analysis'
+import Resolution from '../pages/Resolution'
 import PatternDetector from '../pages/PatternDetector'
 import PlaybookRecommender from '../pages/PlaybookRecommender'
 import CustomerRCASummary from '../pages/CustomerRCASummary'
 import AlertCorrelation from '../pages/AlertCorrelation'
 import ComplianceAudit from '../pages/ComplianceAudit'
-import Item1 from '../pages/ai-rca-guidance/Item1'
-import Item2 from '../pages/ai-rca-guidance/Item2'
-import Item3 from '../pages/ai-rca-guidance/Item3'
 import AddIntegration from '../pages/ai-rca-guidance/AddIntegration'
+import NewTickets from '../pages/NewTickets'
 
 import Login from '../pages/Auth/Login.jsx'
 import Register from '../pages/Auth/Register.jsx'
@@ -23,9 +25,11 @@ export default function RoutesIndex() {
       <Route path="/" element={<MainLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="rca-dashboard" element={<RCADashboard />} />
-        <Route path="ai-rca-guidance/item1" element={<Item1 />} />
-        <Route path="ai-rca-guidance/item2" element={<Item2 />} />
-        <Route path="ai-rca-guidance/item3" element={<Item3 />} />
+        <Route path="complaint/:ticketId" element={<Complaint />} />
+        <Route path="investigation/:ticketId" element={<Investigation />} />
+        <Route path="analysis/:ticketId" element={<Analysis />} />
+        <Route path="resolution/:ticketId" element={<Resolution />} />
+        <Route path="new-tickets" element={<NewTickets />} />
         <Route path="ai-rca-guidance/add-integration" element={<AddIntegration />} />
         <Route path="pattern-detector" element={<PatternDetector />} />
         <Route path="playbook-recommender" element={<PlaybookRecommender />} />

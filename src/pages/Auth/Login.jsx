@@ -1,17 +1,45 @@
 import React, { useState } from 'react'
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, CardFooter, Checkbox } from '../../components/ui'
 import { MdEmail, MdLock, MdVisibility, MdVisibilityOff } from 'react-icons/md'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
+import toast from 'react-hot-toast'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const navigate = useNavigate()
+  const { login } = useAuth()
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    console.log('Login attempt:', { email, password, rememberMe })
+    setIsLoading(true)
+
+    try {
+      const result = await login(email, password)
+      
+      if (result.success) {
+        toast.success(result.data.message || 'Login successful!')
+        
+        // Store user data in localStorage if remember me is checked
+        if (rememberMe) {
+          localStorage.setItem('user', JSON.stringify(result.data.user))
+        }
+        
+        // Navigate to dashboard or home page
+        navigate('/dashboard')
+      } else {
+        toast.error(result.error || 'Login failed. Please try again.')
+      }
+    } catch (error) {
+      console.error('Login error:', error)
+      toast.error('Login failed. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
 
@@ -112,9 +140,10 @@ export default function Login() {
                              {/* Login Button */}
                                <Button
                   type="submit"
-                  className="w-full h-12 bg-gradient-to-r from-teal-500 to-teal-900 hover:from-teal-600 hover:to-teal-800 text-white font-semibold rounded-lg transition-all duration-1000 ease-in-out shadow-lg hover:shadow-xl"
+                  disabled={isLoading}
+                  className="w-full h-12 bg-gradient-to-r from-teal-500 to-teal-900 hover:from-teal-600 hover:to-teal-800 text-white font-semibold rounded-lg transition-all duration-1000 ease-in-out shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Log in
+                  {isLoading ? 'Logging in...' : 'Log in'}
                 </Button>
             </form>
           </CardContent>

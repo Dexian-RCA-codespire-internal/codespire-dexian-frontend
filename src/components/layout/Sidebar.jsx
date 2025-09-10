@@ -10,7 +10,7 @@ import {
   AiOutlineBook,
   AiOutlineSend,
 } from "react-icons/ai";
-import { LuChartLine, LuFolderOpen, LuUser } from "react-icons/lu";
+import { LuFolderOpen, LuUser } from "react-icons/lu";
 import { RiAiGenerate2 } from "react-icons/ri";
 import { FiShield } from "react-icons/fi";
 import { FaRegFile } from "react-icons/fa";
@@ -21,12 +21,6 @@ const Sidebar = ({ onSubSidebarToggle }) => {
 
   const navigationItems = [
     { path: "/", label: "Dashboard", icon: AiOutlineHome, hasSubItems: false },
-    {
-      path: "/rca-dashboard",
-      label: "RCA Dashboard",
-      icon: LuChartLine,
-      hasSubItems: false,
-    },
     {
       path: null,
       label: "AI RCA Guidance",
@@ -76,7 +70,9 @@ const Sidebar = ({ onSubSidebarToggle }) => {
 
   // Check if AI RCA Guidance should be active (when any sub-item is open)
   const isAIRCAGuidanceActive =
-    location.pathname.startsWith("/ai-rca-guidance");
+    location.pathname.startsWith("/ai-rca-guidance") || 
+    location.pathname === "/rca-dashboard" || 
+    location.pathname === "/new-tickets";
 
   return (
     <motion.aside
