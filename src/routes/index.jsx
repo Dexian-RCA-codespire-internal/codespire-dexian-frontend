@@ -1,5 +1,6 @@
 import React from 'react'
 import { Routes, Route } from 'react-router-dom'
+import { SessionAuth } from 'supertokens-auth-react/recipe/session'
 import MainLayout from '../components/layout/MainLayout'
 import Dashboard from '../pages/Dashboard'
 import RCADashboard from '../pages/RCADashboard'
@@ -15,12 +16,28 @@ import AddIntegration from '../pages/ai-rca-guidance/AddIntegration'
 
 import Login from '../pages/Auth/Login.jsx'
 import Register from '../pages/Auth/Register.jsx'
+import VerifyOTP from '../pages/Auth/VerifyOTP.jsx'
+import VerifyMagicLink from '../pages/Auth/VerifyMagicLink.jsx'
+
 export default function RoutesIndex() {
   return (
     <Routes>
+      {/* Public auth routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
-      <Route path="/" element={<MainLayout />}>
+      <Route path="/verify-otp" element={<VerifyOTP />} />
+      <Route path="/verify-magic-link/:token" element={<VerifyMagicLink />} />
+      
+      {/* Handle SuperTokens auth redirects */}
+      <Route path="/auth" element={<Login />} />
+      <Route path="/auth/*" element={<Login />} />
+      
+      {/* Protected routes - wrapped with SessionAuth */}
+      <Route path="/" element={
+        <SessionAuth>
+          <MainLayout />
+        </SessionAuth>
+      }>
         <Route index element={<Dashboard />} />
         <Route path="rca-dashboard" element={<RCADashboard />} />
         <Route path="ai-rca-guidance/item1" element={<Item1 />} />
