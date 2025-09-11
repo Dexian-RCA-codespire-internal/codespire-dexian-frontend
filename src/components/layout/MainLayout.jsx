@@ -10,7 +10,6 @@ const MainLayout = () => {
 
   const subItems = [
     { path: '/rca-dashboard', label: 'RCA Dashboard' },
-    { path: '/new-tickets', label: 'View Tickets' },
     { path: '/ai-rca-guidance/add-integration', label: 'Add Integration' }
   ]
 

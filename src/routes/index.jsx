@@ -7,13 +7,14 @@ import Complaint from '../pages/Complaint'
 import Investigation from '../pages/Investigation'
 import Analysis from '../pages/Analysis'
 import Resolution from '../pages/Resolution'
+import CompleteRCA from '../pages/CompleteRCA'
 import PatternDetector from '../pages/PatternDetector'
 import PlaybookRecommender from '../pages/PlaybookRecommender'
 import CustomerRCASummary from '../pages/CustomerRCASummary'
 import AlertCorrelation from '../pages/AlertCorrelation'
 import ComplianceAudit from '../pages/ComplianceAudit'
 import AddIntegration from '../pages/ai-rca-guidance/AddIntegration'
-import NewTickets from '../pages/NewTickets'
+import { isFeatureEnabled } from '../config/navigation'
 
 import Login from '../pages/Auth/Login.jsx'
 import Register from '../pages/Auth/Register.jsx'
@@ -29,13 +30,13 @@ export default function RoutesIndex() {
         <Route path="investigation/:ticketId" element={<Investigation />} />
         <Route path="analysis/:ticketId" element={<Analysis />} />
         <Route path="resolution/:ticketId" element={<Resolution />} />
-        <Route path="new-tickets" element={<NewTickets />} />
+        <Route path="complete-rca/:ticketId" element={<CompleteRCA />} />
         <Route path="ai-rca-guidance/add-integration" element={<AddIntegration />} />
-        <Route path="pattern-detector" element={<PatternDetector />} />
-        <Route path="playbook-recommender" element={<PlaybookRecommender />} />
-        <Route path="customer-rca-summary" element={<CustomerRCASummary />} />
-        <Route path="alert-correlation" element={<AlertCorrelation />} />
-        <Route path="compliance-audit" element={<ComplianceAudit />} />
+        {isFeatureEnabled('patternDetector') && <Route path="pattern-detector" element={<PatternDetector />} />}
+        {isFeatureEnabled('playbookRecommender') && <Route path="playbook-recommender" element={<PlaybookRecommender />} />}
+        {isFeatureEnabled('customerRcaSummary') && <Route path="customer-rca-summary" element={<CustomerRCASummary />} />}
+        {isFeatureEnabled('alertCorrelation') && <Route path="alert-correlation" element={<AlertCorrelation />} />}
+        {isFeatureEnabled('complianceAudit') && <Route path="compliance-audit" element={<ComplianceAudit />} />}
       </Route>
     </Routes>
   )

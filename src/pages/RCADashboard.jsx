@@ -82,6 +82,7 @@ const RCADashboard = () => {
   const rcaCases = [
     {
       id: 'RCA-001',
+      ticketId: 'INC0012345',
       title: 'Server Outage',
       source: 'Jira',
       system: 'E-commerce Platform',
@@ -95,6 +96,7 @@ const RCADashboard = () => {
     },
     {
       id: 'RCA-002',
+      ticketId: 'INC0012346',
       title: 'Payment Failure',
       source: 'Servicenow',
       system: 'Payment Gateway',
@@ -108,6 +110,7 @@ const RCADashboard = () => {
     },
     {
       id: 'RCA-003',
+      ticketId: 'INC0012347',
       title: 'Data Sync Issue',
       source: 'Jira',
       system: 'CRM System',
@@ -121,6 +124,7 @@ const RCADashboard = () => {
     },
     {
       id: 'RCA-004',
+      ticketId: 'INC0012348',
       title: 'Login Errors',
       source: 'Zendesk',
       system: 'User Portal',
@@ -134,6 +138,7 @@ const RCADashboard = () => {
     },
     {
       id: 'RCA-005',
+      ticketId: 'INC0012349',
       title: 'Page Load Slowness',
       source: 'Remedy',
       system: 'Web Application',
@@ -147,6 +152,7 @@ const RCADashboard = () => {
     },
     {
       id: 'RCA-006',
+      ticketId: 'INC0012350',
       title: 'Report Generation Bug',
       source: 'Zendesk',
       system: 'Reporting System',
@@ -160,6 +166,7 @@ const RCADashboard = () => {
     },
     {
       id: 'RCA-007',
+      ticketId: 'INC0012351',
       title: 'Database Connection Pool Exhaustion',
       source: 'Jira',
       system: 'Customer Portal',
@@ -173,6 +180,7 @@ const RCADashboard = () => {
     },
     {
       id: 'RCA-008',
+      ticketId: 'INC0012352',
       title: 'API Rate Limiting Issues',
       source: 'ServiceNow',
       system: 'Integration Platform',
@@ -186,6 +194,7 @@ const RCADashboard = () => {
     },
     {
       id: 'RCA-009',
+      ticketId: 'INC0012353',
       title: 'Memory Leak in Background Jobs',
       source: 'Remedy',
       system: 'Data Processing Engine',
@@ -199,6 +208,7 @@ const RCADashboard = () => {
     },
     {
       id: 'RCA-010',
+      ticketId: 'INC0012354',
       title: 'SSL Certificate Expiration',
       source: 'Zendesk',
       system: 'External API Gateway',
@@ -212,6 +222,7 @@ const RCADashboard = () => {
     },
     {
       id: 'RCA-011',
+      ticketId: 'INC0012355',
       title: 'User Session Timeout Problems',
       source: 'Jira',
       system: 'Authentication Service',
@@ -225,6 +236,7 @@ const RCADashboard = () => {
     },
     {
       id: 'RCA-012',
+      ticketId: 'INC0012356',
       title: 'File Upload Size Limit Exceeded',
       source: 'ServiceNow',
       system: 'Document Management',
@@ -294,6 +306,7 @@ const RCADashboard = () => {
     const allSources = [...new Set(rcaCases.map(c => c.source))]
     const allStages = [...new Set(rcaCases.map(c => c.stage))]
     const allIds = [...new Set(rcaCases.map(c => c.id))]
+    const allTicketIds = [...new Set(rcaCases.map(c => c.ticketId))]
     
     // Search in titles
     allTitles.forEach(title => {
@@ -326,7 +339,14 @@ const RCADashboard = () => {
     // Search in IDs
     allIds.forEach(id => {
       if (id.toLowerCase().includes(term)) {
-        suggestions.push({ text: id, type: 'ID', field: 'id' })
+        suggestions.push({ text: id, type: 'RCA ID', field: 'id' })
+      }
+    })
+    
+    // Search in Ticket IDs
+    allTicketIds.forEach(ticketId => {
+      if (ticketId.toLowerCase().includes(term)) {
+        suggestions.push({ text: ticketId, type: 'Ticket ID', field: 'ticketId' })
       }
     })
     
@@ -378,7 +398,7 @@ const RCADashboard = () => {
       case 'resolution':
         return `/resolution/${ticketId}`
       case 'compliant':
-        return `/complaint/${ticketId}` // For completed cases, go back to complaint
+        return `/complete-rca/${ticketId}` // For completed cases, go to Complete RCA page
       default:
         return `/complaint/${ticketId}` // Default to complaint page
     }
@@ -387,6 +407,7 @@ const RCADashboard = () => {
   const filteredCases = rcaCases.filter(case_ => {
     const matchesSearch = case_.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          case_.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         case_.ticketId.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          case_.source.toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesSource = filters.sources.length === 0 || filters.sources.includes(case_.source)
@@ -422,12 +443,6 @@ const RCADashboard = () => {
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-gray-900">RCA Dashboard</h1>
           <div className="flex items-center gap-3">
-            <Button 
-              className="bg-green-600 hover:bg-green-700 text-white"
-              onClick={() => navigate('/new-tickets')}
-            >
-              View Tickets
-            </Button>
             <Button 
               variant="outline" 
               className="flex items-center gap-2"
@@ -486,7 +501,7 @@ const RCADashboard = () => {
               <div className="relative flex-1">
                 <Input
                   type="text"
-                  placeholder="Search RCAs by title, ID, system, source, or stage..."
+                  placeholder="Search RCAs by title, RCA ID, Ticket ID, system, source, or stage..."
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value)
@@ -701,13 +716,13 @@ const RCADashboard = () => {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ticket ID
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Ticket Details
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Priority
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Stage
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Source
@@ -720,6 +735,11 @@ const RCADashboard = () => {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {filteredCases.map((case_, index) => (
                       <tr key={index} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {highlightText(case_.ticketId, searchTerm)}
+                          </div>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div>
                             <div className="text-sm font-medium text-gray-900">
@@ -734,11 +754,6 @@ const RCADashboard = () => {
                           <Badge className={`${case_.priorityColor} border-0 font-medium`}>
                             {case_.priority}
                           </Badge>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-medium text-gray-900">
-                            {highlightText(case_.stage, searchTerm)}
-                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm font-medium text-gray-900">
@@ -775,6 +790,9 @@ const RCADashboard = () => {
                   <div key={index} className="border-b border-gray-200 p-4 last:border-b-0">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
+                        <p className="text-xs text-gray-500 mb-1">
+                          Ticket ID: {highlightText(case_.ticketId, searchTerm)}
+                        </p>
                         <h3 className="text-sm font-medium text-gray-900 mb-1">
                           {highlightText(case_.title, searchTerm)}
                         </h3>
@@ -789,9 +807,6 @@ const RCADashboard = () => {
                         <Badge className={`${case_.priorityColor} border-0 font-medium text-xs`}>
                           {case_.priority}
                         </Badge>
-                        <span className="text-xs font-medium text-gray-900">
-                          {highlightText(case_.stage, searchTerm)}
-                        </span>
                       </div>
                     </div>
                     

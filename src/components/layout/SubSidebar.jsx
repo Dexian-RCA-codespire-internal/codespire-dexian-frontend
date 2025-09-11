@@ -52,7 +52,7 @@ const SubSidebar = ({ isOpen, onClose, subItems }) => {
                   >
                     <ChevronLeft className="w-4 h-4 text-gray-600" />
                   </button>
-                  <h2 className="text-lg font-semibold text-gray-900">AI RCA Guidance</h2>
+                  <h2 className="text-lg font-semibold text-gray-900">AI RCA</h2>
                 </div>
                 <button
                   onClick={onClose}
