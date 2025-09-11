@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, X, User, Mail, Phone, LogOut } from "lucide-react";
+import { signOut, doesSessionExist } from "supertokens-auth-react/recipe/session";
 
 const Header = () => {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -49,10 +50,19 @@ const Header = () => {
     setIsUserMenuOpen(false);
   };
 
-  const handleLogout = () => {
-    // Add logout logic here
-    console.log("Logout clicked");
-    setIsUserMenuOpen(false);
+  const handleLogout = async () => {
+    try {
+      setIsUserMenuOpen(false);
+      
+      if (await doesSessionExist()) {
+        await signOut();
+      }
+      
+      window.location.href = "/login";
+    } catch (error) {
+      console.error("Error during logout:", error);
+      window.location.href = "/login";
+    }
   };
 
   // Close popups when clicking outside

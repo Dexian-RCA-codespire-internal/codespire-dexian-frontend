@@ -1,42 +1,157 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, CardFooter, Checkbox } from '../../components/ui'
 import { MdEmail, MdLock, MdVisibility, MdVisibilityOff } from 'react-icons/md'
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../../contexts/AuthContext'
-import toast from 'react-hot-toast'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { validateLoginForm } from '../../utils/validation'
+import { AlertCircle, CheckCircle } from 'lucide-react'
+import { Session } from 'supertokens-auth-react/recipe/session'
+import EmailPassword from 'supertokens-auth-react/recipe/emailpassword'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [validationErrors, setValidationErrors] = useState({})
+  const [touchedFields, setTouchedFields] = useState({})
+  const [successMessage, setSuccessMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+  
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const location = useLocation()
+
+  // Check for success message from registration
+  useEffect(() => {
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message)
+      setTimeout(() => setSuccessMessage(''), 5000)
+    }
+  }, [location.state])
+
+  // Clear error when user makes changes
+  const clearError = () => {
+    setError('')
+  }
+
+  // Note: Session checking is handled by SuperTokensProtectedRoute
+
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target
+    const newValue = type === 'checkbox' ? checked : value
+    
+    if (name === 'email') setEmail(newValue)
+    if (name === 'password') setPassword(newValue)
+    if (name === 'rememberMe') setRememberMe(newValue)
+
+    // Clear validation errors when user starts typing
+    if (validationErrors[name]) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [name]: null
+      }))
+    }
+
+    // Clear auth error when user makes changes
+    if (error) {
+      clearError()
+    }
+  }
+
+  const handleFieldBlur = (fieldName) => {
+    setTouchedFields(prev => ({
+      ...prev,
+      [fieldName]: true
+    }))
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    console.log('🚀 Login form submitted')
+    
+    // Validate form
+    const validation = validateLoginForm({ email, password })
+    if (!validation.isValid) {
+      console.log('❌ Form validation failed:', validation.errors)
+      setValidationErrors(validation.errors)
+      setTouchedFields({
+        email: true,
+        password: true
+      })
+      return
+    }
+
+    console.log('✅ Form validation passed')
+
+    // Clear any previous errors
+    setValidationErrors({})
+    clearError()
+
     setIsLoading(true)
+    console.log('📡 Using SuperTokens EmailPassword.signIn...')
 
     try {
-      const result = await login(email, password)
-      
-      if (result.success) {
-        toast.success(result.data.message || 'Login successful!')
+      // Use SuperTokens EmailPassword.signIn
+      const response = await EmailPassword.signIn({
+        formFields: [{
+          id: "email",
+          value: email.trim()
+        }, {
+          id: "password", 
+          value: password
+        }]
+      })
+
+      console.log('✅ SuperTokens signIn successful:', response)
+
+      if (response.status === "OK") {
+        setSuccessMessage('Login successful! Redirecting...')
         
-        // Store user data in localStorage if remember me is checked
-        if (rememberMe) {
-          localStorage.setItem('user', JSON.stringify(result.data.user))
-        }
-        
-        // Navigate to dashboard or home page
-        navigate('/dashboard')
+        // Wait for SuperTokens session to be established, then redirect
+        setTimeout(async () => {
+          console.log('⏰ Starting redirect process after 1.5s delay...')
+          try {
+            // Check if session exists before redirecting
+            console.log('🔍 Checking if SuperTokens session exists...')
+            const sessionExists = await Session.doesSessionExist()
+            console.log('🔍 Session exists:', sessionExists)
+            
+            if (sessionExists) {
+              console.log('✅ Session exists, navigating to dashboard...')
+              navigate('/', { replace: true })
+            } else {
+              console.log('❌ Session does not exist, forcing page reload...')
+              // If session doesn't exist, force a page reload to establish it
+              window.location.href = '/'
+            }
+          } catch (error) {
+            console.log('❌ Session check failed, forcing reload:', error)
+            window.location.href = '/'
+          }
+        }, 1500)
       } else {
-        toast.error(result.error || 'Login failed. Please try again.')
+        // Handle different response statuses
+        if (response.status === "WRONG_CREDENTIALS_ERROR") {
+          setError('Invalid email or password')
+        } else if (response.status === "FIELD_ERROR") {
+          const fieldErrors = response.formFields
+          if (fieldErrors) {
+            const errors = {}
+            fieldErrors.forEach(field => {
+              if (field.id === "email") errors.email = field.error
+              if (field.id === "password") errors.password = field.error
+            })
+            setValidationErrors(errors)
+          }
+        } else if (response.status === "EMAIL_NOT_VERIFIED_ERROR") {
+          setError('Please verify your email address before logging in')
+        } else {
+          setError('Login failed. Please try again.')
+        }
       }
-    } catch (error) {
-      console.error('Login error:', error)
-      toast.error('Login failed. Please try again.')
+    } catch (err) {
+      console.error('SuperTokens signIn error:', err)
+      setError('Login failed. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -77,6 +192,26 @@ export default function Login() {
         {/* Email and Password Form */}
         <Card className="bg-white border border-gray-100 shadow-sm rounded-lg">
           <CardContent className="p-6">
+            {/* Success Message */}
+            {successMessage && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center text-green-800 text-sm">
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  {successMessage}
+                </div>
+              </div>
+            )}
+
+            {/* Error Display */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center text-red-800 text-sm">
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  {error}
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Email Input */}
               <div className="relative">
@@ -85,12 +220,24 @@ export default function Login() {
                 </div>
                 <Input
                   type="email"
+                  name="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={handleInputChange}
+                  onBlur={() => handleFieldBlur('email')}
                   placeholder="Email"
-                  className="pl-10 h-12 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  className={`pl-10 h-12 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
+                    validationErrors.email && touchedFields.email 
+                      ? 'border-red-500' 
+                      : 'border-gray-200'
+                  }`}
                   required
                 />
+                {validationErrors.email && touchedFields.email && (
+                  <div className="flex items-center mt-1 text-red-600 text-xs">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    {validationErrors.email}
+                  </div>
+                )}
               </div>
 
               {/* Password Input */}
@@ -100,10 +247,16 @@ export default function Login() {
                 </div>
                 <Input
                   type={showPassword ? "text" : "password"}
+                  name="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={handleInputChange}
+                  onBlur={() => handleFieldBlur('password')}
                   placeholder="Password"
-                  className="pl-10 pr-10 h-12 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  className={`pl-10 pr-10 h-12 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
+                    validationErrors.password && touchedFields.password 
+                      ? 'border-red-500' 
+                      : 'border-gray-200'
+                  }`}
                   required
                 />
                 <button
@@ -117,6 +270,12 @@ export default function Login() {
                     <MdVisibility className="h-5 w-5 text-gray-400" />
                   )}
                 </button>
+                {validationErrors.password && touchedFields.password && (
+                  <div className="flex items-center mt-1 text-red-600 text-xs">
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    {validationErrors.password}
+                  </div>
+                )}
               </div>
 
               {/* Remember Me and Forgot Password */}
@@ -158,6 +317,7 @@ export default function Login() {
             </Link>
           </p>
         </div>
+
         </div>
         </div>
 
@@ -173,3 +333,5 @@ export default function Login() {
     </div>
   )
 }
+
+
