@@ -10,60 +10,37 @@ import {
   AiOutlineBook,
   AiOutlineSend,
 } from "react-icons/ai";
-import { LuChartLine, LuFolderOpen, LuUser } from "react-icons/lu";
+import { LuFolderOpen, LuUser } from "react-icons/lu";
 import { RiAiGenerate2 } from "react-icons/ri";
 import { FiShield } from "react-icons/fi";
 import { FaRegFile } from "react-icons/fa";
 import { ChevronRight, BellIcon } from "lucide-react";
+import { getFilteredNavigationItems, isFeatureEnabled } from "../../config/navigation";
 
 const Sidebar = ({ onSubSidebarToggle }) => {
   const location = useLocation();
 
-  const navigationItems = [
-    { path: "/", label: "Dashboard", icon: AiOutlineHome, hasSubItems: false },
-    {
-      path: "/rca-dashboard",
-      label: "RCA Dashboard",
-      icon: LuChartLine,
-      hasSubItems: false,
-    },
-    {
-      path: null,
-      label: "AI RCA Guidance",
-      icon: RiAiGenerate2,
-      hasSubItems: true,
-    },
-    {
-      path: "/pattern-detector",
-      label: "Pattern & Duplicate Detector",
-      icon: AiOutlineSearch,
-      hasSubItems: false,
-    },
-    {
-      path: "/playbook-recommender",
-      label: "Playbook Recommender",
-      icon: AiOutlineBook,
-      hasSubItems: false,
-    },
-    {
-      path: "/customer-rca-summary",
-      label: "Customer RCA Summary",
-      icon: FaRegFile,
-      hasSubItems: false,
-    },
-    {
-      path: "/alert-correlation",
-      label: "Alert Correlation",
-      icon: BellIcon,
-      hasSubItems: false,
-    },
-    {
-      path: "/compliance-audit",
-      label: "Compliance & Audit",
-      icon: FiShield,
-      hasSubItems: false,
-    },
-  ];
+  // Icon mapping for dynamic navigation
+  const iconMap = {
+    AiOutlineHome,
+    RiAiGenerate2,
+    AiOutlineSearch,
+    AiOutlineBook,
+    FaRegFile,
+    BellIcon,
+    FiShield
+  };
+
+  // Get filtered navigation items based on configuration
+  const getNavigationItems = () => {
+    const filteredItems = getFilteredNavigationItems();
+    return filteredItems.map(item => ({
+      ...item,
+      icon: iconMap[item.icon]
+    }));
+  };
+
+  const navigationItems = getNavigationItems();
 
   const handleItemClick = (item, e) => {
     if (item.hasSubItems) {
@@ -74,9 +51,10 @@ const Sidebar = ({ onSubSidebarToggle }) => {
     }
   };
 
-  // Check if AI RCA Guidance should be active (when any sub-item is open)
-  const isAIRCAGuidanceActive =
-    location.pathname.startsWith("/ai-rca-guidance");
+  // Check if AI RCA should be active (when any sub-item is open)
+  const isAIRCAActive =
+    location.pathname.startsWith("/ai-rca-guidance") || 
+    location.pathname === "/rca-dashboard";
 
   return (
     <motion.aside
@@ -120,7 +98,7 @@ const Sidebar = ({ onSubSidebarToggle }) => {
                   <button
                     onClick={(e) => handleItemClick(item, e)}
                     className={`flex items-center justify-center px-1 py-2 transition-colors duration-200 relative w-full ${
-                      item.label === "AI RCA Guidance" && isAIRCAGuidanceActive
+                      item.label === "AI RCA" && isAIRCAActive
                         ? "text-lime-500 border-l-4 border-lime-500 font-bold "
                         : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                     }`}
