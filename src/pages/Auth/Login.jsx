@@ -105,30 +105,9 @@ export default function Login() {
       console.log('✅ SuperTokens signIn successful:', response)
 
       if (response.status === "OK") {
-        setSuccessMessage('Login successful! Redirecting...')
-        
-        // Wait for SuperTokens session to be established, then redirect
-        setTimeout(async () => {
-          console.log('⏰ Starting redirect process after 1.5s delay...')
-          try {
-            // Check if session exists before redirecting
-            console.log('🔍 Checking if SuperTokens session exists...')
-            const sessionExists = await Session.doesSessionExist()
-            console.log('🔍 Session exists:', sessionExists)
-            
-            if (sessionExists) {
-              console.log('✅ Session exists, navigating to dashboard...')
-              navigate('/', { replace: true })
-            } else {
-              console.log('❌ Session does not exist, forcing page reload...')
-              // If session doesn't exist, force a page reload to establish it
-              window.location.href = '/'
-            }
-          } catch (error) {
-            console.log('❌ Session check failed, forcing reload:', error)
-            window.location.href = '/'
-          }
-        }, 1500)
+        console.log('✅ Login successful, redirecting to dashboard...')
+        // Redirect immediately after successful login
+        navigate('/', { replace: true })
       } else {
         // Handle different response statuses
         if (response.status === "WRONG_CREDENTIALS_ERROR") {
@@ -291,9 +270,9 @@ export default function Login() {
                     Remember me
                   </label>
                 </div>
-                <a href="#" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
                   Forgot Password?
-                </a>
+                </Link>
               </div>
 
                              {/* Login Button */}
