@@ -16,6 +16,10 @@ import AddIntegration from '../pages/ai-rca-guidance/AddIntegration'
 
 import Login from '../pages/Auth/Login.jsx'
 import Register from '../pages/Auth/Register.jsx'
+import ForgetPassword from '../pages/Auth/ForgetPassword.jsx'
+import ResetPassword from '../pages/Auth/ResetPassword.jsx'
+import VerifyPasswordResetOTP from '../pages/Auth/VerifyPasswordResetOTP.jsx'
+import ResetPasswordWithOTP from '../pages/Auth/ResetPasswordWithOTP.jsx'
 import VerifyOTP from '../pages/Auth/VerifyOTP.jsx'
 import VerifyMagicLink from '../pages/Auth/VerifyMagicLink.jsx'
 
@@ -25,6 +29,10 @@ export default function RoutesIndex() {
       {/* Public auth routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgetPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/verify-password-reset-otp" element={<VerifyPasswordResetOTP />} />
+      <Route path="/reset-password-with-otp" element={<ResetPasswordWithOTP />} />
       <Route path="/verify-otp" element={<VerifyOTP />} />
       <Route path="/verify-magic-link/:token" element={<VerifyMagicLink />} />
       
