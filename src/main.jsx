@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import { store } from './store'
+import { AuthProvider } from './contexts/AuthContext'
 import './index.css'
 
 // Import and initialize SuperTokens
@@ -19,8 +20,10 @@ createRoot(document.getElementById('root')).render(
     <HelmetProvider>
       <Provider store={store}>
         <BrowserRouter>
-          <App />
-          <Toaster position="top-right" />
+          <AuthProvider>
+            <App />
+            <Toaster position="top-right" />
+          </AuthProvider>
         </BrowserRouter>
       </Provider>
     </HelmetProvider>
