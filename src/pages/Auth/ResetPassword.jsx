@@ -3,6 +3,7 @@ import { Button, Input, Card, CardContent } from '../../components/ui'
 import { MdLock, MdVisibility, MdVisibilityOff, MdArrowBack } from 'react-icons/md'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertCircle, CheckCircle } from 'lucide-react'
+import { validatePassword, getPasswordStrength, getPasswordRequirements } from '../../utils/validation'
 import api from '../../api'
 
 export default function ResetPassword() {
@@ -13,7 +14,10 @@ export default function ResetPassword() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
   const [token, setToken] = useState('')
+  const [passwordValidation, setPasswordValidation] = useState({})
+  const [touchedFields, setTouchedFields] = useState({})
   
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -28,6 +32,16 @@ export default function ResetPassword() {
     setToken(tokenFromUrl)
   }, [searchParams])
 
+  // Real-time password validation
+  useEffect(() => {
+    if (newPassword) {
+      const validation = validatePassword(newPassword)
+      setPasswordValidation(validation)
+    } else {
+      setPasswordValidation({})
+    }
+  }, [newPassword])
+
   const handleInputChange = (e) => {
     const { name, value } = e.target
     
@@ -40,30 +54,13 @@ export default function ResetPassword() {
     if (error) setError('')
   }
 
-  const validatePassword = (password) => {
-    const minLength = 8
-    const hasUpperCase = /[A-Z]/.test(password)
-    const hasLowerCase = /[a-z]/.test(password)
-    const hasNumbers = /\d/.test(password)
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password)
-
-    if (password.length < minLength) {
-      return 'Password must be at least 8 characters long'
-    }
-    if (!hasUpperCase) {
-      return 'Password must contain at least one uppercase letter'
-    }
-    if (!hasLowerCase) {
-      return 'Password must contain at least one lowercase letter'
-    }
-    if (!hasNumbers) {
-      return 'Password must contain at least one number'
-    }
-    if (!hasSpecialChar) {
-      return 'Password must contain at least one special character'
-    }
-    return null
+  const handleFieldBlur = (fieldName) => {
+    setTouchedFields(prev => ({
+      ...prev,
+      [fieldName]: true
+    }))
   }
+
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -83,9 +80,9 @@ export default function ResetPassword() {
       return
     }
 
-    const passwordError = validatePassword(newPassword)
-    if (passwordError) {
-      setError(passwordError)
+    const passwordValidationResult = validatePassword(newPassword)
+    if (!passwordValidationResult.isValid) {
+      setError('Password must be at least 8 characters with uppercase, lowercase, number, and special character')
       return
     }
 
@@ -98,13 +95,51 @@ export default function ResetPassword() {
     setError('')
 
     try {
-      const response = await api.post('/v1/auth/reset-password', {
-        token: token,
-        newPassword: newPassword
+      const response = await fetch('http://localhost:8081/api/v1/auth/reset-password', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          token: token,
+          newPassword: newPassword,
+          confirmPassword: confirmPassword
+        })
       })
+
+      console.log('Response status:', response.status)
+      console.log('Response headers:', response.headers)
+
+      // Check if response is ok
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      // Try to parse as JSON
+      let data
+      const contentType = response.headers.get('content-type')
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json()
+      } else {
+        // If not JSON, read as text to see what we got
+        const text = await response.text()
+        console.log('Non-JSON response:', text)
+        throw new Error('Server returned non-JSON response')
+      }
+
+      console.log('Response data:', data)
       
-      if (response.data.success) {
+      if (data.success) {
         setSuccess(true)
+        setSuccessMessage('Password updated successfully!')
+        
+        // Clear form
+        setNewPassword('')
+        setConfirmPassword('')
+        setPasswordValidation({})
+        setTouchedFields({})
         
         // Navigate to login after a short delay
         setTimeout(() => {
@@ -115,12 +150,11 @@ export default function ResetPassword() {
           })
         }, 2000)
       } else {
-        setError(response.data.message || 'Failed to reset password. Please try again.')
+        setError(data.message || 'Failed to reset password. Please try again.')
       }
     } catch (err) {
       console.error('Password reset error:', err)
-      const errorMessage = err.response?.data?.message || 'An error occurred. Please try again.'
-      setError(errorMessage)
+      setError('An error occurred while resetting your password. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -134,31 +168,6 @@ export default function ResetPassword() {
     navigate('/forgot-password')
   }
 
-  if (success) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
-          <Card className="bg-white border border-gray-100 shadow-sm rounded-lg">
-            <CardContent className="p-6 text-center">
-              <div className="space-y-4">
-                <div className="flex justify-center">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                    <CheckCircle className="h-8 w-8 text-green-600" />
-                  </div>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Password Reset Successfully!
-                </h3>
-                <p className="text-gray-600 text-sm">
-                  Redirecting to login page...
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-8">
@@ -193,6 +202,19 @@ export default function ResetPassword() {
             {/* Form Card */}
             <Card className="bg-white border border-gray-100 shadow-sm rounded-lg">
               <CardContent className="p-6">
+                {/* Success Display */}
+                {success && successMessage && (
+                  <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center text-green-800 text-sm">
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      {successMessage}
+                    </div>
+                    <p className="text-green-700 text-xs mt-1">
+                      Redirecting to login page...
+                    </p>
+                  </div>
+                )}
+
                 {/* Error Display */}
                 {error && (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -214,8 +236,16 @@ export default function ResetPassword() {
                       name="newPassword"
                       value={newPassword}
                       onChange={handleInputChange}
+                      onBlur={() => handleFieldBlur('newPassword')}
                       placeholder="New Password"
-                      className="pl-10 pr-10 h-12 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      className={`pl-10 pr-10 h-12 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
+                        passwordValidation.isValid === false && touchedFields.newPassword 
+                          ? 'border-red-500' 
+                          : passwordValidation.isValid === true
+                          ? 'border-green-500'
+                          : 'border-gray-200'
+                      } ${success ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={success}
                       required
                     />
                     <button
@@ -230,6 +260,14 @@ export default function ResetPassword() {
                       )}
                     </button>
                   </div>
+                  
+                  {/* Password validation error */}
+                  {passwordValidation.isValid === false && touchedFields.newPassword && (
+                    <div className="flex items-center text-red-600 text-xs">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      Password must be at least 8 characters with uppercase, lowercase, number, and special character
+                    </div>
+                  )}
 
                   {/* Confirm Password Input */}
                   <div className="relative">
@@ -241,8 +279,16 @@ export default function ResetPassword() {
                       name="confirmPassword"
                       value={confirmPassword}
                       onChange={handleInputChange}
+                      onBlur={() => handleFieldBlur('confirmPassword')}
                       placeholder="Confirm New Password"
-                      className="pl-10 pr-10 h-12 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      className={`pl-10 pr-10 h-12 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white ${
+                        confirmPassword && newPassword !== confirmPassword && touchedFields.confirmPassword
+                          ? 'border-red-500' 
+                          : confirmPassword && newPassword === confirmPassword
+                          ? 'border-green-500'
+                          : 'border-gray-200'
+                      } ${success ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={success}
                       required
                     />
                     <button
@@ -257,23 +303,51 @@ export default function ResetPassword() {
                       )}
                     </button>
                   </div>
+                  
+                  {/* Confirm password error */}
+                  {confirmPassword && newPassword !== confirmPassword && touchedFields.confirmPassword && (
+                    <div className="flex items-center text-red-600 text-xs">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      Passwords do not match
+                    </div>
+                  )}
 
                   {/* Password Requirements */}
-                  <div className="text-xs text-gray-500 space-y-1">
-                    <p>Password must contain:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-2">
-                      <li>At least 8 characters</li>
-                      <li>One uppercase letter</li>
-                      <li>One lowercase letter</li>
-                      <li>One number</li>
-                      <li>One special character</li>
-                    </ul>
-                  </div>
+                  {newPassword && (
+                    <div className="text-xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Password strength:</span>
+                        <span className={`font-medium ${
+                          passwordValidation.isValid ? 'text-green-600' : 
+                          passwordValidation.score >= 3 ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                          {passwordValidation.isValid ? 'Strong' : 
+                           passwordValidation.score >= 3 ? 'Good' : 
+                           passwordValidation.score >= 2 ? 'Fair' : 'Weak'}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        {getPasswordRequirements(newPassword).map((req, index) => (
+                          <div key={index} className="flex items-center">
+                            <div className={`w-2 h-2 rounded-full mr-2 ${
+                              req.met ? 'bg-green-500' : 'bg-gray-300'
+                            }`} />
+                            <span className={`text-xs ${
+                              req.met ? 'text-green-600' : 'text-gray-500'
+                            }`}>
+                              {req.text}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Submit Button */}
                   <Button
                     type="submit"
-                    disabled={isLoading || !token}
+                    disabled={isLoading || !token || !passwordValidation.isValid || newPassword !== confirmPassword || success}
                     className="w-full h-12 bg-gradient-to-r from-teal-500 to-teal-900 hover:from-teal-600 hover:to-teal-800 text-white font-semibold rounded-lg transition-all duration-1000 ease-in-out shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isLoading ? 'Resetting Password...' : 'Reset Password'}
