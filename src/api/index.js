@@ -1,8 +1,8 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'http://localhost:8081/api/v1',
-  withCredentials: true, // Enable credentials for authentication
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8081/api',
+  withCredentials: true,
   headers: { 'Content-Type': 'application/json' }
 })
 

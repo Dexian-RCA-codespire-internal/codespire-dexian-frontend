@@ -174,17 +174,17 @@ export default function VerifyOTP() {
       // Use SuperTokens EmailVerification.sendVerificationEmail for magic link
       const response = await EmailVerification.sendVerificationEmail()
 
-      console.log('✅ SuperTokens sendVerificationEmail (magic link) response:', response)
+      console.log('✅ SuperTokens sendVerificationEmail (verification link) response:', response)
 
       if (response.status === "OK") {
-        setSuccessMessage('Magic link has been sent to your email')
+        setSuccessMessage('Verification link has been sent to your email')
         setTimeout(() => setSuccessMessage(''), 5000)
       } else {
-        setError('Failed to send magic link. Please try again.')
+        setError('Failed to send verification link. Please try again.')
       }
     } catch (err) {
-      console.error('SuperTokens sendVerificationEmail (magic link) error:', err)
-      setError('Failed to send magic link. Please try again.')
+      console.error('SuperTokens sendVerificationEmail (verification link) error:', err)
+      setError('Failed to send verification link. Please try again.')
     } finally {
       setIsSendingMagicLink(false)
     }
@@ -266,8 +266,6 @@ export default function VerifyOTP() {
                         className="h-12 w-12 text-lg font-semibold border-2 border-gray-200 rounded-lg focus:border-teal-500 focus:ring-2 focus:ring-teal-200"
                       />
                     </InputOTPGroup>
-
-                    <InputOTPSeparator className="mx-2" />
 
                     <InputOTPGroup className="gap-2">
                       <InputOTPSlot 
