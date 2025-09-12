@@ -6,13 +6,28 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Progress } from '../components/ui/progress'
 import { Checkbox } from '../components/ui/checkbox'
-import { FiSearch, FiMenu, FiCheck, FiAlertTriangle, FiClipboard, FiChevronDown, FiCreditCard, FiRefreshCw } from 'react-icons/fi'
+import { FiSearch, FiMenu, FiCheck, FiAlertTriangle, FiClipboard, FiChevronDown, FiCreditCard, FiRefreshCw, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
+import { getTickets, transformTicketToRCACase } from '../api/rcaService'
 
 const RCADashboard = () => {
   const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [apiTickets, setApiTickets] = useState([])
+  const [pollingEnabled, setPollingEnabled] = useState(true)
+  const [pollingInterval, setPollingInterval] = useState(30000) // 30 seconds
+  const [lastUpdated, setLastUpdated] = useState(null)
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false
+  })
   const [filters, setFilters] = useState({
     sources: [],
     priorities: [],
@@ -38,48 +53,123 @@ const RCADashboard = () => {
     }
   }, [showFilterDropdown])
 
-  // Summary data
+  // Fetch tickets from API with pagination
+  const fetchTickets = async (page = 1, limit = 10, isBackgroundRefresh = false) => {
+    try {
+      // Only show loading spinner for initial load or manual refresh
+      if (!isBackgroundRefresh) {
+        setLoading(true)
+      }
+      
+      const response = await getTickets({ page, limit })
+      
+      if (response.success) {
+        const tickets = response.data || []
+        console.log('API Response:', response)
+        console.log('Tickets received:', tickets.length)
+        const transformedTickets = tickets.map(transformTicketToRCACase)
+        setApiTickets(transformedTickets)
+        
+        setPagination({
+          page: response.pagination.currentPage,
+          limit: response.pagination.limit,
+          total: response.pagination.totalCount,
+          totalPages: response.pagination.totalPages,
+          hasNext: response.pagination.hasNextPage,
+          hasPrev: response.pagination.hasPrevPage
+        })
+        
+        // Update last updated timestamp
+        setLastUpdated(new Date())
+        
+        // Mark initial load as complete
+        if (isInitialLoad) {
+          setIsInitialLoad(false)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching tickets:', error)
+    } finally {
+      if (!isBackgroundRefresh) {
+        setLoading(false)
+      }
+    }
+  }
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchTickets(1, 10)
+  }, [])
+
+  // Polling logic
+  useEffect(() => {
+    let intervalId
+    
+    if (pollingEnabled && !isInitialLoad) {
+      intervalId = setInterval(() => {
+        console.log('Auto-refreshing tickets...')
+        fetchTickets(pagination.page, pagination.limit, true) // Background refresh
+      }, pollingInterval)
+    }
+    
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId)
+      }
+    }
+  }, [pollingEnabled, pollingInterval, pagination.page, pagination.limit, isInitialLoad])
+
+  // Pagination handlers
+  const handlePageChange = (newPage) => {
+    fetchTickets(newPage, pagination.limit)
+  }
+
+  const handleLimitChange = (newLimit) => {
+    fetchTickets(1, newLimit)
+  }
+
+  // Summary data - calculated from API tickets
   const summaryData = [
     {
-      title: 'Active Tickets',
-      value: '45',
-      subtitle: '3 created today',
+      title: 'Total Tickets',
+      value: pagination.total.toString(),
+      subtitle: `${apiTickets.length} on current page`,
       subtitleColor: 'text-green-600',
       icon: <FiCreditCard className="text-2xl text-green-600" />,
       bgColor: 'bg-white',
       borderColor: 'border-gray-200'
     },
     {
-      title: 'SLA Breached',
-      value: '7',
-      subtitle: 'Needs attention',
+      title: 'Active Tickets',
+      value: apiTickets.filter(ticket => ticket.status && !['Closed', 'Resolved', 'Cancelled'].includes(ticket.status)).length.toString(),
+      subtitle: 'Currently open',
+      subtitleColor: 'text-blue-600',
+      icon: <FiAlertTriangle className="text-2xl text-blue-600" />,
+      bgColor: 'bg-white',
+      borderColor: 'border-gray-200'
+    },
+    {
+      title: 'High Priority',
+      value: apiTickets.filter(ticket => ticket.priority === 'P1' || ticket.priority === '1 - Critical' || ticket.priority === '2 - High').length.toString(),
+      subtitle: 'P1 & P2 tickets',
       subtitleColor: 'text-red-600',
-      icon: <FiAlertTriangle className="text-2xl text-red-600" />,
+      icon: <FiClipboard className="text-2xl text-red-600" />,
       bgColor: 'bg-white',
       borderColor: 'border-gray-200'
     },
     {
-      title: 'Awaiting Review',
-      value: '12',
-      subtitle: 'Awaiting approval',
-      subtitleColor: 'text-yellow-600',
-      icon: <FiClipboard className="text-2xl text-yellow-600" />,
-      bgColor: 'bg-white',
-      borderColor: 'border-gray-200'
-    },
-    {
-      title: 'Avg Resolution',
-      value: '4.2',
-      subtitle: 'hrs',
-      subtitleColor: 'text-green-600',
-      icon: <FiCheck className="text-2xl text-green-600" />,
+      title: 'Page Info',
+      value: `${pagination.page}/${pagination.totalPages}`,
+      subtitle: `${pagination.limit} per page`,
+      subtitleColor: 'text-gray-600',
+      icon: <FiCheck className="text-2xl text-gray-600" />,
       bgColor: 'bg-white',
       borderColor: 'border-gray-200'
     }
   ]
 
-  // RCA Cases data
-  const rcaCases = [
+  // RCA Cases data - use API tickets or fallback to hardcoded data
+  const rcaCases = apiTickets.length > 0 ? apiTickets : [
     {
       id: 'RCA-001',
       ticketId: 'INC0012345',
@@ -251,8 +341,8 @@ const RCADashboard = () => {
   ]
 
   // Filter options
-  const sourceOptions = ['Jira', 'Zendesk', 'Remedy', 'Servicenow']
-  const priorityOptions = ['P1', 'P2', 'P3']
+  const sourceOptions = ['ServiceNow', 'Jira', 'Zendesk', 'Remedy']
+  const priorityOptions = ['1 - Critical', '2 - High', '3 - Moderate', '4 - Low', '5 - Planning']
   const stageOptions = ['Investigation', 'Analysis', 'Resolution', 'Compliant']
 
   // Filter handlers
@@ -441,15 +531,55 @@ const RCADashboard = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Page Header */}
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">RCA Dashboard</h1>
           <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-gray-900">RCA Dashboard</h1>
+            {pollingEnabled && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <div className={`w-2 h-2 rounded-full ${loading ? 'bg-blue-500 animate-spin' : 'bg-green-500 animate-pulse'}`} />
+                <span>
+                  {loading ? 'Refreshing...' : `Auto-refresh every ${pollingInterval / 1000}s`}
+                </span>
+              </div>
+            )}
+            {lastUpdated && (
+              <div className="text-sm text-gray-500">
+                Last updated: {lastUpdated.toLocaleTimeString()}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Polling Controls */}
+            <div className="flex items-center gap-2">
+              <Button 
+                variant={pollingEnabled ? "default" : "outline"}
+                size="sm"
+                onClick={() => setPollingEnabled(!pollingEnabled)}
+                className="flex items-center gap-1"
+              >
+                <div className={`w-2 h-2 rounded-full ${pollingEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+                {pollingEnabled ? 'Auto' : 'Manual'}
+              </Button>
+              <select
+                value={pollingInterval}
+                onChange={(e) => setPollingInterval(parseInt(e.target.value))}
+                className="border border-gray-300 rounded-md px-2 py-1 text-sm"
+                disabled={!pollingEnabled}
+              >
+                <option value={10000}>10s</option>
+                <option value={30000}>30s</option>
+                <option value={60000}>1m</option>
+                <option value={300000}>5m</option>
+              </select>
+            </div>
+            
             <Button 
               variant="outline" 
               className="flex items-center gap-2"
-              onClick={() => window.location.reload()}
+              onClick={() => fetchTickets(pagination.page, pagination.limit)}
+              disabled={loading}
             >
-              <FiRefreshCw className="w-4 h-4" />
-              Refresh
+              <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              {loading ? 'Refreshing...' : 'Refresh'}
             </Button>
             <Button variant="outline" size="sm">
               <FiMenu className="text-lg" />
@@ -479,18 +609,15 @@ const RCADashboard = () => {
         {/* Main Content Area */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900">Tickets</h2>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Tickets {loading && <span className="text-sm text-gray-500">(Loading...)</span>}
+            </h2>
             {hasActiveFilters && (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">
-                  {filters.sources.length > 0 && `${filters.sources.length} source${filters.sources.length > 1 ? 's' : ''} selected`}
-                  {filters.sources.length > 0 && (filters.priorities.length > 0 || (filters.dateRange.startDate || filters.dateRange.endDate) || filters.stages.length > 0) && ', '}
-                  {filters.priorities.length > 0 && `${filters.priorities.length} priorit${filters.priorities.length > 1 ? 'ies' : 'y'} selected`}
-                  {filters.priorities.length > 0 && ((filters.dateRange.startDate || filters.dateRange.endDate) || filters.stages.length > 0) && ', '}
-                  {(filters.dateRange.startDate || filters.dateRange.endDate) && 'date range selected'}
-                  {(filters.dateRange.startDate || filters.dateRange.endDate) && filters.stages.length > 0 && ', '}
-                  {filters.stages.length > 0 && `${filters.stages.length} stage${filters.stages.length > 1 ? 's' : ''} selected`}
-                </span>
+                <span className="text-sm text-gray-500">Active filters:</span>
+                <Button variant="outline" size="sm" onClick={clearAllFilters}>
+                  Clear All
+                </Button>
               </div>
             )}
           </div>
@@ -689,8 +816,91 @@ const RCADashboard = () => {
               </Card>
             )}
           </div>
+
+          {/* Active Filter Badges */}
+          {hasActiveFilters && (
+            <div className="mb-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-gray-600 font-medium">Active filters:</span>
+                
+                {/* Source Badges */}
+                {filters.sources.map((source) => (
+                  <Badge 
+                    key={`source-${source}`}
+                    variant="secondary" 
+                    className="bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer"
+                    onClick={() => handleSourceFilter(source, false)}
+                  >
+                    Source: {source}
+                    <span className="ml-1 text-blue-600">×</span>
+                  </Badge>
+                ))}
+                
+                {/* Priority Badges */}
+                {filters.priorities.map((priority) => (
+                  <Badge 
+                    key={`priority-${priority}`}
+                    variant="secondary" 
+                    className="bg-orange-100 text-orange-800 hover:bg-orange-200 cursor-pointer"
+                    onClick={() => handlePriorityFilter(priority, false)}
+                  >
+                    Priority: {priority}
+                    <span className="ml-1 text-orange-600">×</span>
+                  </Badge>
+                ))}
+                
+                {/* Date Range Badge */}
+                {(filters.dateRange.startDate || filters.dateRange.endDate) && (
+                  <Badge 
+                    variant="secondary" 
+                    className="bg-green-100 text-green-800 hover:bg-green-200 cursor-pointer"
+                    onClick={() => {
+                      setFilters(prev => ({
+                        ...prev,
+                        dateRange: { startDate: '', endDate: '' }
+                      }))
+                    }}
+                  >
+                    Date: {filters.dateRange.startDate || 'Any'} to {filters.dateRange.endDate || 'Any'}
+                    <span className="ml-1 text-green-600">×</span>
+                  </Badge>
+                )}
+                
+                {/* Stage Badges */}
+                {filters.stages.map((stage) => (
+                  <Badge 
+                    key={`stage-${stage}`}
+                    variant="secondary" 
+                    className="bg-purple-100 text-purple-800 hover:bg-purple-200 cursor-pointer"
+                    onClick={() => handleStageFilter(stage, false)}
+                  >
+                    Stage: {stage}
+                    <span className="ml-1 text-purple-600">×</span>
+                  </Badge>
+                ))}
+                
+                {/* Clear All Button */}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={clearAllFilters}
+                  className="text-xs h-6 px-2"
+                >
+                  Clear All
+                </Button>
+              </div>
+            </div>
+          )}
             
-          {filteredCases.length === 0 ? (
+          {isInitialLoad ? (
+            <div className="text-center py-12">
+              <div className="text-gray-400 mb-4">
+                <FiRefreshCw className="text-4xl mx-auto animate-spin" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Loading tickets...</h3>
+              <p className="text-gray-500">Fetching data from the server</p>
+            </div>
+          ) : filteredCases.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-gray-400 mb-4">
                 <FiSearch className="text-4xl mx-auto" />
@@ -699,7 +909,9 @@ const RCADashboard = () => {
               <p className="text-gray-500 mb-4">
                 {hasActiveFilters 
                   ? 'Try adjusting your filters or search terms'
-                  : 'No RCA cases match your search criteria'
+                  : apiTickets.length === 0 
+                    ? 'No tickets available from the server'
+                    : 'No RCA cases match your search criteria'
                 }
               </p>
               {hasActiveFilters && (
@@ -709,7 +921,16 @@ const RCADashboard = () => {
               )}
             </div>
           ) : (
-            <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+            <div className="bg-white shadow-sm rounded-lg overflow-hidden relative">
+              {/* Subtle loading overlay for background refreshes */}
+              {loading && !isInitialLoad && (
+                <div className="absolute inset-0 bg-white bg-opacity-50 z-10 flex items-center justify-center">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 bg-white px-3 py-2 rounded-lg shadow-sm">
+                    <FiRefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Updating...</span>
+                  </div>
+                </div>
+              )}
               {/* Desktop Table View */}
               <div className="hidden lg:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -840,6 +1061,76 @@ const RCADashboard = () => {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {apiTickets.length > 0 && (
+            <div className="mt-6 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-700">Show:</span>
+                  <select
+                    value={pagination.limit}
+                    onChange={(e) => handleLimitChange(parseInt(e.target.value))}
+                    className="border border-gray-300 rounded-md px-2 py-1 text-sm"
+                    disabled={loading && !isInitialLoad}
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                  <span className="text-sm text-gray-700">per page</span>
+                </div>
+                <div className="text-sm text-gray-700">
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} results
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={!pagination.hasPrev || (loading && !isInitialLoad)}
+                  className="flex items-center gap-1"
+                >
+                  <FiChevronLeft className="w-4 h-4" />
+                  Previous
+                </Button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                    const pageNum = Math.max(1, Math.min(pagination.totalPages - 4, pagination.page - 2)) + i
+                    if (pageNum > pagination.totalPages) return null
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={pageNum === pagination.page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(pageNum)}
+                        disabled={loading && !isInitialLoad}
+                        className="w-8 h-8 p-0"
+                      >
+                        {pageNum}
+                      </Button>
+                    )
+                  })}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={!pagination.hasNext || (loading && !isInitialLoad)}
+                  className="flex items-center gap-1"
+                >
+                  Next
+                  <FiChevronRight className="w-4 h-4" />
+                </Button>
               </div>
             </div>
           )}
