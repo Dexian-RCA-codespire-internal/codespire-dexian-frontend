@@ -1,10 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, CardFooter, Checkbox } from '../../components/ui'
-import { Mail, Lock, User, Eye, EyeOff, Phone, ChevronDown, Search } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Mail, Lock, User, Eye, EyeOff, Phone, ChevronDown, Search, AlertCircle, CheckCircle } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import { COUNTRY_CODES, searchCountries } from '../../constants/countryCodes'
+import { validateRegistrationForm, getPasswordStrength, getPasswordRequirements } from '../../utils/validation'
+import EmailPassword from 'supertokens-auth-react/recipe/emailpassword'
 
 export default function Register() {
+  const navigate = useNavigate()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -14,6 +19,8 @@ export default function Register() {
     confirmPassword: '',
     agreeToTerms: false
   })
+  const [validationErrors, setValidationErrors] = useState({})
+  const [touchedFields, setTouchedFields] = useState({})
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [selectedCountry, setSelectedCountry] = useState(COUNTRY_CODES[0]) // Default to US
@@ -21,45 +28,14 @@ export default function Register() {
   const [countrySearch, setCountrySearch] = useState('')
   const dropdownRef = useRef(null)
 
+  // Clear error function
+  const clearError = () => {
+    setError('')
+  }
+
   // Password strength calculation
-  const calculatePasswordStrength = (password) => {
-    let score = 0
-    let feedback = []
-    
-    if (password.length >= 8) score += 1
-    else feedback.push('At least 8 characters')
-    
-    if (/[a-z]/.test(password)) score += 1
-    else feedback.push('Lowercase letter')
-    
-    if (/[A-Z]/.test(password)) score += 1
-    else feedback.push('Uppercase letter')
-    
-    if (/[0-9]/.test(password)) score += 1
-    else feedback.push('Number')
-    
-    if (/[^A-Za-z0-9]/.test(password)) score += 1
-    else feedback.push('Special character')
-    
-    return { score, feedback }
-  }
-
-  const passwordStrength = calculatePasswordStrength(formData.password)
-  const getStrengthColor = (score) => {
-    if (score <= 1) return 'bg-red-500'
-    if (score <= 2) return 'bg-orange-500'
-    if (score <= 3) return 'bg-yellow-500'
-    if (score <= 4) return 'bg-blue-500'
-    return 'bg-green-500'
-  }
-
-  const getStrengthText = (score) => {
-    if (score <= 1) return 'Very Weak'
-    if (score <= 2) return 'Weak'
-    if (score <= 3) return 'Fair'
-    if (score <= 4) return 'Good'
-    return 'Strong'
-  }
+  const passwordStrength = getPasswordStrength(formData.password)
+  const passwordRequirements = getPasswordRequirements(formData.password)
 
   // Country dropdown functions
   const filteredCountries = countrySearch ? searchCountries(countrySearch) : COUNTRY_CODES
@@ -95,23 +71,142 @@ export default function Register() {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target
+    const newValue = type === 'checkbox' ? checked : value
+    
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: newValue
+    }))
+
+    // Clear validation errors when user starts typing
+    if (validationErrors[name]) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [name]: null
+      }))
+    }
+
+    // Clear auth error when user makes changes
+    if (error) {
+      clearError()
+    }
+  }
+
+  const handleFieldBlur = (fieldName) => {
+    setTouchedFields(prev => ({
+      ...prev,
+      [fieldName]: true
     }))
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match')
+    
+    // Validate form
+    const validation = validateRegistrationForm(formData)
+    if (!validation.isValid) {
+      setValidationErrors(validation.errors)
+      setTouchedFields({
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        password: true,
+        confirmPassword: true,
+        agreeToTerms: true
+      })
       return
     }
-    if (!formData.phone || formData.phone.length < 10) {
-      alert('Please enter a valid phone number')
-      return
+
+    // Clear any previous errors
+    setValidationErrors({})
+    clearError()
+
+    setIsLoading(true)
+
+    try {
+      // Use SuperTokens EmailPassword.signUp with additional fields
+      const response = await EmailPassword.signUp({
+        formFields: [{
+          id: "email",
+          value: formData.email.trim()
+        }, {
+          id: "password",
+          value: formData.password
+        }, {
+          id: "firstName",
+          value: formData.firstName.trim()
+        }, {
+          id: "lastName",
+          value: formData.lastName.trim()
+        }, {
+          id: "phone",
+          value: `${selectedCountry.code}${formData.phone}`
+        }]
+      })
+
+      console.log('✅ SuperTokens signUp response:', response)
+
+      if (response.status === "OK") {
+        // After successful registration, generate email verification token
+        try {
+          const verifyResponse = await fetch('http://localhost:8081/api/v1/auth/generate-email-verification-token', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              email: formData.email.trim()
+            })
+          })
+
+          const verifyData = await verifyResponse.json()
+          console.log('✅ Email verification token generated:', verifyData)
+
+          if (verifyResponse.ok && verifyData.success) {
+            // Store the verification token
+            localStorage.setItem('verificationToken', verifyData.token)
+            
+            // Navigate to OTP verification
+            navigate('/verify-otp', { 
+              state: { 
+                email: formData.email,
+                fromRegistration: true,
+                verificationToken: verifyData.token
+              } 
+            })
+          } else {
+            setError(verifyData.message || 'Failed to send verification email')
+          }
+        } catch (err) {
+          console.error('Failed to generate verification token:', err)
+          setError('Registration successful but failed to send verification email')
+        }
+      } else {
+        // Handle different response statuses
+        if (response.status === "FIELD_ERROR") {
+          const fieldErrors = response.formFields
+          if (fieldErrors) {
+            const errors = {}
+            fieldErrors.forEach(field => {
+              if (field.id === "email") errors.email = field.error
+              if (field.id === "password") errors.password = field.error
+            })
+            setValidationErrors(errors)
+          }
+        } else if (response.status === "SIGN_UP_NOT_ALLOWED") {
+          setError('Registration is not allowed at this time')
+        } else {
+          setError('Registration failed. Please try again.')
+        }
+      }
+    } catch (err) {
+      console.error('SuperTokens signUp error:', err)
+      setError('Registration failed. Please try again.')
+    } finally {
+      setIsLoading(false)
     }
-    console.log('Registration attempt:', formData)
   }
 
   return (
@@ -142,6 +237,16 @@ export default function Register() {
         {/* Registration Form */}
         <Card className="bg-white border border-gray-100 shadow-sm rounded-lg">
           <CardContent className="p-3 sm:p-4 md:p-6">
+            {/* Global Error Display */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center text-red-800 text-sm">
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  {error}
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
               {/* First Name and Last Name */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -154,10 +259,21 @@ export default function Register() {
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleInputChange}
+                    onBlur={() => handleFieldBlur('firstName')}
                     placeholder="First Name"
-                    className="pl-10 h-10 sm:h-12 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm sm:text-base"
+                    className={`pl-10 h-10 sm:h-12 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm sm:text-base ${
+                      validationErrors.firstName && touchedFields.firstName 
+                        ? 'border-red-500' 
+                        : 'border-gray-200'
+                    }`}
                     required
                   />
+                  {validationErrors.firstName && touchedFields.firstName && (
+                    <div className="flex items-center mt-1 text-red-600 text-xs">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      {validationErrors.firstName}
+                    </div>
+                  )}
                 </div>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -168,10 +284,21 @@ export default function Register() {
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleInputChange}
+                    onBlur={() => handleFieldBlur('lastName')}
                     placeholder="Last Name"
-                    className="pl-10 h-10 sm:h-12 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm sm:text-base"
+                    className={`pl-10 h-10 sm:h-12 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm sm:text-base ${
+                      validationErrors.lastName && touchedFields.lastName 
+                        ? 'border-red-500' 
+                        : 'border-gray-200'
+                    }`}
                     required
                   />
+                  {validationErrors.lastName && touchedFields.lastName && (
+                    <div className="flex items-center mt-1 text-red-600 text-xs">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      {validationErrors.lastName}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -293,24 +420,33 @@ export default function Register() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs sm:text-sm text-gray-600">Password Strength</span>
                     <span className={`text-xs sm:text-sm font-medium ${
-                      passwordStrength.score <= 2 ? 'text-red-600' :
-                      passwordStrength.score <= 3 ? 'text-orange-600' :
-                      passwordStrength.score <= 4 ? 'text-blue-600' : 'text-green-600'
+                      passwordStrength.level === 'weak' ? 'text-red-600' :
+                      passwordStrength.level === 'fair' ? 'text-orange-600' :
+                      passwordStrength.level === 'good' ? 'text-blue-600' : 'text-green-600'
                     }`}>
-                      {getStrengthText(passwordStrength.score)}
+                      {passwordStrength.text}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
                     <div 
-                      className={`h-1.5 sm:h-2 rounded-full transition-all duration-300 ${getStrengthColor(passwordStrength.score)}`}
-                      style={{ width: `${(passwordStrength.score / 5) * 100}%` }}
+                      className={`h-1.5 sm:h-2 rounded-full transition-all duration-300 bg-${passwordStrength.color}-500`}
+                      style={{ width: `${(passwordRequirements.filter(req => req.met).length / passwordRequirements.length) * 100}%` }}
                     ></div>
                   </div>
-                  {passwordStrength.feedback.length > 0 && (
-                    <div className="text-xs text-gray-500">
-                      <p>Missing: {passwordStrength.feedback.join(', ')}</p>
-                    </div>
-                  )}
+                  <div className="space-y-1">
+                    {passwordRequirements.map((req, index) => (
+                      <div key={index} className="flex items-center text-xs">
+                        {req.met ? (
+                          <CheckCircle className="h-3 w-3 text-green-500 mr-2" />
+                        ) : (
+                          <AlertCircle className="h-3 w-3 text-gray-400 mr-2" />
+                        )}
+                        <span className={req.met ? 'text-green-600' : 'text-gray-500'}>
+                          {req.text}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -365,9 +501,10 @@ export default function Register() {
               {/* Register Button */}
               <Button
                 type="submit"
-                className="w-full h-10 sm:h-12 bg-gradient-to-r from-teal-500 to-teal-900 hover:from-teal-600 hover:to-teal-800 text-white font-semibold rounded-lg transition-all duration-1000 ease-in-out shadow-lg hover:shadow-xl text-sm sm:text-base"
+                disabled={isLoading}
+                className="w-full h-10 sm:h-12 bg-gradient-to-r from-teal-500 to-teal-900 hover:from-teal-600 hover:to-teal-800 text-white font-semibold rounded-lg transition-all duration-1000 ease-in-out shadow-lg hover:shadow-xl text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Create Account
+                {isLoading ? 'Creating Account...' : 'Create Account'}
               </Button>
             </form>
           </CardContent>

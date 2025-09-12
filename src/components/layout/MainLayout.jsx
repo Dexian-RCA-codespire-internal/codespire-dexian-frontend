@@ -9,9 +9,7 @@ const MainLayout = () => {
   const [isSubSidebarOpen, setIsSubSidebarOpen] = useState(false)
 
   const subItems = [
-    { path: '/ai-rca-guidance/item1', label: 'Item 1' },
-    { path: '/ai-rca-guidance/item2', label: 'Item 2' },
-    { path: '/ai-rca-guidance/item3', label: 'Item 3' },
+    { path: '/rca-dashboard', label: 'RCA Dashboard' },
     { path: '/ai-rca-guidance/add-integration', label: 'Add Integration' }
   ]
 

@@ -1,8 +1,9 @@
 import React from 'react'
 import { Helmet } from 'react-helmet-async'
+import { SuperTokensWrapper } from 'supertokens-auth-react'
 import RoutesIndex from './routes'
 
-export default function App() {
+function AppContent() {
   return (
     <>
       <Helmet>
@@ -13,5 +14,13 @@ export default function App() {
         <RoutesIndex />
       </main>
     </>
+  )
+}
+
+export default function App() {
+  return (
+    <SuperTokensWrapper>
+      <AppContent />
+    </SuperTokensWrapper>
   )
 }

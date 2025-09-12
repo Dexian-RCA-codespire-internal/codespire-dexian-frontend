@@ -18,15 +18,15 @@ const Dashboard = () => {
 
   const integrations = [
     { 
-      name: 'Jira', 
-      logo: '/logos/jira-logo.jpg', 
+      name: 'Service Now', 
+      logo: '/logos/servicenow-logo.png', 
       connected: true, 
       pinned: true,
       pinStatus: '40ms'
     },
     { 
-      name: 'Service Now', 
-      logo: '/logos/servicenow-logo.png', 
+      name: 'Jira', 
+      logo: '/logos/jira-logo.jpg', 
       connected: false, 
       pinned: false,
       pinStatus: '40ms'
@@ -34,8 +34,8 @@ const Dashboard = () => {
     { 
       name: 'Zendesk', 
       logo: '/logos/zendesk-logo.png', 
-      connected: true, 
-      pinned: true,
+      connected: false, 
+      pinned: false,
       pinStatus: '40ms'
     },
     { 
@@ -59,8 +59,8 @@ const Dashboard = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
-        <p className="text-gray-600">Welcome to your RCA management dashboard</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
+          <p className="text-gray-600">Welcome to your RCA management dashboard</p>
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -109,7 +109,11 @@ const Dashboard = () => {
             return (
               <motion.div
                 key={integration.name}
-                className="bg-gray-50 rounded-lg border border-gray-200 p-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                className={`${
+                  integration.name === 'Service Now' 
+                    ? 'bg-white' 
+                    : 'bg-gray-200'
+                } rounded-lg border border-gray-200 p-4 cursor-pointer`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
