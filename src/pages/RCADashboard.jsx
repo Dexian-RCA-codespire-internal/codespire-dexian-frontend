@@ -15,6 +15,7 @@ const RCADashboard = () => {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [apiTickets, setApiTickets] = useState([])
   const [pollingEnabled, setPollingEnabled] = useState(true)
   const [pollingInterval, setPollingInterval] = useState(30000) // 30 seconds
@@ -53,9 +54,13 @@ const RCADashboard = () => {
   }, [showFilterDropdown])
 
   // Fetch tickets from API with pagination
-  const fetchTickets = async (page = 1, limit = 10) => {
+  const fetchTickets = async (page = 1, limit = 10, isBackgroundRefresh = false) => {
     try {
-      setLoading(true)
+      // Only show loading spinner for initial load or manual refresh
+      if (!isBackgroundRefresh) {
+        setLoading(true)
+      }
+      
       const response = await getTickets({ page, limit })
       
       if (response.success) {
@@ -76,11 +81,18 @@ const RCADashboard = () => {
         
         // Update last updated timestamp
         setLastUpdated(new Date())
+        
+        // Mark initial load as complete
+        if (isInitialLoad) {
+          setIsInitialLoad(false)
+        }
       }
     } catch (error) {
       console.error('Error fetching tickets:', error)
     } finally {
-      setLoading(false)
+      if (!isBackgroundRefresh) {
+        setLoading(false)
+      }
     }
   }
 
@@ -93,10 +105,10 @@ const RCADashboard = () => {
   useEffect(() => {
     let intervalId
     
-    if (pollingEnabled) {
+    if (pollingEnabled && !isInitialLoad) {
       intervalId = setInterval(() => {
         console.log('Auto-refreshing tickets...')
-        fetchTickets(pagination.page, pagination.limit)
+        fetchTickets(pagination.page, pagination.limit, true) // Background refresh
       }, pollingInterval)
     }
     
@@ -105,7 +117,7 @@ const RCADashboard = () => {
         clearInterval(intervalId)
       }
     }
-  }, [pollingEnabled, pollingInterval, pagination.page, pagination.limit])
+  }, [pollingEnabled, pollingInterval, pagination.page, pagination.limit, isInitialLoad])
 
   // Pagination handlers
   const handlePageChange = (newPage) => {
@@ -523,8 +535,10 @@ const RCADashboard = () => {
             <h1 className="text-3xl font-bold text-gray-900">RCA Dashboard</h1>
             {pollingEnabled && (
               <div className="flex items-center gap-2 text-sm text-gray-600">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span>Auto-refresh every {pollingInterval / 1000}s</span>
+                <div className={`w-2 h-2 rounded-full ${loading ? 'bg-blue-500 animate-spin' : 'bg-green-500 animate-pulse'}`} />
+                <span>
+                  {loading ? 'Refreshing...' : `Auto-refresh every ${pollingInterval / 1000}s`}
+                </span>
               </div>
             )}
             {lastUpdated && (
@@ -600,15 +614,10 @@ const RCADashboard = () => {
             </h2>
             {hasActiveFilters && (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">
-                  {filters.sources.length > 0 && `${filters.sources.length} source${filters.sources.length > 1 ? 's' : ''} selected`}
-                  {filters.sources.length > 0 && (filters.priorities.length > 0 || (filters.dateRange.startDate || filters.dateRange.endDate) || filters.stages.length > 0) && ', '}
-                  {filters.priorities.length > 0 && `${filters.priorities.length} priorit${filters.priorities.length > 1 ? 'ies' : 'y'} selected`}
-                  {filters.priorities.length > 0 && ((filters.dateRange.startDate || filters.dateRange.endDate) || filters.stages.length > 0) && ', '}
-                  {(filters.dateRange.startDate || filters.dateRange.endDate) && 'date range selected'}
-                  {(filters.dateRange.startDate || filters.dateRange.endDate) && filters.stages.length > 0 && ', '}
-                  {filters.stages.length > 0 && `${filters.stages.length} stage${filters.stages.length > 1 ? 's' : ''} selected`}
-                </span>
+                <span className="text-sm text-gray-500">Active filters:</span>
+                <Button variant="outline" size="sm" onClick={clearAllFilters}>
+                  Clear All
+                </Button>
               </div>
             )}
           </div>
@@ -807,8 +816,83 @@ const RCADashboard = () => {
               </Card>
             )}
           </div>
+
+          {/* Active Filter Badges */}
+          {hasActiveFilters && (
+            <div className="mb-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-gray-600 font-medium">Active filters:</span>
+                
+                {/* Source Badges */}
+                {filters.sources.map((source) => (
+                  <Badge 
+                    key={`source-${source}`}
+                    variant="secondary" 
+                    className="bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer"
+                    onClick={() => handleSourceFilter(source, false)}
+                  >
+                    Source: {source}
+                    <span className="ml-1 text-blue-600">×</span>
+                  </Badge>
+                ))}
+                
+                {/* Priority Badges */}
+                {filters.priorities.map((priority) => (
+                  <Badge 
+                    key={`priority-${priority}`}
+                    variant="secondary" 
+                    className="bg-orange-100 text-orange-800 hover:bg-orange-200 cursor-pointer"
+                    onClick={() => handlePriorityFilter(priority, false)}
+                  >
+                    Priority: {priority}
+                    <span className="ml-1 text-orange-600">×</span>
+                  </Badge>
+                ))}
+                
+                {/* Date Range Badge */}
+                {(filters.dateRange.startDate || filters.dateRange.endDate) && (
+                  <Badge 
+                    variant="secondary" 
+                    className="bg-green-100 text-green-800 hover:bg-green-200 cursor-pointer"
+                    onClick={() => {
+                      setFilters(prev => ({
+                        ...prev,
+                        dateRange: { startDate: '', endDate: '' }
+                      }))
+                    }}
+                  >
+                    Date: {filters.dateRange.startDate || 'Any'} to {filters.dateRange.endDate || 'Any'}
+                    <span className="ml-1 text-green-600">×</span>
+                  </Badge>
+                )}
+                
+                {/* Stage Badges */}
+                {filters.stages.map((stage) => (
+                  <Badge 
+                    key={`stage-${stage}`}
+                    variant="secondary" 
+                    className="bg-purple-100 text-purple-800 hover:bg-purple-200 cursor-pointer"
+                    onClick={() => handleStageFilter(stage, false)}
+                  >
+                    Stage: {stage}
+                    <span className="ml-1 text-purple-600">×</span>
+                  </Badge>
+                ))}
+                
+                {/* Clear All Button */}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={clearAllFilters}
+                  className="text-xs h-6 px-2"
+                >
+                  Clear All
+                </Button>
+              </div>
+            </div>
+          )}
             
-          {loading ? (
+          {isInitialLoad ? (
             <div className="text-center py-12">
               <div className="text-gray-400 mb-4">
                 <FiRefreshCw className="text-4xl mx-auto animate-spin" />
@@ -837,7 +921,16 @@ const RCADashboard = () => {
               )}
             </div>
           ) : (
-            <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+            <div className="bg-white shadow-sm rounded-lg overflow-hidden relative">
+              {/* Subtle loading overlay for background refreshes */}
+              {loading && !isInitialLoad && (
+                <div className="absolute inset-0 bg-white bg-opacity-50 z-10 flex items-center justify-center">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 bg-white px-3 py-2 rounded-lg shadow-sm">
+                    <FiRefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Updating...</span>
+                  </div>
+                </div>
+              )}
               {/* Desktop Table View */}
               <div className="hidden lg:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -982,7 +1075,7 @@ const RCADashboard = () => {
                     value={pagination.limit}
                     onChange={(e) => handleLimitChange(parseInt(e.target.value))}
                     className="border border-gray-300 rounded-md px-2 py-1 text-sm"
-                    disabled={loading}
+                    disabled={loading && !isInitialLoad}
                   >
                     <option value={5}>5</option>
                     <option value={10}>10</option>
@@ -1001,7 +1094,7 @@ const RCADashboard = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => handlePageChange(pagination.page - 1)}
-                  disabled={!pagination.hasPrev || loading}
+                  disabled={!pagination.hasPrev || (loading && !isInitialLoad)}
                   className="flex items-center gap-1"
                 >
                   <FiChevronLeft className="w-4 h-4" />
@@ -1019,7 +1112,7 @@ const RCADashboard = () => {
                         variant={pageNum === pagination.page ? "default" : "outline"}
                         size="sm"
                         onClick={() => handlePageChange(pageNum)}
-                        disabled={loading}
+                        disabled={loading && !isInitialLoad}
                         className="w-8 h-8 p-0"
                       >
                         {pageNum}
@@ -1032,7 +1125,7 @@ const RCADashboard = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => handlePageChange(pagination.page + 1)}
-                  disabled={!pagination.hasNext || loading}
+                  disabled={!pagination.hasNext || (loading && !isInitialLoad)}
                   className="flex items-center gap-1"
                 >
                   Next
