@@ -40,9 +40,10 @@ export default function ForgetPassword() {
     setError('')
 
     try {
-      // Call the token-based forgot password API
+      // Call the token-based forgot password API with frontend URL
       const response = await api.post('/v1/auth/forgot-password', {
-        email: email.trim()
+        email: email.trim(),
+        resetUrl: `${window.location.origin}/reset-password` // Send frontend URL
       })
       
       if (response.data.success) {
@@ -159,7 +160,7 @@ export default function ForgetPassword() {
                       </p>
                       <p className="text-gray-500 text-xs">
                         Please check your email and click the link to reset your password. 
-                        The link will expire in 1 hour.
+                        The link will open in this application and expire in 1 hour.
                       </p>
                     </div>
 
