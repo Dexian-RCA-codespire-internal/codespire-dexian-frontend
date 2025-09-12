@@ -9,6 +9,7 @@ import { RCAWorkflow } from '../components/RCA'
 import { FiUpload, FiImage, FiUser, FiPlus, FiClock, FiMoreHorizontal, FiSearch, FiZap, FiTrendingUp, FiAlertTriangle, FiCheckCircle } from 'react-icons/fi'
 import { getTicketById } from '../utils/ticketData'
 import ChatBot from '../components/ChatBot'
+import { isChatbotEnabled } from '../config/navigation'
 
 const Analysis = () => {
   const { ticketId } = useParams()
@@ -175,15 +176,17 @@ const Analysis = () => {
         />
       </div>
 
-      {/* ChatBot */}
-      <ChatBot 
-        pageContext={{
-          pageName: 'Analysis',
-          ticketData: ticketData,
+      {/* ChatBot - Only render if enabled in config */}
+      {isChatbotEnabled() && (
+        <ChatBot 
+          pageContext={{
+            pageName: 'Analysis',
+            ticketData: ticketData,
           currentStep: rcaStep,
           totalSteps: 5
         }}
       />
+      )}
     </div>
   )
 }

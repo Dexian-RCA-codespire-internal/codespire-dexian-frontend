@@ -12,7 +12,7 @@ export const navigationConfig = {
   playbookRecommender: true,    // Playbook Recommender
   customerRcaSummary: true,     // Customer RCA Summary
   alertCorrelation: true,       // Alert Correlation
-  complianceAudit: true,        // Compliance & Audit
+  complianceAudit: false,        // Compliance & Audit
   
   // UI Components
   chatbot: true,                // ChatBot component visibility

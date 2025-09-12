@@ -8,6 +8,7 @@ import { Progress } from '../components/ui/progress'
 import { Checkbox } from '../components/ui/checkbox'
 import { FiSearch, FiMenu, FiCheck, FiAlertTriangle, FiClipboard, FiChevronDown, FiCreditCard, FiRefreshCw } from 'react-icons/fi'
 import ChatBot from '../components/ChatBot'
+import { isChatbotEnabled } from '../config/navigation'
 
 const RCADashboard = () => {
   const navigate = useNavigate()
@@ -847,17 +848,19 @@ const RCADashboard = () => {
         </div>
       </div>
 
-      {/* ChatBot */}
-      <ChatBot 
-        pageContext={{
-          pageName: 'RCA Dashboard',
-          totalTickets: filteredCases.length,
+      {/* ChatBot - Only render if enabled in config */}
+      {isChatbotEnabled() && (
+        <ChatBot 
+          pageContext={{
+            pageName: 'RCA Dashboard',
+            totalTickets: filteredCases.length,
           activeTickets: summaryData[0].value,
           slaBreached: summaryData[1].value,
           awaitingReview: summaryData[2].value,
           avgResolution: summaryData[3].value
         }}
       />
+      )}
     </div>
   )
 }

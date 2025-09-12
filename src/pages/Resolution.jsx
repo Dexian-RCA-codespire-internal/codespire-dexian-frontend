@@ -10,6 +10,7 @@ import { RCAWorkflow } from '../components/RCA'
 import { FiUpload, FiImage, FiFileText, FiFile, FiUser, FiPlus, FiClock, FiMoreHorizontal, FiSearch, FiCheckCircle, FiX, FiExternalLink, FiDownload } from 'react-icons/fi'
 import { getTicketById } from '../utils/ticketData'
 import ChatBot from '../components/ChatBot'
+import { isChatbotEnabled } from '../config/navigation'
 
 const Resolution = () => {
   const { ticketId } = useParams()
@@ -206,15 +207,17 @@ const Resolution = () => {
         />
       </div>
 
-      {/* ChatBot */}
-      <ChatBot 
-        pageContext={{
-          pageName: 'Resolution',
-          ticketData: ticketData,
+      {/* ChatBot - Only render if enabled in config */}
+      {isChatbotEnabled() && (
+        <ChatBot 
+          pageContext={{
+            pageName: 'Resolution',
+            ticketData: ticketData,
           currentStep: rcaStep,
           totalSteps: 5
         }}
       />
+      )}
     </div>
   )
 }
