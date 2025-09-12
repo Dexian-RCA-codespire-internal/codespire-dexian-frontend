@@ -5,6 +5,8 @@ import { FiAlertTriangle } from "react-icons/fi";
 import { PiUsersThree } from "react-icons/pi";
 import { AiOutlineLineChart } from "react-icons/ai";
 import { IoSpeedometerOutline } from "react-icons/io5";
+import ChatBot from '../components/ChatBot'
+import { isChatbotEnabled } from '../config/navigation'
 
 const Dashboard = () => {
   const navigate = useNavigate()
@@ -185,6 +187,20 @@ const Dashboard = () => {
           </div>
         </div>
       </motion.div>
+
+      {/* ChatBot - Only render if enabled in config */}
+      {isChatbotEnabled() && (
+        <ChatBot 
+          pageContext={{
+            pageName: 'Main Dashboard',
+            totalRCAs: stats[0].value,
+            activeInvestigations: stats[1].value,
+            teamMembers: stats[2].value,
+            criticalIssues: stats[3].value,
+            integrations: integrations
+          }}
+        />
+      )}
     </div>
   )
 }

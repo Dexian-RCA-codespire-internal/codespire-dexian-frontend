@@ -1,8 +1,8 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'http://localhost:3001/api/v1',
-  withCredentials: true,
+  baseURL: 'http://localhost:8081/api/v1',
+  withCredentials: true, // Enable credentials for authentication
   headers: { 'Content-Type': 'application/json' }
 })
 

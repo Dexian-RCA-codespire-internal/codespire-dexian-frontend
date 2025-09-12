@@ -8,11 +8,14 @@ export const navigationConfig = {
 
   
   // Optional features (can be enabled/disabled)
-  patternDetector: false,        // Pattern & Duplicate Detector
-  playbookRecommender: false,    // Playbook Recommender
-  customerRcaSummary: false,     // Customer RCA Summary
-  alertCorrelation: false,       // Alert Correlation
-  complianceAudit: false,        // Compliance & Audit
+  patternDetector: true,        // Pattern & Duplicate Detector
+  playbookRecommender: true,    // Playbook Recommender
+  customerRcaSummary: true,     // Customer RCA Summary
+  alertCorrelation: true,       // Alert Correlation
+  complianceAudit: true,        // Compliance & Audit
+  
+  // UI Components
+  chatbot: true,                // ChatBot component visibility
 }
 
 // Helper function to get enabled navigation items
@@ -25,6 +28,11 @@ export const getEnabledNavigationItems = () => {
 // Helper function to check if a specific feature is enabled
 export const isFeatureEnabled = (featureName) => {
   return navigationConfig[featureName] === true
+}
+
+// Helper function to check if chatbot is enabled
+export const isChatbotEnabled = () => {
+  return navigationConfig.chatbot === true
 }
 
 // Navigation items mapping

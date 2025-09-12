@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
@@ -7,6 +7,8 @@ import { Textarea } from '../components/ui/textarea'
 import { Badge } from '../components/ui/badge'
 import { RCAWorkflow } from '../components/RCA'
 import { FiUpload, FiImage, FiUser, FiPlus, FiClock, FiMoreHorizontal, FiSearch, FiZap, FiTrendingUp, FiAlertTriangle, FiCheckCircle } from 'react-icons/fi'
+import { getTicketById } from '../utils/ticketData'
+import ChatBot from '../components/ChatBot'
 
 const Analysis = () => {
   const { ticketId } = useParams()
@@ -15,10 +17,17 @@ const Analysis = () => {
   const [analysisNotes, setAnalysisNotes] = useState('')
   const [rootCause, setRootCause] = useState('')
   const [recommendations, setRecommendations] = useState('')
+  const [ticketData, setTicketData] = useState(null)
 
   // RCA Workflow State
   const [rcaStep, setRcaStep] = useState(1)
   const [analysisResponse, setAnalysisResponse] = useState('')
+
+  // Fetch ticket data when component mounts
+  useEffect(() => {
+    const ticket = getTicketById(ticketId)
+    setTicketData(ticket)
+  }, [ticketId])
 
 
 
@@ -162,8 +171,19 @@ const Analysis = () => {
           canProceed={analysisResponse.trim().length > 0}
           onSaveProgress={handleSaveProgress}
           onGenerateReport={handleGenerateReport}
+          ticketData={ticketData}
         />
       </div>
+
+      {/* ChatBot */}
+      <ChatBot 
+        pageContext={{
+          pageName: 'Analysis',
+          ticketData: ticketData,
+          currentStep: rcaStep,
+          totalSteps: 5
+        }}
+      />
     </div>
   )
 }

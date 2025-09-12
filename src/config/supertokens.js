@@ -8,7 +8,7 @@ export const initSuperTokens = () => {
     appInfo: {
       appName: 'Dexian RCA Dashboard',
       apiDomain: 'http://localhost:8081', // Backend URL
-      websiteDomain: 'http://localhost:3001', // Frontend URL
+      websiteDomain: 'http://localhost:3002', // Frontend URL
     },
     getRedirectionURL: async (context) => {
       if (context.action === "TO_AUTH") {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 // Investigation page with chat interface
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
@@ -7,16 +7,25 @@ import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
 import { RCAWorkflow } from '../components/RCA'
 import { FiUpload, FiImage, FiFileText, FiFile, FiUser, FiPlus, FiClock, FiMoreHorizontal, FiSearch, FiBarChart, FiPaperclip, FiSend } from 'react-icons/fi'
+import { getTicketById } from '../utils/ticketData'
+import ChatBot from '../components/ChatBot'
 
 const Investigation = () => {
   const { ticketId } = useParams()
   const navigate = useNavigate()
   const [comment, setComment] = useState('')
   const [chatMessage, setChatMessage] = useState('')
+  const [ticketData, setTicketData] = useState(null)
 
   // RCA Workflow State
   const [rcaStep, setRcaStep] = useState(1)
   const [investigationResponse, setInvestigationResponse] = useState('')
+
+  // Fetch ticket data when component mounts
+  useEffect(() => {
+    const ticket = getTicketById(ticketId)
+    setTicketData(ticket)
+  }, [ticketId])
 
   // Validation function to check if notes are entered
   const canNavigateToAnalysis = () => {
@@ -157,8 +166,19 @@ const Investigation = () => {
           canProceed={investigationResponse.trim().length > 0}
           onSaveProgress={handleSaveProgress}
           onGenerateReport={handleGenerateReport}
+          ticketData={ticketData}
         />
       </div>
+
+      {/* ChatBot */}
+      <ChatBot 
+        pageContext={{
+          pageName: 'Investigation',
+          ticketData: ticketData,
+          currentStep: rcaStep,
+          totalSteps: 5
+        }}
+      />
     </div>
   )
 }

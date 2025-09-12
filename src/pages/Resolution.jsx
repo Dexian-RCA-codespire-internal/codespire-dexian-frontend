@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
@@ -8,6 +8,8 @@ import { Badge } from '../components/ui/badge'
 import { Checkbox } from '../components/ui/checkbox'
 import { RCAWorkflow } from '../components/RCA'
 import { FiUpload, FiImage, FiFileText, FiFile, FiUser, FiPlus, FiClock, FiMoreHorizontal, FiSearch, FiCheckCircle, FiX, FiExternalLink, FiDownload } from 'react-icons/fi'
+import { getTicketById } from '../utils/ticketData'
+import ChatBot from '../components/ChatBot'
 
 const Resolution = () => {
   const { ticketId } = useParams()
@@ -32,10 +34,17 @@ const Resolution = () => {
     { id: 'ZEN-5678', platform: 'Zendesk', status: 'Closed' },
     { id: 'SN-9012', platform: 'ServiceNow', status: 'Completed' }
   ])
+  const [ticketData, setTicketData] = useState(null)
 
   // RCA Workflow State
   const [rcaStep, setRcaStep] = useState(1)
   const [resolutionResponse, setResolutionResponse] = useState('')
+
+  // Fetch ticket data when component mounts
+  useEffect(() => {
+    const ticket = getTicketById(ticketId)
+    setTicketData(ticket)
+  }, [ticketId])
 
   const handleStepToggle = (stepId) => {
     setStepsTaken(prev => prev.map(step => 
@@ -193,8 +202,19 @@ const Resolution = () => {
           canProceed={resolutionResponse.trim().length > 0}
           onSaveProgress={handleSaveProgress}
           onGenerateReport={handleGenerateReport}
+          ticketData={ticketData}
         />
       </div>
+
+      {/* ChatBot */}
+      <ChatBot 
+        pageContext={{
+          pageName: 'Resolution',
+          ticketData: ticketData,
+          currentStep: rcaStep,
+          totalSteps: 5
+        }}
+      />
     </div>
   )
 }

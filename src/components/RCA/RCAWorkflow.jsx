@@ -3,7 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
 import { Badge } from '../ui/badge'
-import { FiMessageCircle, FiZap, FiSearch, FiArrowRight, FiArrowLeft, FiCheck, FiSave, FiDownload } from 'react-icons/fi'
+import { FiMessageCircle, FiZap, FiSearch, FiArrowRight, FiArrowLeft, FiCheck, FiSave, FiDownload, FiBook, FiStar, FiUsers, FiTarget } from 'react-icons/fi'
+import { useNavigate } from 'react-router-dom'
+import { getPlaybookRecommendations, getBestPlaybookMatch } from '../../utils/playbookMatcher'
 
 const RCAWorkflow = ({ 
   currentStep, 
@@ -20,8 +22,29 @@ const RCAWorkflow = ({
   showPrevious = true,
   canProceed = true,
   onSaveProgress,
-  onGenerateReport
+  onGenerateReport,
+  ticketData = null
 }) => {
+  const navigate = useNavigate()
+  
+  // Get dynamic playbook recommendations based on ticket data
+  const playbookRecommendations = getPlaybookRecommendations(ticketData)
+
+  const getScoreColor = (score) => {
+    if (score >= 90) return 'bg-green-100 text-green-800'
+    if (score >= 80) return 'bg-blue-100 text-blue-800'
+    if (score >= 70) return 'bg-yellow-100 text-yellow-800'
+    return 'bg-red-100 text-red-800'
+  }
+
+  const getConfidenceColor = (confidence) => {
+    switch (confidence) {
+      case 'High': return 'bg-green-100 text-green-800'
+      case 'Medium': return 'bg-yellow-100 text-yellow-800'
+      case 'Low': return 'bg-red-100 text-red-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
   return (
     <div className="space-y-8">
       {/* Header Section */}
@@ -172,6 +195,84 @@ const RCAWorkflow = ({
             </div>
           </CardContent>
         </Card>
+
+        {/* Playbook Recommendations Section - Only show on Problem Definition step */}
+        {currentStep === 1 && (
+          <Card className="bg-white shadow-sm mt-6">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
+                <FiBook className="w-5 h-5 mr-2 text-green-600" />
+                Recommended Playbooks
+                <Badge className="ml-2 bg-green-100 text-green-800">
+                  AI Matched
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Show the best matching playbook for this ticket */}
+              {(() => {
+                const bestMatchPlaybook = getBestPlaybookMatch(ticketData)
+                
+                return (
+                  <div className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    {/* Header with title and score */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900 text-sm mb-1">{bestMatchPlaybook.title}</h3>
+                        <p className="text-xs text-gray-600 mb-2">{bestMatchPlaybook.description}</p>
+                      </div>
+                      <div className="flex flex-col items-end space-y-1">
+                        <Badge className={`text-xs ${getScoreColor(bestMatchPlaybook.score)}`}>
+                          <FiStar className="w-3 h-3 mr-1" />
+                          {bestMatchPlaybook.score}%
+                        </Badge>
+                        <Badge className={`text-xs ${getConfidenceColor(bestMatchPlaybook.confidence)}`}>
+                          {bestMatchPlaybook.confidence}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {/* Tags */}
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {bestMatchPlaybook.tags.map((tag, index) => (
+                        <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Usage stats */}
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <div className="flex items-center">
+                        <FiUsers className="w-3 h-3 mr-1" />
+                        <span>{bestMatchPlaybook.usage}</span>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        className="text-xs px-3 py-1 h-auto bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <FiTarget className="w-3 h-3 mr-1" />
+                        AI Resolve
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })()}
+              
+              {/* View All Playbooks Link */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <Button 
+                  variant="outline" 
+                  className="w-full text-sm"
+                  onClick={() => navigate('/playbook-recommender')}
+                >
+                  <FiBook className="w-4 h-4 mr-2" />
+                  View All Playbook Recommendations
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Right Sidebar */}
