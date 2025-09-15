@@ -18,6 +18,11 @@ const Analysis = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   
+  // Similar cases state
+  const [similarCases, setSimilarCases] = useState(null)
+  const [similarCasesLoading, setSimilarCasesLoading] = useState(false)
+  const [similarCasesError, setSimilarCasesError] = useState(null)
+  
   const [analysisNotes, setAnalysisNotes] = useState('')
   const [rootCause, setRootCause] = useState('')
   const [recommendations, setRecommendations] = useState('')
@@ -25,6 +30,32 @@ const Analysis = () => {
   // RCA Workflow State
   const [rcaStep, setRcaStep] = useState(1)
   const [analysisResponse, setAnalysisResponse] = useState('')
+
+  // Fetch similar cases
+  const fetchSimilarCases = async (ticketData) => {
+    try {
+      setSimilarCasesLoading(true)
+      setSimilarCasesError(null)
+      console.log('Fetching similar cases for ticket:', ticketData)
+      
+      const requestData = {
+        source: ticketData.source,
+        short_description: ticketData.short_description,
+        description: ticketData.description || ticketData.short_description,
+        category: ticketData.category
+      }
+      
+      const response = await ticketService.getSimilarTickets(requestData)
+      console.log('Similar cases received:', response)
+      
+      setSimilarCases(response)
+    } catch (err) {
+      console.error('Error fetching similar cases:', err)
+      setSimilarCasesError(err.message || 'Failed to fetch similar cases')
+    } finally {
+      setSimilarCasesLoading(false)
+    }
+  }
 
   // Fetch ticket data when component loads
   useEffect(() => {
@@ -37,7 +68,13 @@ const Analysis = () => {
         const response = await ticketService.getTicketById(ticketId)
         console.log('Ticket data received:', response)
         
-        setTicketData(response.data || response)
+        const ticket = response.data || response
+        setTicketData(ticket)
+        
+        // Fetch similar cases after ticket data is loaded
+        if (ticket) {
+          await fetchSimilarCases(ticket)
+        }
       } catch (err) {
         console.error('Error fetching ticket data:', err)
         setError(err.message || 'Failed to fetch ticket data')
@@ -138,7 +175,8 @@ const Analysis = () => {
     }
   ]
 
-  const similarCases = [
+  // Mock similar cases data (will be replaced by API data)
+  const mockSimilarCases = [
     { id: 'RCA-087', title: 'Payment timeout issues', match: 89 },
     { id: 'RCA-053', title: 'Database connection failures', match: 76 },
     { id: 'RCA-091', title: 'API response delays', match: 64 }
@@ -224,6 +262,7 @@ const Analysis = () => {
             </div>
           </div>
         )}
+
 
         {/* RCA Workflow */}
         <RCAWorkflow

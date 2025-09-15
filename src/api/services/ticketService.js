@@ -135,5 +135,11 @@ export const ticketService = {
       responseType: 'blob'
     });
     return response.data;
+  },
+
+  // Get similar tickets
+  getSimilarTickets: async (ticketData) => {
+    const response = await api.post('/v1/ticket-similarity/similar', ticketData);
+    return response.data;
   }
 };
