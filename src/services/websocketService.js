@@ -105,27 +105,8 @@ class WebSocketService {
       console.log('🏓 Received pong from server');
     });
 
-    // Handle paginated data responses
-    this.socket.on('paginated_data_response', (data) => {
-      console.log('📡 Received paginated data response:', data);
-      this.emitToListeners('paginated_data_response', data);
-    });
-
-    this.socket.on('paginated_data_error', (data) => {
-      console.error('❌ Received paginated data error:', data);
-      this.emitToListeners('paginated_data_error', data);
-    });
-
-    // Handle data statistics responses
-    this.socket.on('data_statistics_response', (data) => {
-      console.log('📡 Received data statistics response:', data);
-      this.emitToListeners('data_statistics_response', data);
-    });
-
-    this.socket.on('data_statistics_error', (data) => {
-      console.error('❌ Received data statistics error:', data);
-      this.emitToListeners('data_statistics_error', data);
-    });
+    // Note: Removed paginated_data_response and data_statistics_response handlers
+    // Frontend now relies entirely on real-time push events
 
     // Handle sync events
     this.socket.on('sync_started', (data) => {
@@ -203,59 +184,19 @@ class WebSocketService {
   }
 
   /**
-   * Request paginated data via WebSocket (NO REST API CALLS)
-   * @param {Object} options - Request options
-   */
-  requestPaginatedData(options = {}) {
-    if (!this.socket || !this.isConnected) {
-      console.error('WebSocket not connected');
-      return;
-    }
-    
-    console.log('📄 Requesting paginated data with options:', options);
-    this.socket.emit('request_paginated_data', options);
-  }
-
-  /**
-   * Request data statistics via WebSocket (NO REST API CALLS)
-   * @param {Object} options - Request options
-   */
-  requestDataStatistics(options = {}) {
-    if (!this.socket || !this.isConnected) {
-      console.error('WebSocket not connected');
-      return;
-    }
-    
-    console.log('📊 Requesting data statistics with options:', options);
-    this.socket.emit('request_data_statistics', options);
-  }
-
-  /**
-   * Request initial data sync via WebSocket (NO REST API CALLS)
+   * Request initial data sync via WebSocket (for initial load only)
    * @param {Object} options - Sync options
    */
   requestInitialSync(options = {}) {
     if (!this.socket || !this.isConnected) {
-      console.error('WebSocket not connected');
+      console.error('❌ WebSocket not connected - cannot request initial sync');
       return;
     }
     
     console.log('🔄 Requesting initial sync with options:', options);
+    console.log('🔌 Socket connected:', this.isConnected);
+    console.log('🔌 Socket ID:', this.socket.id);
     this.socket.emit('request_initial_sync', options);
-  }
-
-  /**
-   * Request incremental data sync via WebSocket (NO REST API CALLS)
-   * @param {Object} options - Sync options
-   */
-  requestIncrementalSync(options = {}) {
-    if (!this.socket || !this.isConnected) {
-      console.error('WebSocket not connected');
-      return;
-    }
-    
-    console.log('🔄 Requesting incremental sync with options:', options);
-    this.socket.emit('request_incremental_sync', options);
   }
 
   /**
