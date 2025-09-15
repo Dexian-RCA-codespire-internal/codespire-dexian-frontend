@@ -6,6 +6,7 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Textarea } from '../components/ui/textarea'
 import { Badge } from '../components/ui/badge'
+import { Skeleton } from '../components/ui/skeleton'
 import { RCAWorkflow } from '../components/RCA'
 import { FiUpload, FiImage, FiUser, FiPlus, FiClock, FiMoreHorizontal, FiSearch, FiZap, FiTrendingUp, FiAlertTriangle, FiCheckCircle } from 'react-icons/fi'
 
@@ -262,13 +263,46 @@ const Analysis = () => {
     // Implement report generation
   }
 
-  // Show loading state
+  // Show loading state with skeleton loaders instead of full page spinner
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading ticket data...</p>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          
+          {/* Ticket Information Header Skeleton */}
+          <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border">
+            <div className="flex items-center gap-3 mb-2">
+              <Skeleton className="h-8 w-48" />
+            </div>
+            <div className="flex flex-wrap gap-4">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-4 w-36" />
+            </div>
+          </div>
+
+          {/* RCA Workflow with skeleton loaders */}
+          <RCAWorkflow
+            currentStep={rcaStep}
+            totalSteps={5}
+            stepTitle={getCurrentStepData().title}
+            aiGuidance={getCurrentStepData().aiGuidance}
+            response={analysisResponse}
+            onResponseChange={setAnalysisResponse}
+            onNext={handleRcaNext}
+            onPrevious={handleRcaPrevious}
+            aiSuggestions={[]}
+            similarCases={null}
+            aiSuggestionsLoading={true}
+            similarCasesLoading={true}
+            nextButtonText={rcaStep === 5 ? "Complete RCA →" : "Next Step →"}
+            showPrevious={rcaStep > 1}
+            canProceed={analysisResponse.trim().length > 0}
+            onSaveProgress={handleSaveProgress}
+            onGenerateReport={handleGenerateReport}
+          />
         </div>
       </div>
     )
@@ -314,23 +348,25 @@ const Analysis = () => {
 
 
         {/* RCA Workflow */}
-        <RCAWorkflow
-          currentStep={rcaStep}
-          totalSteps={5}
-          stepTitle={getCurrentStepData().title}
-          aiGuidance={getCurrentStepData().aiGuidance}
-          response={analysisResponse}
-          onResponseChange={setAnalysisResponse}
-          onNext={handleRcaNext}
-          onPrevious={handleRcaPrevious}
+         <RCAWorkflow
+           currentStep={rcaStep}
+           totalSteps={5}
+           stepTitle={getCurrentStepData().title}
+           aiGuidance={getCurrentStepData().aiGuidance}
+           response={analysisResponse}
+           onResponseChange={setAnalysisResponse}
+           onNext={handleRcaNext}
+           onPrevious={handleRcaPrevious}
            aiSuggestions={aiSuggestions.length > 0 ? aiSuggestions : getCurrentStepData().aiSuggestions}
-          similarCases={similarCases}
-          nextButtonText={rcaStep === 5 ? "Complete RCA →" : "Next Step →"}
-          showPrevious={rcaStep > 1}
-          canProceed={analysisResponse.trim().length > 0}
-          onSaveProgress={handleSaveProgress}
-          onGenerateReport={handleGenerateReport}
-        />
+           similarCases={similarCases}
+           aiSuggestionsLoading={aiSuggestionsLoading}
+           similarCasesLoading={similarCasesLoading}
+           nextButtonText={rcaStep === 5 ? "Complete RCA →" : "Next Step →"}
+           showPrevious={rcaStep > 1}
+           canProceed={analysisResponse.trim().length > 0}
+           onSaveProgress={handleSaveProgress}
+           onGenerateReport={handleGenerateReport}
+         />
       </div>
     </div>
   )
