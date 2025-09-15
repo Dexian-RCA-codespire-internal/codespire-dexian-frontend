@@ -11,7 +11,7 @@ import { RCAWorkflow } from '../components/RCA'
 import { FiUpload, FiImage, FiUser, FiPlus, FiClock, FiMoreHorizontal, FiSearch, FiZap, FiTrendingUp, FiAlertTriangle, FiCheckCircle } from 'react-icons/fi'
 
 const Analysis = () => {
-  const { ticketId } = useParams()
+  const { id, ticketId } = useParams()
   const navigate = useNavigate()
   
   // Ticket data state
@@ -109,9 +109,9 @@ const Analysis = () => {
       try {
         setLoading(true)
         setError(null)
-        console.log('Fetching ticket data for ID:', ticketId)
+        console.log('Fetching ticket data for ID:', id)
         
-        const response = await ticketService.getTicketById(ticketId)
+        const response = await ticketService.getTicketById(id)
         console.log('Ticket data received:', response)
         
         const ticket = response.data || response
@@ -133,10 +133,10 @@ const Analysis = () => {
       }
     }
 
-    if (ticketId) {
+    if (id) {
       fetchTicketData()
     }
-  }, [ticketId])
+  }, [id])
 
 
 

@@ -53,7 +53,7 @@ export default function RoutesIndex() {
         <Route path="rca-dashboard" element={<RCADashboard />} />
         <Route path="complaint/:ticketId" element={<Complaint />} />
         <Route path="investigation/:ticketId" element={<Investigation />} />
-        <Route path="analysis/:ticketId" element={<Analysis />} />
+        <Route path="analysis/:id/:ticketId" element={<Analysis />} />
         <Route path="resolution/:ticketId" element={<Resolution />} />
         <Route path="complete-rca/:ticketId" element={<CompleteRCA />} />
         <Route path="ai-rca-guidance/add-integration" element={<AddIntegration />} />

@@ -479,9 +479,10 @@ const RCADashboard = () => {
                           (filters.dateRange.startDate || filters.dateRange.endDate) || filters.stages.length > 0
 
   // Function to determine which stage page to navigate to
-  const getStageNavigationPath = (stage, ticketId) => {
+  const getStageNavigationPath = (stage, case_) => {
     // Always route to analysis page for resolve functionality
-    return `/analysis/${ticketId}`
+    // Use both _id and ticket_id in the URL
+    return `/analysis/${case_.id}/${case_.ticketId}`
   }
 
   const filteredCases = rcaCases.filter(case_ => {
@@ -976,7 +977,7 @@ const RCADashboard = () => {
                             <Button 
                               size="sm" 
                               className="bg-green-600 hover:bg-green-700 text-white"
-                              onClick={() => navigate(getStageNavigationPath(case_.stage, case_.id))}
+                              onClick={() => navigate(getStageNavigationPath(case_.stage, case_))}
                             >
                               Resolve
                             </Button>
@@ -1035,7 +1036,7 @@ const RCADashboard = () => {
                         <Button 
                           size="sm" 
                           className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1"
-                          onClick={() => navigate(getStageNavigationPath(case_.stage, case_.id))}
+                          onClick={() => navigate(getStageNavigationPath(case_.stage, case_))}
                         >
                           Resolve
                         </Button>
