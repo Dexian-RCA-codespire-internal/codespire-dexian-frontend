@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { ticketService } from '../api'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -12,6 +13,11 @@ const Analysis = () => {
   const { ticketId } = useParams()
   const navigate = useNavigate()
   
+  // Ticket data state
+  const [ticketData, setTicketData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  
   const [analysisNotes, setAnalysisNotes] = useState('')
   const [rootCause, setRootCause] = useState('')
   const [recommendations, setRecommendations] = useState('')
@@ -19,6 +25,31 @@ const Analysis = () => {
   // RCA Workflow State
   const [rcaStep, setRcaStep] = useState(1)
   const [analysisResponse, setAnalysisResponse] = useState('')
+
+  // Fetch ticket data when component loads
+  useEffect(() => {
+    const fetchTicketData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        console.log('Fetching ticket data for ID:', ticketId)
+        
+        const response = await ticketService.getTicketById(ticketId)
+        console.log('Ticket data received:', response)
+        
+        setTicketData(response.data || response)
+      } catch (err) {
+        console.error('Error fetching ticket data:', err)
+        setError(err.message || 'Failed to fetch ticket data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (ticketId) {
+      fetchTicketData()
+    }
+  }, [ticketId])
 
 
 
@@ -48,7 +79,9 @@ const Analysis = () => {
 
 
   const handleResolution = () => {
-    navigate(`/resolution/${ticketId}`)
+    // Keep resolution functionality within the analysis page
+    // No navigation needed - user can complete resolution here
+    console.log('Resolution completed for ticket:', ticketId)
   }
 
   // RCA Workflow Data
@@ -116,8 +149,9 @@ const Analysis = () => {
     if (rcaStep < 5) {
       setRcaStep(rcaStep + 1)
     } else {
-      // Complete RCA and navigate to resolution
-      navigate(`/resolution/${ticketId}`)
+      // Complete RCA - keep user on analysis page
+      console.log('RCA completed for ticket:', ticketId)
+      // You can add success message or update UI state here
     }
   }
 
@@ -141,9 +175,55 @@ const Analysis = () => {
     // Implement report generation
   }
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading ticket data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 mb-4">
+            <FiAlertTriangle className="w-12 h-12 mx-auto mb-2" />
+            <p className="text-lg font-semibold">Error Loading Ticket</p>
+            <p className="text-sm text-gray-600">{error}</p>
+          </div>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* Ticket Information Header */}
+        {ticketData && (
+          <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              Analysis: {ticketData.short_description || 'No Title'}
+            </h1>
+            <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+              <span><strong>Ticket ID:</strong> {ticketData.ticket_id}</span>
+              <span><strong>Source:</strong> {ticketData.source}</span>
+              <span><strong>Status:</strong> {ticketData.status}</span>
+              <span><strong>Priority:</strong> {ticketData.priority}</span>
+              <span><strong>Category:</strong> {ticketData.category}</span>
+            </div>
+          </div>
+        )}
 
         {/* RCA Workflow */}
         <RCAWorkflow
