@@ -17,7 +17,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
   const [pollingStatus, setPollingStatus] = useState(null);
   const [notifications, setNotifications] = useState([]);
   
-  // Pagination state (for UI display only - data comes from real-time events)
+  // Pagination state
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 0,
@@ -31,24 +31,21 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   
-  // Statistics (updated from real-time events)
+  // Statistics
   const [dataStatistics, setDataStatistics] = useState(null);
   
   // Sync state
   const [syncState, setSyncState] = useState({
     isInitialSyncComplete: false,
     isSyncInProgress: false,
-    lastSyncTimestamp: null,
-    syncProgress: {
-      currentBatch: 0,
-      totalBatches: 0,
-      percentage: 0
-    }
+    lastSyncTimestamp: null
   });
   
-  // Local data management (no more requests - just real-time updates)
-  const allTicketsRef = useRef([]);
-  const [displayedTickets, setDisplayedTickets] = useState([]);
+  // Request tracking to prevent duplicate requests
+  const pendingRequests = useRef(new Set());
+  
+  // Cache for previously fetched pages
+  const pageCache = useRef(new Map());
   
   const ticketsRef = useRef([]);
   const newTicketsRef = useRef([]);
@@ -63,45 +60,24 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
   }, [newTickets]);
 
   /**
-   * Update displayed tickets based on current pagination
-   */
-  const updateDisplayedTickets = useCallback((page = 1, limit = 10) => {
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const pageTickets = allTicketsRef.current.slice(startIndex, endIndex);
-    
-    setDisplayedTickets(pageTickets);
-    setTickets(pageTickets);
-    
-    // Update pagination info
-    const totalCount = allTicketsRef.current.length;
-    const totalPages = Math.ceil(totalCount / limit);
-    
-    setPagination({
-      currentPage: page,
-      totalPages,
-      limit,
-      totalCount,
-      hasNextPage: page < totalPages,
-      hasPrevPage: page > 1
-    });
-    
-    console.log(`📄 Updated display: page ${page}/${totalPages}, showing ${pageTickets.length}/${totalCount} tickets`);
-  }, []);
-
-  /**
    * Add a new ticket to the real-time list
    */
   const addTicket = useCallback((ticketData) => {
     const transformedTicket = transformTicketToRCACase(ticketData);
     
-    // Add to all tickets collection
-    allTicketsRef.current = [transformedTicket, ...allTicketsRef.current];
-    
-    // Update displayed tickets if we're on page 1
-    if (pagination.currentPage === 1) {
-      updateDisplayedTickets(1, pagination.limit);
-    }
+    setTickets(prevTickets => {
+      // Check if ticket already exists
+      const exists = prevTickets.some(ticket => ticket.ticketId === transformedTicket.ticketId);
+      if (exists) {
+        // Update existing ticket
+        return prevTickets.map(ticket => 
+          ticket.ticketId === transformedTicket.ticketId ? transformedTicket : ticket
+        );
+      } else {
+        // Add new ticket to the beginning
+        return [transformedTicket, ...prevTickets];
+      }
+    });
 
     // Add to new tickets for highlighting
     setNewTickets(prevNewTickets => {
@@ -119,8 +95,9 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
       );
     }, 5000);
 
-    console.log(`✅ Added new ticket: ${transformedTicket.ticketId}`);
-  }, [pagination, updateDisplayedTickets]);
+    // Invalidate cache for page 1 (where new tickets appear)
+    clearPageCacheForPage(1);
+  }, []);
 
   /**
    * Update an existing ticket in real-time list
@@ -128,17 +105,15 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
   const updateTicket = useCallback((ticketData) => {
     const transformedTicket = transformTicketToRCACase(ticketData);
     
-    // Update in all tickets collection
-    const ticketIndex = allTicketsRef.current.findIndex(ticket => ticket.ticketId === transformedTicket.ticketId);
-    if (ticketIndex !== -1) {
-      allTicketsRef.current[ticketIndex] = transformedTicket;
-      
-      // Update displayed tickets if this ticket is currently visible
-      updateDisplayedTickets(pagination.currentPage, pagination.limit);
-      
-      console.log(`✅ Updated ticket: ${transformedTicket.ticketId}`);
-    }
-  }, [pagination, updateDisplayedTickets]);
+    setTickets(prevTickets => 
+      prevTickets.map(ticket => 
+        ticket.ticketId === transformedTicket.ticketId ? transformedTicket : ticket
+      )
+    );
+
+    // Invalidate all cached pages since ticket updates can affect sorting/filtering
+    clearPageCache();
+  }, []);
 
   /**
    * Add multiple tickets (for initial sync)
@@ -146,19 +121,25 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
   const addTicketsBatch = useCallback((ticketsData) => {
     const transformedTickets = ticketsData.map(ticket => transformTicketToRCACase(ticket));
     
-    // Add to all tickets collection, avoiding duplicates
-    transformedTickets.forEach(newTicket => {
-      const exists = allTicketsRef.current.some(ticket => ticket.ticketId === newTicket.ticketId);
-      if (!exists) {
-        allTicketsRef.current.push(newTicket);
-      }
+    setTickets(prevTickets => {
+      // Create a map of existing tickets for quick lookup
+      const existingTicketsMap = new Map();
+      prevTickets.forEach(ticket => {
+        existingTicketsMap.set(ticket.ticketId, ticket);
+      });
+
+      // Merge new tickets with existing ones
+      const mergedTickets = [...prevTickets];
+      
+      transformedTickets.forEach(newTicket => {
+        if (!existingTicketsMap.has(newTicket.ticketId)) {
+          mergedTickets.push(newTicket);
+        }
+      });
+
+      return mergedTickets;
     });
-    
-    // Update displayed tickets
-    updateDisplayedTickets(pagination.currentPage, pagination.limit);
-    
-    console.log(`✅ Added batch of ${transformedTickets.length} tickets`);
-  }, [pagination, updateDisplayedTickets]);
+  }, []);
 
   /**
    * Add notification
@@ -198,46 +179,117 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
   }, []);
 
   /**
-   * Navigate to next page (local pagination only)
+   * Clear page cache
    */
-  const nextPage = useCallback(() => {
-    if (pagination.hasNextPage) {
-      updateDisplayedTickets(pagination.currentPage + 1, pagination.limit);
+  const clearPageCache = useCallback(() => {
+    pageCache.current.clear();
+    console.log('🗑️ Page cache cleared');
+  }, []);
+
+  /**
+   * Clear cache for a specific page
+   */
+  const clearPageCacheForPage = useCallback((page, limit = 10) => {
+    const cacheKey = `${page}-${limit}-${JSON.stringify({})}`;
+    pageCache.current.delete(cacheKey);
+    console.log(`🗑️ Cache cleared for page ${page}`);
+  }, []);
+
+  /**
+   * Request paginated data via WebSocket (NO REST API CALLS)
+   */
+  const fetchTickets = useCallback((page = 1, limit = 10, filters = {}, isBackgroundRefresh = false) => {
+    const requestId = `page-${page}-limit-${limit}`;
+    const cacheKey = `${page}-${limit}-${JSON.stringify(filters)}`;
+    
+    // Check cache first
+    if (pageCache.current.has(cacheKey)) {
+      console.log('📦 Using cached data for page:', page);
+      const cachedData = pageCache.current.get(cacheKey);
+      setTickets(cachedData.tickets);
+      setPagination(cachedData.pagination);
+      setIsLoading(false);
+      setIsInitialLoad(false);
+      return;
     }
-  }, [pagination, updateDisplayedTickets]);
-
-  /**
-   * Navigate to previous page (local pagination only)
-   */
-  const prevPage = useCallback(() => {
-    if (pagination.hasPrevPage) {
-      updateDisplayedTickets(pagination.currentPage - 1, pagination.limit);
+    
+    // Prevent duplicate requests
+    if (pendingRequests.current.has(requestId)) {
+      console.log('Request already pending:', requestId);
+      return;
     }
-  }, [pagination, updateDisplayedTickets]);
-
-  /**
-   * Navigate to specific page (local pagination only)
-   */
-  const goToPage = useCallback((page) => {
-    if (page >= 1 && page <= pagination.totalPages) {
-      updateDisplayedTickets(page, pagination.limit);
+    
+    pendingRequests.current.add(requestId);
+    
+    if (!isBackgroundRefresh) {
+      setIsLoading(true);
     }
-  }, [pagination, updateDisplayedTickets]);
+    
+    console.log('🔄 Fetching tickets via WebSocket:', { page, limit, filters });
+    
+    // Request data via WebSocket
+    webSocketService.requestPaginatedData({
+      page,
+      limit,
+      ...filters
+    });
+  }, []);
 
   /**
-   * Change page size (local pagination only)
+   * Request data statistics via WebSocket (NO REST API CALLS)
    */
-  const changePageSize = useCallback((newLimit) => {
-    updateDisplayedTickets(1, newLimit);
-  }, [updateDisplayedTickets]);
+  const fetchStatistics = useCallback(() => {
+    console.log('📊 Fetching statistics via WebSocket');
+    webSocketService.requestDataStatistics();
+  }, []);
 
   /**
-   * Request initial data sync via WebSocket (for initial load only)
+   * Request initial data sync via WebSocket (NO REST API CALLS)
    */
   const requestInitialSync = useCallback((options = {}) => {
-    console.log('🚀 Requesting initial sync with options:', options);
     webSocketService.requestInitialSync(options);
   }, []);
+
+  /**
+   * Request incremental data sync via WebSocket (NO REST API CALLS)
+   */
+  const requestIncrementalSync = useCallback((options = {}) => {
+    webSocketService.requestIncrementalSync(options);
+  }, []);
+
+  /**
+   * Navigate to next page (WebSocket only)
+   */
+  const nextPage = useCallback((filters = {}) => {
+    if (pagination.hasNextPage) {
+      fetchTickets(pagination.currentPage + 1, pagination.limit, filters);
+    }
+  }, [pagination, fetchTickets]);
+
+  /**
+   * Navigate to previous page (WebSocket only)
+   */
+  const prevPage = useCallback((filters = {}) => {
+    if (pagination.hasPrevPage) {
+      fetchTickets(pagination.currentPage - 1, pagination.limit, filters);
+    }
+  }, [pagination, fetchTickets]);
+
+  /**
+   * Navigate to specific page (WebSocket only)
+   */
+  const goToPage = useCallback((page, filters = {}) => {
+    if (page >= 1 && page <= pagination.totalPages) {
+      fetchTickets(page, pagination.limit, filters);
+    }
+  }, [pagination, fetchTickets]);
+
+  /**
+   * Change page size (WebSocket only)
+   */
+  const changePageSize = useCallback((newLimit, filters = {}) => {
+    fetchTickets(1, newLimit, filters);
+  }, [fetchTickets]);
 
   // Setup WebSocket connection and event listeners
   useEffect(() => {
@@ -250,9 +302,6 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
       if (data.connected) {
         setConnectionError(null);
         console.log('✅ WebSocket connected - ready for data requests');
-        console.log('🔌 Socket ID:', data.socketId);
-      } else {
-        console.log('❌ WebSocket disconnected:', data.reason);
       }
     };
 
@@ -295,42 +344,90 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
       addNotification(data);
     };
 
-    // Note: Removed all request-response handlers
-    // Frontend now relies entirely on real-time push events
+    // Paginated data handlers (WebSocket responses)
+    const handlePaginatedDataResponse = (data) => {
+      if (data.success) {
+        const transformedData = data.data.map(ticket => transformTicketToRCACase(ticket));
+        setTickets(transformedData);
+        setPagination(data.pagination);
+        setIsLoading(false);
+        setIsInitialLoad(false);
+        
+        // Cache the data for future navigation
+        const cacheKey = `${data.pagination.currentPage}-${data.pagination.limit}-${JSON.stringify({})}`;
+        pageCache.current.set(cacheKey, {
+          tickets: transformedData,
+          pagination: data.pagination,
+          timestamp: Date.now()
+        });
+
+        // Limit cache size to prevent memory issues (keep last 10 pages)
+        if (pageCache.current.size > 10) {
+          const oldestKey = pageCache.current.keys().next().value;
+          pageCache.current.delete(oldestKey);
+        }
+        
+        // Clear pending request
+        const requestId = `page-${data.pagination.currentPage}-limit-${data.pagination.limit}`;
+        pendingRequests.current.delete(requestId);
+        
+        console.log('✅ Received paginated data via WebSocket:', {
+          count: transformedData.length,
+          page: data.pagination.currentPage,
+          total: data.pagination.totalCount
+        });
+      }
+    };
+
+    const handlePaginatedDataError = (data) => {
+      console.error('❌ Paginated data error via WebSocket:', data);
+      setIsLoading(false);
+      setIsInitialLoad(false);
+      
+      // Clear pending request
+      pendingRequests.current.clear();
+      
+      addNotification({
+        message: `Failed to load data: ${data.error}`,
+        notificationType: 'error',
+        timestamp: data.timestamp
+      });
+    };
+
+    // Data statistics handlers (WebSocket responses)
+    const handleDataStatisticsResponse = (data) => {
+      if (data.success) {
+        setDataStatistics(data.data);
+        console.log('✅ Received statistics via WebSocket:', data.data);
+      }
+    };
+
+    const handleDataStatisticsError = (data) => {
+      console.error('❌ Data statistics error via WebSocket:', data);
+      addNotification({
+        message: `Failed to load statistics: ${data.error}`,
+        notificationType: 'error',
+        timestamp: data.timestamp
+      });
+    };
 
     // Sync event handlers
     const handleSyncStarted = (data) => {
-      console.log('🔄 Sync started:', data);
       setSyncState(prev => ({ ...prev, isSyncInProgress: true }));
     };
 
     const handleInitialSyncBatch = (data) => {
       console.log(`📦 Processing initial sync batch ${data.batchNumber}/${data.totalBatches}`);
-      console.log('📦 Batch data:', data.batch);
-      
-      // Update sync progress
-      setSyncState(prev => ({
-        ...prev,
-        syncProgress: {
-          currentBatch: data.batchNumber,
-          totalBatches: data.totalBatches,
-          percentage: Math.round((data.batchNumber / data.totalBatches) * 100)
-        }
-      }));
-      
       addTicketsBatch(data.batch);
     };
 
     const handleInitialSyncComplete = (data) => {
-      console.log('✅ Initial sync completed:', data);
       setSyncState(prev => ({
         ...prev,
         isInitialSyncComplete: true,
         isSyncInProgress: false,
         lastSyncTimestamp: data.timestamp
       }));
-      setIsInitialLoad(false);
-      setIsLoading(false);
       addNotification({
         message: `Initial sync completed: ${data.totalTickets} tickets loaded`,
         notificationType: 'success',
@@ -368,7 +465,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
       });
     };
 
-    // Register event listeners (real-time only)
+    // Register event listeners
     webSocketService.on('connection', handleConnection);
     webSocketService.on('connection_error', handleConnectionError);
     webSocketService.on('reconnection', handleReconnection);
@@ -377,6 +474,10 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
     webSocketService.on('ticket_update', handleTicketUpdate);
     webSocketService.on('polling_status', handlePollingStatus);
     webSocketService.on('notification', handleNotification);
+    webSocketService.on('paginated_data_response', handlePaginatedDataResponse);
+    webSocketService.on('paginated_data_error', handlePaginatedDataError);
+    webSocketService.on('data_statistics_response', handleDataStatisticsResponse);
+    webSocketService.on('data_statistics_error', handleDataStatisticsError);
     webSocketService.on('sync_started', handleSyncStarted);
     webSocketService.on('initial_sync_batch', handleInitialSyncBatch);
     webSocketService.on('initial_sync_complete', handleInitialSyncComplete);
@@ -394,6 +495,10 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
       webSocketService.off('ticket_update', handleTicketUpdate);
       webSocketService.off('polling_status', handlePollingStatus);
       webSocketService.off('notification', handleNotification);
+      webSocketService.off('paginated_data_response', handlePaginatedDataResponse);
+      webSocketService.off('paginated_data_error', handlePaginatedDataError);
+      webSocketService.off('data_statistics_response', handleDataStatisticsResponse);
+      webSocketService.off('data_statistics_error', handleDataStatisticsError);
       webSocketService.off('sync_started', handleSyncStarted);
       webSocketService.off('initial_sync_batch', handleInitialSyncBatch);
       webSocketService.off('initial_sync_complete', handleInitialSyncComplete);
@@ -422,12 +527,12 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
     isConnected,
     connectionError,
     
-    // Data (Real-time only - NO requests)
+    // Data (WebSocket only - NO REST API calls)
     tickets,
     newTickets,
     pollingStatus,
     
-    // Pagination (Local pagination only)
+    // Pagination (WebSocket only)
     pagination,
     isLoading,
     isInitialLoad,
@@ -440,14 +545,20 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
     
     // Sync state and controls
     syncState,
-    syncProgress: syncState.syncProgress,
     requestInitialSync,
+    requestIncrementalSync,
     
-    // Pagination controls (Local pagination only)
+    // Pagination controls (WebSocket only - NO REST API calls)
+    fetchTickets, // This now uses WebSocket instead of REST API
+    fetchStatistics, // This now uses WebSocket instead of REST API
     nextPage,
     prevPage,
     goToPage,
     changePageSize,
+    
+    // Cache management
+    clearPageCache,
+    clearPageCacheForPage,
     
     // Manual controls
     addTicket,
@@ -455,11 +566,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
     connect: () => webSocketService.connect(serverUrl),
     disconnect: () => webSocketService.disconnect(),
     joinRoom: (room) => webSocketService.joinRoom(room),
-    leaveRoom: (room) => webSocketService.leaveRoom(room),
-    
-    // Loading state controls (for timeout handling)
-    setIsInitialLoad,
-    setIsLoading
+    leaveRoom: (room) => webSocketService.leaveRoom(room)
   };
 };
 

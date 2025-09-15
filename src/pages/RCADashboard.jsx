@@ -25,7 +25,7 @@ const RCADashboard = () => {
   })
   const filterDropdownRef = useRef(null)
 
-  // WebSocket-only hook for all data operations (Real-time only)
+  // WebSocket-only hook for all data operations (NO REST API calls)
   const {
     isConnected: wsConnected,
     connectionError: wsError,
@@ -39,15 +39,12 @@ const RCADashboard = () => {
     isLoading: wsLoading,
     isInitialLoad: wsInitialLoad,
     dataStatistics,
-    syncState: wsSyncState,
-    syncProgress: wsSyncProgress,
+    fetchTickets: wsFetchTickets,
+    fetchStatistics: wsFetchStatistics,
     nextPage: wsNextPage,
     prevPage: wsPrevPage,
     goToPage: wsGoToPage,
-    changePageSize: wsChangePageSize,
-    requestInitialSync,
-    setIsInitialLoad,
-    setIsLoading
+    changePageSize: wsChangePageSize
   } = useWebSocketOnly(import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081')
 
   // Handle click outside to close filter dropdown
@@ -67,32 +64,32 @@ const RCADashboard = () => {
     }
   }, [showFilterDropdown])
 
-  // Initial data sync via WebSocket (Real-time only)
+  // Fetch tickets via WebSocket (NO REST API calls)
+  const fetchTickets = (page = 1, limit = 10, isBackgroundRefresh = false) => {
+    console.log('🔄 Fetching tickets via WebSocket (NO REST API calls):', { page, limit, isBackgroundRefresh })
+    wsFetchTickets(page, limit, filters, isBackgroundRefresh)
+    if (!isBackgroundRefresh) {
+      setLastUpdated(new Date())
+    }
+  }
+
+  // Initial data fetch via WebSocket (NO REST API calls)
   useEffect(() => {
     if (wsConnected && wsInitialLoad) {
-      console.log('🚀 Requesting initial sync via WebSocket (Real-time only)')
-      requestInitialSync()
-      setLastUpdated(new Date())
-      
-      // Set a timeout to prevent infinite loading (30 seconds)
-      const timeoutId = setTimeout(() => {
-        console.warn('⚠️ Initial sync timeout - setting loading to false');
-        setIsInitialLoad(false);
-        setIsLoading(false);
-      }, 30000);
-      
-      return () => clearTimeout(timeoutId);
+      console.log('🚀 Initial data fetch via WebSocket (NO REST API calls)')
+      fetchTickets(1, 10)
+      wsFetchStatistics() // Also fetch statistics via WebSocket
     }
-  }, [wsConnected, wsInitialLoad, requestInitialSync])
+  }, [wsConnected, wsInitialLoad])
 
 
-  // Pagination handlers (Local pagination only)
+  // Pagination handlers (WebSocket only)
   const handlePageChange = (newPage) => {
-    wsGoToPage(newPage)
+    wsGoToPage(newPage, filters)
   }
 
   const handleLimitChange = (newLimit) => {
-    wsChangePageSize(newLimit)
+    wsChangePageSize(newLimit, filters)
   }
 
   // Summary data - calculated from WebSocket data and statistics
@@ -856,23 +853,6 @@ const RCADashboard = () => {
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">Loading tickets...</h3>
               <p className="text-gray-500">Fetching data from the server</p>
-              
-              {/* Sync Progress Indicator */}
-              {wsSyncProgress && wsSyncProgress.totalBatches > 0 && (
-                <div className="mt-6 max-w-md mx-auto">
-                  <div className="flex justify-between text-sm text-gray-600 mb-2">
-                    <span>Syncing tickets...</span>
-                    <span>{wsSyncProgress.percentage}%</span>
-                  </div>
-                  <Progress 
-                    value={wsSyncProgress.percentage} 
-                    className="h-2"
-                  />
-                  <p className="text-xs text-gray-500 mt-2">
-                    Batch {wsSyncProgress.currentBatch} of {wsSyncProgress.totalBatches}
-                  </p>
-                </div>
-              )}
             </div>
           ) : filteredCases.length === 0 ? (
             <div className="text-center py-12">
