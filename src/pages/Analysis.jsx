@@ -23,6 +23,12 @@ const Analysis = () => {
   const [similarCasesLoading, setSimilarCasesLoading] = useState(false)
   const [similarCasesError, setSimilarCasesError] = useState(null)
   
+  // AI suggestions state
+  const [aiSuggestions, setAiSuggestions] = useState([])
+  const [aiSuggestionsData, setAiSuggestionsData] = useState([]) // Store full suggestion objects
+  const [aiSuggestionsLoading, setAiSuggestionsLoading] = useState(false)
+  const [aiSuggestionsError, setAiSuggestionsError] = useState(null)
+  
   const [analysisNotes, setAnalysisNotes] = useState('')
   const [rootCause, setRootCause] = useState('')
   const [recommendations, setRecommendations] = useState('')
@@ -49,11 +55,50 @@ const Analysis = () => {
       console.log('Similar cases received:', response)
       
       setSimilarCases(response)
+      return response
     } catch (err) {
       console.error('Error fetching similar cases:', err)
       setSimilarCasesError(err.message || 'Failed to fetch similar cases')
+      return null
     } finally {
       setSimilarCasesLoading(false)
+    }
+  }
+
+  // Fetch AI suggestions based on similar cases
+  const fetchAISuggestions = async (similarCasesData, currentTicket) => {
+    try {
+      setAiSuggestionsLoading(true)
+      setAiSuggestionsError(null)
+      console.log('Fetching AI suggestions for similar cases:', similarCasesData)
+      
+      if (similarCasesData && similarCasesData.results && similarCasesData.results.length > 0) {
+        const response = await ticketService.getAISuggestions(similarCasesData.results, currentTicket)
+        console.log('AI suggestions received:', response)
+        
+        // Extract suggestions from response - adjust based on actual API response structure
+        const suggestions = response.suggestions || response.data?.suggestions || []
+        console.log('Raw suggestions from API:', suggestions)
+        
+        // Convert suggestion objects to strings for display
+        const suggestionStrings = suggestions.map(suggestion => {
+          if (typeof suggestion === 'string') {
+            return suggestion
+          } else if (suggestion && typeof suggestion === 'object') {
+            return suggestion.suggestion || suggestion.text || suggestion.description || JSON.stringify(suggestion)
+          }
+          return String(suggestion)
+        })
+        
+        console.log('Processed suggestion strings:', suggestionStrings)
+        setAiSuggestions(suggestionStrings)
+        setAiSuggestionsData(suggestions) // Store full objects for future use
+      }
+    } catch (err) {
+      console.error('Error fetching AI suggestions:', err)
+      setAiSuggestionsError(err.message || 'Failed to fetch AI suggestions')
+    } finally {
+      setAiSuggestionsLoading(false)
     }
   }
 
@@ -73,7 +118,11 @@ const Analysis = () => {
         
         // Fetch similar cases after ticket data is loaded
         if (ticket) {
-          await fetchSimilarCases(ticket)
+          const similarCasesData = await fetchSimilarCases(ticket)
+          // Fetch AI suggestions after similar cases are loaded
+          if (similarCasesData) {
+            await fetchAISuggestions(similarCasesData, ticket)
+          }
         }
       } catch (err) {
         console.error('Error fetching ticket data:', err)
@@ -274,7 +323,7 @@ const Analysis = () => {
           onResponseChange={setAnalysisResponse}
           onNext={handleRcaNext}
           onPrevious={handleRcaPrevious}
-          aiSuggestions={getCurrentStepData().aiSuggestions}
+           aiSuggestions={aiSuggestions.length > 0 ? aiSuggestions : getCurrentStepData().aiSuggestions}
           similarCases={similarCases}
           nextButtonText={rcaStep === 5 ? "Complete RCA →" : "Next Step →"}
           showPrevious={rcaStep > 1}
