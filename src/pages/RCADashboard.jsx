@@ -957,7 +957,7 @@ const RCADashboard = () => {
                               {highlightText(case_.title, searchTerm)}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {highlightText(case_.id, searchTerm)} • {highlightText(case_.system, searchTerm)}
+                               • {highlightText(case_.system, searchTerm)}
                             </div>
                           </div>
                         </td>
