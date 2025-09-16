@@ -150,5 +150,14 @@ export const ticketService = {
       currentTicket
     });
     return response.data;
+  },
+
+  // Resolve ticket with root cause analysis
+  resolveTicket: async ({ rootCause, ticket }) => {
+    const response = await api.post('/v1/tickets/resolve', {
+      rootCause,
+      ticket
+    });
+    return response.data;
   }
 };

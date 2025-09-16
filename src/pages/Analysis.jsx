@@ -233,13 +233,33 @@ const Analysis = () => {
   ]
 
   // RCA Workflow Handlers
-  const handleRcaNext = () => {
+  const handleRcaNext = async () => {
     if (rcaStep < 5) {
       setRcaStep(rcaStep + 1)
     } else {
-      // Complete RCA - keep user on analysis page
-      console.log('RCA completed for ticket:', ticketId)
-      // You can add success message or update UI state here
+      // Complete RCA - call the API to resolve the ticket
+      try {
+        
+        if (!ticketData) {
+          console.error('No ticket data available')
+          return
+        }
+
+        const response = await ticketService.resolveTicket({
+          rootCause: analysisResponse,
+          ticket: ticketData
+        })
+        
+        // Show success message or navigate TODO: add success message
+        alert('RCA completed successfully! Ticket has been resolved.')
+        
+        // Optionally navigate back to dashboard or show success state
+        navigate('/rca-dashboard')
+        
+      } catch (error) {
+        console.error('Error completing RCA:', error)
+        alert(`Error completing RCA: ${error.message}`)
+      }
     }
   }
 
