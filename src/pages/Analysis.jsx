@@ -6,11 +6,12 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Textarea } from '../components/ui/textarea'
 import { Badge } from '../components/ui/badge'
+import { Skeleton } from '../components/ui/skeleton'
 import { RCAWorkflow } from '../components/RCA'
 import { FiUpload, FiImage, FiUser, FiPlus, FiClock, FiMoreHorizontal, FiSearch, FiZap, FiTrendingUp, FiAlertTriangle, FiCheckCircle } from 'react-icons/fi'
 
 const Analysis = () => {
-  const { ticketId } = useParams()
+  const { id, ticketId } = useParams()
   const navigate = useNavigate()
   
   // Ticket data state
@@ -22,6 +23,12 @@ const Analysis = () => {
   const [similarCases, setSimilarCases] = useState(null)
   const [similarCasesLoading, setSimilarCasesLoading] = useState(false)
   const [similarCasesError, setSimilarCasesError] = useState(null)
+  
+  // AI suggestions state
+  const [aiSuggestions, setAiSuggestions] = useState([])
+  const [aiSuggestionsData, setAiSuggestionsData] = useState([]) // Store full suggestion objects
+  const [aiSuggestionsLoading, setAiSuggestionsLoading] = useState(false)
+  const [aiSuggestionsError, setAiSuggestionsError] = useState(null)
   
   const [analysisNotes, setAnalysisNotes] = useState('')
   const [rootCause, setRootCause] = useState('')
@@ -49,11 +56,50 @@ const Analysis = () => {
       console.log('Similar cases received:', response)
       
       setSimilarCases(response)
+      return response
     } catch (err) {
       console.error('Error fetching similar cases:', err)
       setSimilarCasesError(err.message || 'Failed to fetch similar cases')
+      return null
     } finally {
       setSimilarCasesLoading(false)
+    }
+  }
+
+  // Fetch AI suggestions based on similar cases
+  const fetchAISuggestions = async (similarCasesData, currentTicket) => {
+    try {
+      setAiSuggestionsLoading(true)
+      setAiSuggestionsError(null)
+      console.log('Fetching AI suggestions for similar cases:', similarCasesData)
+      
+      if (similarCasesData && similarCasesData.results && similarCasesData.results.length > 0) {
+        const response = await ticketService.getAISuggestions(similarCasesData.results, currentTicket)
+        console.log('AI suggestions received:', response)
+        
+        // Extract suggestions from response - adjust based on actual API response structure
+        const suggestions = response.suggestions || response.data?.suggestions || []
+        console.log('Raw suggestions from API:', suggestions)
+        
+        // Convert suggestion objects to strings for display
+        const suggestionStrings = suggestions.map(suggestion => {
+          if (typeof suggestion === 'string') {
+            return suggestion
+          } else if (suggestion && typeof suggestion === 'object') {
+            return suggestion.suggestion || suggestion.text || suggestion.description || JSON.stringify(suggestion)
+          }
+          return String(suggestion)
+        })
+        
+        console.log('Processed suggestion strings:', suggestionStrings)
+        setAiSuggestions(suggestionStrings)
+        setAiSuggestionsData(suggestions) // Store full objects for future use
+      }
+    } catch (err) {
+      console.error('Error fetching AI suggestions:', err)
+      setAiSuggestionsError(err.message || 'Failed to fetch AI suggestions')
+    } finally {
+      setAiSuggestionsLoading(false)
     }
   }
 
@@ -63,9 +109,9 @@ const Analysis = () => {
       try {
         setLoading(true)
         setError(null)
-        console.log('Fetching ticket data for ID:', ticketId)
+        console.log('Fetching ticket data for ID:', id)
         
-        const response = await ticketService.getTicketById(ticketId)
+        const response = await ticketService.getTicketById(id)
         console.log('Ticket data received:', response)
         
         const ticket = response.data || response
@@ -73,7 +119,11 @@ const Analysis = () => {
         
         // Fetch similar cases after ticket data is loaded
         if (ticket) {
-          await fetchSimilarCases(ticket)
+          const similarCasesData = await fetchSimilarCases(ticket)
+          // Fetch AI suggestions after similar cases are loaded
+          if (similarCasesData) {
+            await fetchAISuggestions(similarCasesData, ticket)
+          }
         }
       } catch (err) {
         console.error('Error fetching ticket data:', err)
@@ -83,10 +133,10 @@ const Analysis = () => {
       }
     }
 
-    if (ticketId) {
+    if (id) {
       fetchTicketData()
     }
-  }, [ticketId])
+  }, [id])
 
 
 
@@ -213,13 +263,35 @@ const Analysis = () => {
     // Implement report generation
   }
 
-  // Show loading state
+  // Show loading state with skeleton loaders instead of full page spinner
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading ticket data...</p>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          
+          
+
+          {/* RCA Workflow with skeleton loaders */}
+          <RCAWorkflow
+            currentStep={rcaStep}
+            totalSteps={5}
+            stepTitle={getCurrentStepData().title}
+            aiGuidance={getCurrentStepData().aiGuidance}
+            response={analysisResponse}
+            onResponseChange={setAnalysisResponse}
+            onNext={handleRcaNext}
+            onPrevious={handleRcaPrevious}
+            aiSuggestions={[]}
+            similarCases={null}
+            aiSuggestionsLoading={true}
+            similarCasesLoading={true}
+            nextButtonText={rcaStep === 5 ? "Complete RCA →" : "Next Step →"}
+            showPrevious={rcaStep > 1}
+            canProceed={analysisResponse.trim().length > 0}
+            onSaveProgress={handleSaveProgress}
+            onGenerateReport={handleGenerateReport}
+            ticketData={null}
+          />
         </div>
       </div>
     )
@@ -247,23 +319,6 @@ const Analysis = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        {/* Ticket Information Header */}
-        {ticketData && (
-          <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Analysis: {ticketData.short_description || 'No Title'}
-            </h1>
-            <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-              <span><strong>Ticket ID:</strong> {ticketData.ticket_id}</span>
-              <span><strong>Source:</strong> {ticketData.source}</span>
-              <span><strong>Status:</strong> {ticketData.status}</span>
-              <span><strong>Priority:</strong> {ticketData.priority}</span>
-              <span><strong>Category:</strong> {ticketData.category}</span>
-            </div>
-          </div>
-        )}
-
-
         {/* RCA Workflow */}
         <RCAWorkflow
           currentStep={rcaStep}
@@ -274,13 +329,16 @@ const Analysis = () => {
           onResponseChange={setAnalysisResponse}
           onNext={handleRcaNext}
           onPrevious={handleRcaPrevious}
-          aiSuggestions={getCurrentStepData().aiSuggestions}
+          aiSuggestions={aiSuggestions.length > 0 ? aiSuggestions : getCurrentStepData().aiSuggestions}
           similarCases={similarCases}
+          aiSuggestionsLoading={aiSuggestionsLoading}
+          similarCasesLoading={similarCasesLoading}
           nextButtonText={rcaStep === 5 ? "Complete RCA →" : "Next Step →"}
           showPrevious={rcaStep > 1}
           canProceed={analysisResponse.trim().length > 0}
           onSaveProgress={handleSaveProgress}
           onGenerateReport={handleGenerateReport}
+          ticketData={ticketData}
         />
       </div>
     </div>
