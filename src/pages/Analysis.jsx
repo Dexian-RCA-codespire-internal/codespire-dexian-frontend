@@ -37,6 +37,15 @@ const Analysis = () => {
   // RCA Workflow State
   const [rcaStep, setRcaStep] = useState(1)
   const [analysisResponse, setAnalysisResponse] = useState('')
+  
+  // Step data tracking
+  const [stepData, setStepData] = useState({
+    problem_step1: '',
+    timeline_step2: '',
+    impact_step3: '',
+    findings_step4: '',
+    root_cause_step5: ''
+  })
 
   // Fetch similar cases
   const fetchSimilarCases = async (ticketData) => {
@@ -234,38 +243,71 @@ const Analysis = () => {
 
   // RCA Workflow Handlers
   const handleRcaNext = async () => {
-    if (rcaStep < 5) {
-      setRcaStep(rcaStep + 1)
-    } else {
-      // Complete RCA - call the API to resolve the ticket
-      try {
-        
-        if (!ticketData) {
-          console.error('No ticket data available')
-          return
-        }
+    try {
+      if (!ticketData) {
+        console.error('No ticket data available')
+        return
+      }
 
-        const response = await ticketService.resolveTicket({
+      // Update step data with current response
+      const updatedStepData = {
+        ...stepData,
+        [`${rcaStep === 1 ? 'problem' : 
+           rcaStep === 2 ? 'timeline' : 
+           rcaStep === 3 ? 'impact' : 
+           rcaStep === 4 ? 'findings' : 'root_cause'}_step${rcaStep}`]: analysisResponse,
+        status: rcaStep === 5 ? 'Resolved' : 'In Progress'
+      }
+
+      // Call API to update ticket with step data
+      await ticketService.updateTicketSteps({
+        ticketId: ticketData._id,
+        stepData: updatedStepData
+      })
+
+      // Update local step data state
+      setStepData(updatedStepData)
+
+      if (rcaStep < 5) {
+        // Move to next step
+        setRcaStep(rcaStep + 1)
+        // Clear response for next step
+        setAnalysisResponse('')
+      } else {
+        // Complete RCA - also call the resolve API
+        const resolveResponse = await ticketService.resolveTicket({
           rootCause: analysisResponse,
           ticket: ticketData
         })
         
-        // Show success message or navigate TODO: add success message
+        console.log('Ticket resolved successfully:', resolveResponse)
+        
+        // Show success message and navigate
         alert('RCA completed successfully! Ticket has been resolved.')
-        
-        // Optionally navigate back to dashboard or show success state
         navigate('/rca-dashboard')
-        
-      } catch (error) {
-        console.error('Error completing RCA:', error)
-        alert(`Error completing RCA: ${error.message}`)
       }
+    } catch (error) {
+      console.error('Error saving step data:', error)
+      alert(`Error saving step data: ${error.message}`)
     }
   }
 
   const handleRcaPrevious = () => {
     if (rcaStep > 1) {
-      setRcaStep(rcaStep - 1)
+      const previousStep = rcaStep - 1
+      setRcaStep(previousStep)
+      
+      // Load previous step data if available
+      const stepKey = `${previousStep === 1 ? 'problem' : 
+                       previousStep === 2 ? 'timeline' : 
+                       previousStep === 3 ? 'impact' : 
+                       previousStep === 4 ? 'findings' : 'root_cause'}_step${previousStep}`
+      
+      if (stepData[stepKey]) {
+        setAnalysisResponse(stepData[stepKey])
+      } else {
+        setAnalysisResponse('')
+      }
     }
   }
 
@@ -287,6 +329,18 @@ const Analysis = () => {
   const handleStepClick = (stepNumber) => {
     // Allow navigation to any step
     setRcaStep(stepNumber)
+    
+    // Load existing step data if available
+    const stepKey = `${stepNumber === 1 ? 'problem' : 
+                     stepNumber === 2 ? 'timeline' : 
+                     stepNumber === 3 ? 'impact' : 
+                     stepNumber === 4 ? 'findings' : 'root_cause'}_step${stepNumber}`
+    
+    if (stepData[stepKey]) {
+      setAnalysisResponse(stepData[stepKey])
+    } else {
+      setAnalysisResponse('')
+    }
   }
 
   // Show loading state with skeleton loaders instead of full page spinner

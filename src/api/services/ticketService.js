@@ -159,5 +159,11 @@ export const ticketService = {
       ticket
     });
     return response.data;
+  },
+
+  // Update ticket with RCA step data
+  updateTicketSteps: async ({ ticketId, stepData }) => {
+    const response = await api.put(`/v1/tickets/${ticketId}`, stepData);
+    return response.data;
   }
 };
