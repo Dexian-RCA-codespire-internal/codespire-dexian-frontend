@@ -118,7 +118,7 @@ const RCAWorkflow = ({
                 const isCompleted = stepNumber < currentStep
                 const isCurrent = stepNumber === currentStep
                 const isFuture = stepNumber > currentStep
-                const isClickable = onStepClick && (isCompleted || isCurrent)
+                const isClickable = onStepClick
                 
                 return (
                   <div 
@@ -137,8 +137,8 @@ const RCAWorkflow = ({
                         ? 'bg-green-600 text-white hover:bg-green-700' 
                         : isCurrent 
                         ? 'bg-green-600 text-white hover:bg-green-700' 
-                        : 'bg-gray-200 text-gray-600'
-                    } ${isClickable ? 'hover:scale-105' : ''}`}>
+                        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                    } ${isClickable ? 'hover:scale-105 cursor-pointer' : 'cursor-default'}`}>
                       {isCompleted ? <FiCheck className="w-4 h-4" /> : stepNumber}
                     </div>
                     <span className={`text-xs mt-1 transition-colors duration-200 ${
