@@ -19,6 +19,7 @@ const RCADashboard = () => {
   const [lastUpdated, setLastUpdated] = useState(null)
   const [showInfoPopup, setShowInfoPopup] = useState(false)
   const [autoShowReason, setAutoShowReason] = useState(null)
+  const [userManuallyClosed, setUserManuallyClosed] = useState(false)
   const [filters, setFilters] = useState({
     sources: [],
     priorities: [],
@@ -55,14 +56,17 @@ const RCADashboard = () => {
   // Handle click outside to close filter dropdown and info popup
   useEffect(() => {
     const handleClickOutside = (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      
       if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target)) {
         setShowFilterDropdown(false)
       }
       if (infoPopupRef.current && !infoPopupRef.current.contains(event.target)) {
-        // Only close popup if it's not auto-opened due to service disconnection
-        if (!autoShowReason) {
-          setShowInfoPopup(false)
-        }
+        // Close popup when clicking outside, regardless of auto-show reason
+        setShowInfoPopup(false)
+        setAutoShowReason(null) // Clear auto-show reason when manually closed
+        setUserManuallyClosed(true) // Mark as manually closed to prevent auto-reopening
       }
     }
 
@@ -99,20 +103,45 @@ const RCADashboard = () => {
     const isBackendDisconnected = !wsConnected
     const isServiceNowDisconnected = wsConnected && (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false)
     
-    if (isBackendDisconnected) {
-      setShowInfoPopup(true)
-      setAutoShowReason('Backend disconnected')
-    } else if (isServiceNowDisconnected) {
-      setShowInfoPopup(true)
-      setAutoShowReason('ServiceNow disconnected')
-    } else if (autoShowReason) {
-      // Auto-hide popup when all services are connected (with a small delay)
-      setTimeout(() => {
-        setShowInfoPopup(false)
-        setAutoShowReason(null)
-      }, 3000) // 3 second delay to let user see the reconnection
+    // Only auto-show if user hasn't manually closed it
+    if (!userManuallyClosed) {
+      if (isBackendDisconnected) {
+        setShowInfoPopup(true)
+        setAutoShowReason('Backend disconnected')
+      } else if (isServiceNowDisconnected) {
+        setShowInfoPopup(true)
+        setAutoShowReason('ServiceNow disconnected')
+      } else if (autoShowReason) {
+        // Auto-hide popup when all services are connected (with a small delay)
+        setTimeout(() => {
+          setShowInfoPopup(false)
+          setAutoShowReason(null)
+          setUserManuallyClosed(false) // Reset manual close flag when services reconnect
+        }, 3000) // 3 second delay to let user see the reconnection
+      }
     }
-  }, [wsConnected, pollingStatus, autoShowReason])
+  }, [wsConnected, pollingStatus, autoShowReason, userManuallyClosed])
+
+  // Periodic popup every 20 seconds when there are service issues
+  useEffect(() => {
+    const isBackendDisconnected = !wsConnected
+    const isServiceNowDisconnected = wsConnected && (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false)
+    
+    // Only show periodic popup if there are service issues
+    if (isBackendDisconnected || isServiceNowDisconnected) {
+      const interval = setInterval(() => {
+        // Show popup every 20 seconds to remind user of issues
+        setShowInfoPopup(true)
+        if (isBackendDisconnected) {
+          setAutoShowReason('Backend disconnected')
+        } else if (isServiceNowDisconnected) {
+          setAutoShowReason('ServiceNow disconnected')
+        }
+      }, 20000) // 20 seconds
+
+      return () => clearInterval(interval)
+    }
+  }, [wsConnected, pollingStatus])
 
   // Pagination handlers (WebSocket only)
   const handlePageChange = (newPage) => {
@@ -558,14 +587,14 @@ const RCADashboard = () => {
                 variant="outline" 
                 size="sm"
                 onClick={() => setShowInfoPopup(!showInfoPopup)}
-                className={`flex items-center justify-center ${
-                  showInfoPopup && autoShowReason 
+                className={`relative flex items-center justify-center ${
+                  autoShowReason 
                     ? 'border-red-500 bg-red-50 text-red-700' 
                     : ''
                 }`}
               >
                 <FiInfo className="text-lg" />
-                {showInfoPopup && autoShowReason && (
+                {autoShowReason && (
                   <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
                 )}
               </Button>
@@ -573,18 +602,22 @@ const RCADashboard = () => {
               {/* Info Popup */}
               {showInfoPopup && (
                 <div className="absolute right-0 top-10 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4">
-                  {/* Popup Header */}
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-medium text-gray-900">Service Status</h3>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowInfoPopup(false)}
-                      className="h-6 w-6 p-0"
-                    >
-                      ×
-                    </Button>
-                  </div>
+          {/* Popup Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-gray-900">Service Status</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowInfoPopup(false)
+                setAutoShowReason(null)
+                setUserManuallyClosed(true)
+              }}
+              className="h-6 w-6 p-0"
+            >
+              ×
+            </Button>
+          </div>
                   
                   
                   <div className="space-y-4">
@@ -636,37 +669,11 @@ const RCADashboard = () => {
                       
                       {wsConnected && (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false) && (
                         <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
-                          ServiceNow disconnected - check credentials or connection
+                          ServiceNow is disconnected
                         </div>
                       )}
                     </div>
 
-                    {/* Data Statistics */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-700">Data Status</span>
-                        <span className="text-xs text-gray-600">
-                          {wsPagination.totalCount || 0} tickets loaded
-                        </span>
-                      </div>
-                      
-                      {wsLoading && (
-                        <div className="flex items-center gap-2 text-xs text-blue-600">
-                          <FiLoader className="w-3 h-3 animate-spin" />
-                          Loading data...
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Real-time Updates */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-700">Real-time Updates</span>
-                        <span className="text-xs text-gray-600">
-                          {newTickets.length} new ticket{newTickets.length !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                    </div>
 
                     {/* Close Button */}
                     <div className="pt-2 border-t border-gray-200">

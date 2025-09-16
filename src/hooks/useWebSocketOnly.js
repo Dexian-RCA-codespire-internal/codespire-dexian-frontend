@@ -372,13 +372,19 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
 
     // Polling status handler
     const handlePollingStatus = (data) => {
+      console.log('🔍 Received polling status event:', data);
+      
       // The backend sends data in format: { type: 'polling_status', status: actualData, timestamp: '...' }
       // We need to extract the actual status data
       const statusData = data.status || data;
       
+      console.log('🔍 Extracted status data:', statusData);
+      
       // Update polling status and track last event
       setPollingStatus(statusData);
       setLastPollingEvent(new Date());
+      
+      console.log('🔍 Updated polling status in state');
     };
 
     // Notification handler (now defined above with useCallback)
@@ -587,6 +593,119 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
 
       return () => clearInterval(pingInterval);
     }
+  }, [isConnected]);
+
+  // Perform immediate health check when WebSocket connects
+  useEffect(() => {
+    if (isConnected && !pollingStatus) {
+      // Perform immediate health check when first connecting
+      fetch('http://localhost:8081/api/v1/servicenow-polling/health-check')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            setPollingStatus({
+              isActive: data.data.success,
+              isHealthy: data.data.success,
+              status: data.data.success ? 'healthy' : 'error',
+              message: data.data.message,
+              timestamp: new Date()
+            });
+          } else {
+            setPollingStatus({
+              isActive: false,
+              isHealthy: false,
+              status: 'error',
+              message: data.message || 'Health check failed',
+              timestamp: new Date()
+            });
+          }
+        })
+        .catch(error => {
+          console.error('Failed to perform initial health check:', error);
+          setPollingStatus({
+            isActive: false,
+            isHealthy: false,
+            status: 'error',
+            message: 'Health check failed',
+            timestamp: new Date()
+          });
+        });
+    }
+  }, [isConnected, pollingStatus]);
+
+  // Periodic health check every 30 seconds to detect configuration changes
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const interval = setInterval(() => {
+      fetch('http://localhost:8081/api/v1/servicenow-polling/health-check')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            const newStatus = {
+              isActive: data.data.success,
+              isHealthy: data.data.success,
+              status: data.data.success ? 'healthy' : 'error',
+              message: data.data.message,
+              timestamp: new Date()
+            };
+            
+            // Only update if status has changed
+            setPollingStatus(prev => {
+              if (!prev || 
+                  prev.isActive !== newStatus.isActive || 
+                  prev.isHealthy !== newStatus.isHealthy ||
+                  prev.message !== newStatus.message) {
+                console.log('🔄 Health check status changed:', newStatus);
+                return newStatus;
+              }
+              return prev;
+            });
+          } else {
+            const newStatus = {
+              isActive: false,
+              isHealthy: false,
+              status: 'error',
+              message: data.message || 'Health check failed',
+              timestamp: new Date()
+            };
+            
+            setPollingStatus(prev => {
+              if (!prev || 
+                  prev.isActive !== newStatus.isActive || 
+                  prev.isHealthy !== newStatus.isHealthy ||
+                  prev.message !== newStatus.message) {
+                console.log('🔄 Health check status changed:', newStatus);
+                return newStatus;
+              }
+              return prev;
+            });
+          }
+        })
+        .catch(error => {
+          console.error('Failed to perform periodic health check:', error);
+          const newStatus = {
+            isActive: false,
+            isHealthy: false,
+            status: 'error',
+            message: 'Health check failed',
+            timestamp: new Date()
+          };
+          
+          setPollingStatus(prev => {
+            if (!prev || 
+                prev.isActive !== newStatus.isActive || 
+                prev.isHealthy !== newStatus.isHealthy ||
+                prev.message !== newStatus.message) {
+              console.log('🔄 Health check status changed:', newStatus);
+              return newStatus;
+            }
+            return prev;
+          });
+        });
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(interval);
   }, [isConnected]);
 
   // Monitor for missed polling events (polling runs every minute, so if we miss 1.5 events = 1.5 minutes)
