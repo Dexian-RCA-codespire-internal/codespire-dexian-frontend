@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
 import { Badge } from '../ui/badge'
+import { Skeleton } from '../ui/skeleton'
 import { FiMessageCircle, FiZap, FiSearch, FiArrowRight, FiArrowLeft, FiCheck, FiSave, FiDownload } from 'react-icons/fi'
 
 const RCAWorkflow = ({ 
@@ -16,11 +17,14 @@ const RCAWorkflow = ({
   onPrevious, 
   aiSuggestions = [], 
   similarCases = [],
+  aiSuggestionsLoading = false,
+  similarCasesLoading = false,
   nextButtonText = "Next Step →",
   showPrevious = true,
   canProceed = true,
   onSaveProgress,
-  onGenerateReport
+  onGenerateReport,
+  ticketData = null
 }) => {
   return (
     <div className="space-y-8">
@@ -53,6 +57,36 @@ const RCAWorkflow = ({
           </Button>
         </div>
       </div>
+
+           
+      {/* Ticket Information Header */}
+      {ticketData ? (
+        <div className="p-4 bg-white rounded-lg shadow-sm border">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            {ticketData.short_description || 'No Title'}
+          </h1>
+          <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+            <span><strong>Ticket ID:</strong> {ticketData.ticket_id}</span>
+            <span><strong>Source:</strong> {ticketData.source}</span>
+            <span><strong>Status:</strong> {ticketData.status}</span>
+            <span><strong>Priority:</strong> {ticketData.priority}</span>
+            <span><strong>Category:</strong> {ticketData.category}</span>
+          </div>
+        </div>
+      ) : (
+        <div className="p-4 bg-white rounded-lg shadow-sm border">
+          <div className="flex items-center gap-3 mb-2">
+            <Skeleton className="h-8 w-48" />
+          </div>
+          <div className="flex flex-wrap gap-4">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-36" />
+          </div>
+        </div>
+      )}
 
       {/* RCA Progress Card */}
       <Card className="bg-white shadow-sm">
@@ -176,59 +210,108 @@ const RCAWorkflow = ({
 
       {/* Right Sidebar */}
       <div className="lg:col-span-1 space-y-6">
-        {/* AI Suggestions */}
-        {aiSuggestions.length > 0 && (
-          <Card className="bg-white shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
-                <FiZap className="w-5 h-5 mr-2 text-yellow-500" />
-                AI Suggestions
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {aiSuggestions.map((suggestion, index) => (
-                <div 
-                  key={index} 
-                  className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
-                  onClick={() => onResponseChange(suggestion)}
-                >
-                  <p className="text-sm text-gray-700">{suggestion}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+         {/* AI Suggestions */}
+         {(aiSuggestions.length > 0 || aiSuggestionsLoading) && (
+           <Card className="bg-white shadow-sm">
+             <CardHeader>
+               <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
+                 <FiZap className="w-5 h-5 mr-2 text-yellow-500" />
+                 AI Suggestions
+               </CardTitle>
+             </CardHeader>
+             <CardContent className="space-y-3">
+               {aiSuggestionsLoading ? (
+                 // Skeleton loader for AI suggestions
+                 Array.from({ length: 3 }).map((_, index) => (
+                   <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                     <Skeleton className="h-4 w-full mb-2" />
+                     <Skeleton className="h-4 w-3/4 mb-1" />
+                     <Skeleton className="h-4 w-1/2" />
+                   </div>
+                 ))
+               ) : (
+                 aiSuggestions.map((suggestion, index) => (
+                   <div 
+                     key={index} 
+                     className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
+                     onClick={() => onResponseChange(suggestion)}
+                   >
+                     <p className="text-sm text-gray-700">{suggestion}</p>
+                   </div>
+                 ))
+               )}
+             </CardContent>
+           </Card>
+         )}
 
         {/* Similar Cases */}
-        {similarCases.length > 0 && (
+        {(similarCases && similarCases.results && similarCases.results.length > 0) || similarCasesLoading ? (
           <Card className="bg-white shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
                 <FiSearch className="w-5 h-5 mr-2 text-blue-500" />
                 Similar Cases
+                {similarCases && similarCases.total_results && (
+                  <Badge variant="secondary" className="ml-2">
+                    {similarCases.total_results} found
+                  </Badge>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {similarCases.map((caseItem, index) => (
-                <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">{caseItem.id}</p>
-                      <p className="text-sm text-gray-600 mt-1">{caseItem.title}</p>
+              {similarCasesLoading ? (
+                // Skeleton loader for similar cases
+                Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex-1">
+                        <Skeleton className="h-4 w-24 mb-2" />
+                        <Skeleton className="h-4 w-full mb-1" />
+                        <Skeleton className="h-3 w-3/4" />
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <Skeleton className="h-6 w-16" />
+                      </div>
                     </div>
-                    <Badge className={`ml-2 ${
-                      caseItem.match >= 80 ? 'bg-green-100 text-green-800' :
-                      caseItem.match >= 60 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {caseItem.match}% match
-                    </Badge>
+                    <div className="flex flex-wrap gap-2">
+                      <Skeleton className="h-3 w-20" />
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                similarCases.results.map((caseItem, index) => (
+                  <div key={caseItem.ticket_id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">{caseItem.ticket_id}</p>
+                        <p className="text-sm text-gray-600 mt-1">{caseItem.short_description}</p>
+                        {caseItem.description && (
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{caseItem.description}</p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge className={`${
+                          caseItem.confidence_percentage >= 90 ? 'bg-green-100 text-green-800' :
+                          caseItem.confidence_percentage >= 80 ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-orange-100 text-orange-800'
+                        }`}>
+                          {caseItem.confidence_percentage}% match
+                        </Badge>
+                        {/* <span className="text-xs text-gray-500">Rank #{caseItem.rank}</span> */}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-xs text-gray-600">
+                      {/* <span><strong>Status:</strong> {caseItem.status}</span>
+                      <span><strong>Priority:</strong> {caseItem.priority}</span>
+                      <span><strong>Category:</strong> {caseItem.category}</span> */}
+                      <span><strong>Source:</strong> {caseItem.source}</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
-        )}
+        ) : null}
       </div>
       </div>
     </div>

@@ -87,7 +87,7 @@ export const transformTicketToRCACase = (ticket) => {
   const progress = getProgress(stage)
   
   return {
-    id: `RCA-${ticket.ticket_id}`,
+    id: ticket._id, // Use the _id from API response
     ticketId: ticket.ticket_id,
     title: ticket.short_description || 'No Title',
     source: ticket.source || 'ServiceNow',
