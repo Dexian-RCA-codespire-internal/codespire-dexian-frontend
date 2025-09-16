@@ -44,9 +44,30 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
   
   // Request tracking to prevent duplicate requests
   const pendingRequests = useRef(new Set());
+  const requestTimeouts = useRef(new Map());
   
   // Cache for previously fetched pages
   const pageCache = useRef(new Map());
+  
+  // Store handlers in refs to prevent re-creation
+  const handlersRef = useRef({});
+  
+  // Create stable event handlers using useCallback
+  const handleConnection = useCallback((data) => {
+    setIsConnected(data.connected);
+    if (data.connected) {
+      setConnectionError(null);
+      console.log('✅ WebSocket connected - ready for data requests');
+    } else {
+      console.log('❌ WebSocket disconnected:', data.reason);
+    }
+  }, []);
+
+  const handleConnectionError = useCallback((error) => {
+    setConnectionError(error.message || 'Connection failed');
+    setIsConnected(false);
+  }, []);
+
   
   const ticketsRef = useRef([]);
   const newTicketsRef = useRef([]);
@@ -116,6 +137,17 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
     clearPageCache();
   }, []);
 
+  // Create handleTicketUpdate callback after addTicket and updateTicket are defined
+  const handleTicketUpdate = useCallback((data) => {
+    console.log('📡 Received real-time ticket update:', data);
+    
+    if (data.type === 'new_ticket') {
+      addTicket(data.ticket);
+    } else if (data.type === 'updated_ticket') {
+      updateTicket(data.ticket);
+    }
+  }, [addTicket, updateTicket]);
+
   /**
    * Add multiple tickets (for initial sync)
    */
@@ -162,6 +194,11 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
       );
     }, 10000);
   }, []);
+
+  // Create handleNotification callback after addNotification is defined
+  const handleNotification = useCallback((data) => {
+    addNotification(data);
+  }, [addNotification]);
 
   /**
    * Remove notification
@@ -223,8 +260,27 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
     pendingRequests.current.add(requestId);
     
     if (!isBackgroundRefresh) {
+      // Don't clear data for pagination - just set loading state
+      // This prevents the page from jumping to top
       setIsLoading(true);
     }
+    
+    // Set timeout to prevent infinite loading (10 seconds)
+    const timeoutId = setTimeout(() => {
+      console.warn('⚠️ Request timeout for page:', page);
+      pendingRequests.current.delete(requestId);
+      requestTimeouts.current.delete(requestId);
+      setIsLoading(false);
+      setIsInitialLoad(false);
+      
+      addNotification({
+        message: `Request timeout for page ${page}. Please try again.`,
+        notificationType: 'error',
+        timestamp: new Date().toISOString()
+      });
+    }, 10000);
+    
+    requestTimeouts.current.set(requestId, timeoutId);
     
     console.log('🔄 Fetching tickets via WebSocket:', { page, limit, filters });
     
@@ -297,19 +353,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
     // Connect to WebSocket
     webSocketService.connect(serverUrl);
 
-    // Connection status handlers
-    const handleConnection = (data) => {
-      setIsConnected(data.connected);
-      if (data.connected) {
-        setConnectionError(null);
-        console.log('✅ WebSocket connected - ready for data requests');
-      }
-    };
-
-    const handleConnectionError = (error) => {
-      setConnectionError(error.message || 'Connection failed');
-      setIsConnected(false);
-    };
+    // Connection status handlers (now defined above with useCallback)
 
     const handleReconnection = (data) => {
       console.log(`🔄 WebSocket reconnected after ${data.attemptNumber} attempts`);
@@ -324,16 +368,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
       setConnectionError('Failed to reconnect after maximum attempts');
     };
 
-    // Ticket update handlers
-    const handleTicketUpdate = (data) => {
-      console.log('📡 Received real-time ticket update:', data);
-      
-      if (data.type === 'new_ticket') {
-        addTicket(data.ticket);
-      } else if (data.type === 'updated_ticket') {
-        updateTicket(data.ticket);
-      }
-    };
+    // Ticket update handlers (now defined above with useCallback)
 
     // Polling status handler
     const handlePollingStatus = (data) => {
@@ -346,10 +381,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
       setLastPollingEvent(new Date());
     };
 
-    // Notification handler
-    const handleNotification = (data) => {
-      addNotification(data);
-    };
+    // Notification handler (now defined above with useCallback)
 
     // Paginated data handlers (WebSocket responses)
     const handlePaginatedDataResponse = (data) => {
@@ -374,14 +406,36 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
           pageCache.current.delete(oldestKey);
         }
         
-        // Clear pending request
+        // Clear pending request and timeout
         const requestId = `page-${data.pagination.currentPage}-limit-${data.pagination.limit}`;
         pendingRequests.current.delete(requestId);
+        
+        // Clear timeout if it exists
+        if (requestTimeouts.current.has(requestId)) {
+          clearTimeout(requestTimeouts.current.get(requestId));
+          requestTimeouts.current.delete(requestId);
+        }
         
         console.log('✅ Received paginated data via WebSocket:', {
           count: transformedData.length,
           page: data.pagination.currentPage,
           total: data.pagination.totalCount
+        });
+      } else {
+        // Handle unsuccessful response
+        console.error('❌ Paginated data response unsuccessful:', data);
+        setIsLoading(false);
+        setIsInitialLoad(false);
+        
+        // Clear pending requests and timeouts
+        pendingRequests.current.clear();
+        requestTimeouts.current.forEach(timeoutId => clearTimeout(timeoutId));
+        requestTimeouts.current.clear();
+        
+        addNotification({
+          message: `Failed to load page data: ${data.error || 'Unknown error'}`,
+          notificationType: 'error',
+          timestamp: new Date().toISOString()
         });
       }
     };
@@ -391,8 +445,10 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
       setIsLoading(false);
       setIsInitialLoad(false);
       
-      // Clear pending request
+      // Clear pending requests and timeouts
       pendingRequests.current.clear();
+      requestTimeouts.current.forEach(timeoutId => clearTimeout(timeoutId));
+      requestTimeouts.current.clear();
       
       addNotification({
         message: `Failed to load data: ${data.error}`,
@@ -513,10 +569,14 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
       webSocketService.off('incremental_sync_complete', handleIncrementalSyncComplete);
       webSocketService.off('sync_error', handleSyncError);
       
+      // Cleanup timeouts
+      requestTimeouts.current.forEach(timeoutId => clearTimeout(timeoutId));
+      requestTimeouts.current.clear();
+      
       // Disconnect when component unmounts
       webSocketService.disconnect();
     };
-  }, [serverUrl, addTicket, updateTicket, addTicketsBatch, addNotification]);
+  }, [serverUrl, handleConnection, handleConnectionError, handleTicketUpdate, handleNotification]);
 
   // Ping server every 30 seconds to keep connection alive
   useEffect(() => {

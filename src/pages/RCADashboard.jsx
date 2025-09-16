@@ -704,7 +704,7 @@ const RCADashboard = () => {
 
 
         {/* Main Content Area */}
-        <div className="mb-6 max-w-full overflow-x-hidden">
+        <div className="mb-6 max-w-full">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-900">
               Tickets {wsLoading && <span className="text-sm text-gray-500">(Loading...)</span>}
@@ -720,7 +720,7 @@ const RCADashboard = () => {
           </div>
 
           {/* Search Bar with Filter Dropdown */}
-          <div className="relative mb-6 max-w-full overflow-x-hidden" ref={filterDropdownRef}>
+          <div className="relative mb-6 max-w-full" ref={filterDropdownRef}>
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
                 <Input
@@ -781,7 +781,7 @@ const RCADashboard = () => {
 
             {/* Filter Dropdown */}
             {showFilterDropdown && (
-              <Card className="absolute top-full left-0 right-0 mt-2 z-10 bg-white border border-gray-200 shadow-lg">
+              <Card className="absolute top-full left-0 right-0 mt-2 z-20 bg-white border border-gray-200 shadow-lg">
                 <CardContent className="p-6">
                   <div className="flex gap-8">
                     {/* Source Filter */}
@@ -996,6 +996,12 @@ const RCADashboard = () => {
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">Loading tickets...</h3>
               <p className="text-gray-500">Fetching data from the server</p>
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg max-w-md mx-auto">
+                <p className="text-sm text-blue-800">
+                  <strong>First time setup:</strong> If this is your first time running the application, 
+                  the initial data import may take a few minutes. Please be patient.
+                </p>
+              </div>
             </div>
           ) : filteredCases.length === 0 ? (
             <div className="text-center py-12">
@@ -1029,7 +1035,16 @@ const RCADashboard = () => {
                 </div>
               )}
               {/* Desktop Table View */}
-              <div className="hidden lg:block">
+              <div className="hidden lg:block relative">
+                {/* Loading overlay for pagination */}
+                {wsLoading && !wsInitialLoad && (
+                  <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <FiLoader className="text-2xl mx-auto animate-spin text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600">Loading page...</p>
+                    </div>
+                  </div>
+                )}
                 <table className="w-full table-fixed divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr className="h-12">
@@ -1113,7 +1128,16 @@ const RCADashboard = () => {
               </div>
 
               {/* Mobile Card View */}
-              <div className="lg:hidden">
+              <div className="lg:hidden relative">
+                {/* Loading overlay for pagination */}
+                {wsLoading && !wsInitialLoad && (
+                  <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <FiLoader className="text-2xl mx-auto animate-spin text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600">Loading page...</p>
+                    </div>
+                  </div>
+                )}
                 {filteredCases.map((case_, index) => {
                   const isNewTicket = newTickets.some(ticket => ticket.ticketId === case_.ticketId)
                   return (
