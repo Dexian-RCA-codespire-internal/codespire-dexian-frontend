@@ -200,29 +200,44 @@ const RCAWorkflow = ({
         )}
 
         {/* Similar Cases */}
-        {similarCases.length > 0 && (
+        {similarCases && similarCases.results && similarCases.results.length > 0 && (
           <Card className="bg-white shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
                 <FiSearch className="w-5 h-5 mr-2 text-blue-500" />
                 Similar Cases
+                <Badge variant="secondary" className="ml-2">
+                  {similarCases.total_results} found
+                </Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {similarCases.map((caseItem, index) => (
-                <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+              {similarCases.results.map((caseItem, index) => (
+                <div key={caseItem.ticket_id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">{caseItem.id}</p>
-                      <p className="text-sm text-gray-600 mt-1">{caseItem.title}</p>
+                      <p className="text-sm font-medium text-gray-900">{caseItem.ticket_id}</p>
+                      <p className="text-sm text-gray-600 mt-1">{caseItem.short_description}</p>
+                      {caseItem.description && (
+                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{caseItem.description}</p>
+                      )}
                     </div>
-                    <Badge className={`ml-2 ${
-                      caseItem.match >= 80 ? 'bg-green-100 text-green-800' :
-                      caseItem.match >= 60 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {caseItem.match}% match
-                    </Badge>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge className={`${
+                        caseItem.confidence_percentage >= 90 ? 'bg-green-100 text-green-800' :
+                        caseItem.confidence_percentage >= 80 ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-orange-100 text-orange-800'
+                      }`}>
+                        {caseItem.confidence_percentage}% match
+                      </Badge>
+                      {/* <span className="text-xs text-gray-500">Rank #{caseItem.rank}</span> */}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs text-gray-600">
+                    {/* <span><strong>Status:</strong> {caseItem.status}</span>
+                    <span><strong>Priority:</strong> {caseItem.priority}</span>
+                    <span><strong>Category:</strong> {caseItem.category}</span> */}
+                    <span><strong>Source:</strong> {caseItem.source}</span>
                   </div>
                 </div>
               ))}

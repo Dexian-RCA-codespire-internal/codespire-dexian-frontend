@@ -480,18 +480,8 @@ const RCADashboard = () => {
 
   // Function to determine which stage page to navigate to
   const getStageNavigationPath = (stage, ticketId) => {
-    switch (stage.toLowerCase()) {
-      case 'investigation':
-        return `/investigation/${ticketId}`
-      case 'analysis':
-        return `/analysis/${ticketId}`
-      case 'resolution':
-        return `/resolution/${ticketId}`
-      case 'compliant':
-        return `/complete-rca/${ticketId}` // For completed cases, go to Complete RCA page
-      default:
-        return `/complaint/${ticketId}` // Default to complaint page
-    }
+    // Always route to analysis page for resolve functionality
+    return `/analysis/${ticketId}`
   }
 
   const filteredCases = rcaCases.filter(case_ => {
