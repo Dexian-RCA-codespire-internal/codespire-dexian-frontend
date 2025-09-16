@@ -6,7 +6,7 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Progress } from '../components/ui/progress'
 import { Checkbox } from '../components/ui/checkbox'
-import { FiSearch, FiMenu, FiCheck, FiAlertTriangle, FiClipboard, FiChevronDown, FiCreditCard, FiChevronLeft, FiChevronRight, FiWifi, FiWifiOff, FiLoader } from 'react-icons/fi'
+import { FiSearch, FiCheck, FiAlertTriangle, FiClipboard, FiChevronDown, FiCreditCard, FiChevronLeft, FiChevronRight, FiWifi, FiWifiOff, FiLoader, FiInfo } from 'react-icons/fi'
 import { transformTicketToRCACase } from '../api/rcaService'
 import useWebSocketOnly from '../hooks/useWebSocketOnly'
 import NotificationContainer from '../components/ui/NotificationContainer'
@@ -17,6 +17,8 @@ const RCADashboard = () => {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(null)
+  const [showInfoPopup, setShowInfoPopup] = useState(false)
+  const [autoShowReason, setAutoShowReason] = useState(null)
   const [filters, setFilters] = useState({
     sources: [],
     priorities: [],
@@ -24,6 +26,7 @@ const RCADashboard = () => {
     stages: []
   })
   const filterDropdownRef = useRef(null)
+  const infoPopupRef = useRef(null)
 
   // WebSocket-only hook for all data operations (NO REST API calls)
   const {
@@ -32,6 +35,8 @@ const RCADashboard = () => {
     tickets: wsTickets,
     newTickets,
     pollingStatus,
+    setPollingStatus,
+    lastPollingEvent,
     notifications,
     removeNotification,
     clearNotifications,
@@ -47,22 +52,28 @@ const RCADashboard = () => {
     changePageSize: wsChangePageSize
   } = useWebSocketOnly(import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081')
 
-  // Handle click outside to close filter dropdown
+  // Handle click outside to close filter dropdown and info popup
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target)) {
         setShowFilterDropdown(false)
       }
+      if (infoPopupRef.current && !infoPopupRef.current.contains(event.target)) {
+        // Only close popup if it's not auto-opened due to service disconnection
+        if (!autoShowReason) {
+          setShowInfoPopup(false)
+        }
+      }
     }
 
-    if (showFilterDropdown) {
+    if (showFilterDropdown || showInfoPopup) {
       document.addEventListener('mousedown', handleClickOutside)
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showFilterDropdown])
+  }, [showFilterDropdown, showInfoPopup])
 
   // Fetch tickets via WebSocket (NO REST API calls)
   const fetchTickets = (page = 1, limit = 10, isBackgroundRefresh = false) => {
@@ -79,9 +90,29 @@ const RCADashboard = () => {
       console.log('🚀 Initial data fetch via WebSocket (NO REST API calls)')
       fetchTickets(1, 10)
       wsFetchStatistics() // Also fetch statistics via WebSocket
+      
     }
   }, [wsConnected, wsInitialLoad])
 
+  // Auto-show info popup when any service is disconnected
+  useEffect(() => {
+    const isBackendDisconnected = !wsConnected
+    const isServiceNowDisconnected = wsConnected && (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false)
+    
+    if (isBackendDisconnected) {
+      setShowInfoPopup(true)
+      setAutoShowReason('Backend disconnected')
+    } else if (isServiceNowDisconnected) {
+      setShowInfoPopup(true)
+      setAutoShowReason('ServiceNow disconnected')
+    } else if (autoShowReason) {
+      // Auto-hide popup when all services are connected (with a small delay)
+      setTimeout(() => {
+        setShowInfoPopup(false)
+        setAutoShowReason(null)
+      }, 3000) // 3 second delay to let user see the reconnection
+    }
+  }, [wsConnected, pollingStatus, autoShowReason])
 
   // Pagination handlers (WebSocket only)
   const handlePageChange = (newPage) => {
@@ -504,17 +535,6 @@ const RCADashboard = () => {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold text-gray-900">RCA Dashboard</h1>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-              <span>
-                {wsConnected ? 'Real-time connected' : 'Real-time disconnected'}
-              </span>
-            </div>
-            {lastUpdated && (
-              <div className="text-sm text-gray-500">
-                Last updated: {lastUpdated.toLocaleTimeString()}
-              </div>
-            )}
             {newTickets.length > 0 && (
               <div className="flex items-center gap-1 text-sm text-green-600">
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
@@ -535,9 +555,135 @@ const RCADashboard = () => {
               </div>
             </div>
             
-            <Button variant="outline" size="sm">
-              <FiMenu className="text-lg" />
-            </Button>
+            {/* Info Button for Connectivity Status */}
+            <div className="relative" ref={infoPopupRef}>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowInfoPopup(!showInfoPopup)}
+                className={`flex items-center justify-center ${
+                  showInfoPopup && autoShowReason 
+                    ? 'border-red-500 bg-red-50 text-red-700' 
+                    : ''
+                }`}
+              >
+                <FiInfo className="text-lg" />
+                {showInfoPopup && autoShowReason && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                )}
+              </Button>
+
+              {/* Info Popup */}
+              {showInfoPopup && (
+                <div className="absolute right-0 top-10 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4">
+                  {/* Popup Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-medium text-gray-900">Service Status</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowInfoPopup(false)}
+                      className="h-6 w-6 p-0"
+                    >
+                      ×
+                    </Button>
+                  </div>
+                  
+                  
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-gray-900 text-sm border-b border-gray-200 pb-2">
+                      System Connectivity Status
+                    </h3>
+                    
+                    {/* Backend Connection Status */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">Backend</span>
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          wsConnected 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {wsConnected ? <FiWifi className="w-3 h-3" /> : <FiWifiOff className="w-3 h-3" />}
+                          {wsConnected ? 'Connected' : 'Disconnected'}
+                        </div>
+                      </div>
+                      
+                      {wsError && (
+                        <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                          Backend disconnected
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ServiceNow Connection Status */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">ServiceNow Integration</span>
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          wsConnected && pollingStatus?.isActive !== false && pollingStatus?.isHealthy !== false
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          <FiInfo className="w-3 h-3" />
+                          {wsConnected && pollingStatus?.isActive !== false && pollingStatus?.isHealthy !== false ? 'Active' : 'Disconnected'}
+                        </div>
+                      </div>
+                      
+                      
+                      {!wsConnected && (
+                        <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                          Backend disconnected - ServiceNow unavailable
+                        </div>
+                      )}
+                      
+                      {wsConnected && (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false) && (
+                        <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                          ServiceNow disconnected - check credentials or connection
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Data Statistics */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">Data Status</span>
+                        <span className="text-xs text-gray-600">
+                          {wsPagination.totalCount || 0} tickets loaded
+                        </span>
+                      </div>
+                      
+                      {wsLoading && (
+                        <div className="flex items-center gap-2 text-xs text-blue-600">
+                          <FiLoader className="w-3 h-3 animate-spin" />
+                          Loading data...
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Real-time Updates */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">Real-time Updates</span>
+                        <span className="text-xs text-gray-600">
+                          {newTickets.length} new ticket{newTickets.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Close Button */}
+                    <div className="pt-2 border-t border-gray-200">
+                      <button
+                        onClick={() => setShowInfoPopup(false)}
+                        className="w-full text-xs text-gray-500 hover:text-gray-700 text-center"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

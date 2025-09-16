@@ -15,6 +15,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
   const [tickets, setTickets] = useState([]);
   const [newTickets, setNewTickets] = useState([]);
   const [pollingStatus, setPollingStatus] = useState(null);
+  const [lastPollingEvent, setLastPollingEvent] = useState(null);
   const [notifications, setNotifications] = useState([]);
   
   // Pagination state
@@ -336,7 +337,13 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
 
     // Polling status handler
     const handlePollingStatus = (data) => {
-      setPollingStatus(data.status);
+      // The backend sends data in format: { type: 'polling_status', status: actualData, timestamp: '...' }
+      // We need to extract the actual status data
+      const statusData = data.status || data;
+      
+      // Update polling status and track last event
+      setPollingStatus(statusData);
+      setLastPollingEvent(new Date());
     };
 
     // Notification handler
@@ -522,6 +529,32 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
     }
   }, [isConnected]);
 
+  // Monitor for missed polling events (polling runs every minute, so if we miss 1.5 events = 1.5 minutes)
+  useEffect(() => {
+    if (!isConnected || !lastPollingEvent) return;
+
+    const checkMissedEvents = () => {
+      const now = new Date();
+      const timeSinceLastEvent = now - lastPollingEvent;
+      const oneAndHalfMinutes = 1.5 * 60 * 1000; // 1.5 minutes in milliseconds
+
+      if (timeSinceLastEvent > oneAndHalfMinutes) {
+        setPollingStatus(prev => ({
+          ...prev,
+          isActive: false,
+          isHealthy: false,
+          status: 'error',
+          error: 'No polling events received in the last 1.5 minutes',
+          timestamp: now
+        }));
+      }
+    };
+
+    // Check every 15 seconds for faster detection
+    const interval = setInterval(checkMissedEvents, 15000);
+    return () => clearInterval(interval);
+  }, [isConnected, lastPollingEvent]);
+
   return {
     // Connection status
     isConnected,
@@ -531,6 +564,8 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
     tickets,
     newTickets,
     pollingStatus,
+    setPollingStatus,
+    lastPollingEvent,
     
     // Pagination (WebSocket only)
     pagination,
