@@ -546,12 +546,18 @@ const RCADashboard = () => {
             {/* WebSocket Connection Status */}
             <div className="flex items-center gap-2">
               <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                wsConnected 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-red-100 text-red-800'
+                !wsConnected 
+                  ? 'bg-red-100 text-red-800' 
+                  : (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false)
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-green-100 text-green-800'
               }`}>
-                {wsConnected ? <FiWifi className="w-3 h-3" /> : <FiWifiOff className="w-3 h-3" />}
-                {wsConnected ? 'Connected' : 'Disconnected'}
+                {!wsConnected ? <FiWifiOff className="w-3 h-3" /> : 
+                 (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false) ? 
+                 <FiAlertTriangle className="w-3 h-3" /> : <FiWifi className="w-3 h-3" />}
+                {!wsConnected ? 'Disconnected' : 
+                 (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false) ? 
+                 'Partial' : 'Connected'}
               </div>
             </div>
             
