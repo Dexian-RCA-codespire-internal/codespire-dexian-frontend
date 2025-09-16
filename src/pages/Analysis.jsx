@@ -283,6 +283,14 @@ const Analysis = () => {
     // Implement report generation
   }
 
+  // Handle step navigation
+  const handleStepClick = (stepNumber) => {
+    // Allow navigation to completed steps or current step
+    if (stepNumber <= rcaStep) {
+      setRcaStep(stepNumber)
+    }
+  }
+
   // Show loading state with skeleton loaders instead of full page spinner
   if (loading) {
     return (
@@ -311,6 +319,7 @@ const Analysis = () => {
             onSaveProgress={handleSaveProgress}
             onGenerateReport={handleGenerateReport}
             ticketData={null}
+            onStepClick={handleStepClick}
           />
         </div>
       </div>
@@ -359,6 +368,7 @@ const Analysis = () => {
           onSaveProgress={handleSaveProgress}
           onGenerateReport={handleGenerateReport}
           ticketData={ticketData}
+          onStepClick={handleStepClick}
         />
       </div>
     </div>

@@ -24,7 +24,8 @@ const RCAWorkflow = ({
   canProceed = true,
   onSaveProgress,
   onGenerateReport,
-  ticketData = null
+  ticketData = null,
+  onStepClick = null
 }) => {
   return (
     <div className="space-y-8">
@@ -117,19 +118,32 @@ const RCAWorkflow = ({
                 const isCompleted = stepNumber < currentStep
                 const isCurrent = stepNumber === currentStep
                 const isFuture = stepNumber > currentStep
+                const isClickable = onStepClick && (isCompleted || isCurrent)
                 
                 return (
-                  <div key={stepNumber} className="flex flex-col items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${
+                  <div 
+                    key={stepNumber} 
+                    className={`flex flex-col items-center ${
+                      isClickable ? 'cursor-pointer' : 'cursor-default'
+                    }`}
+                    onClick={() => {
+                      if (isClickable) {
+                        onStepClick(stepNumber)
+                      }
+                    }}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-200 ${
                       isCompleted 
-                        ? 'bg-green-600 text-white' 
+                        ? 'bg-green-600 text-white hover:bg-green-700' 
                         : isCurrent 
-                        ? 'bg-green-600 text-white' 
+                        ? 'bg-green-600 text-white hover:bg-green-700' 
                         : 'bg-gray-200 text-gray-600'
-                    }`}>
+                    } ${isClickable ? 'hover:scale-105' : ''}`}>
                       {isCompleted ? <FiCheck className="w-4 h-4" /> : stepNumber}
                     </div>
-                    <span className="text-xs text-gray-500 mt-1">
+                    <span className={`text-xs mt-1 transition-colors duration-200 ${
+                      isClickable ? 'text-gray-700 hover:text-gray-900' : 'text-gray-500'
+                    }`}>
                       {stepNumber === 1 ? 'Problem' :
                        stepNumber === 2 ? 'Timeline' :
                        stepNumber === 3 ? 'Impact' :
