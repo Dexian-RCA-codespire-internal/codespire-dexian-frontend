@@ -1134,7 +1134,7 @@ const RCADashboard = () => {
                           <Button 
                             size="sm" 
                             className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1"
-                            onClick={() => navigate(getStageNavigationPath(case_.stage, case_.id))}
+                            onClick={() => navigate(getStageNavigationPath(case_.stage, case_))}
                           >
                             Resolve
                           </Button>
