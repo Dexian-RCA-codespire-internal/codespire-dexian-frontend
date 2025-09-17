@@ -89,7 +89,7 @@ const Resolution = () => {
   }
 
   const handleReopenInvestigation = () => {
-    navigate(`/investigation/${ticketId}`)
+    navigate(`/analysis/${ticketId}`)
   }
 
   // RCA Workflow Data

@@ -6,7 +6,10 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Progress } from '../components/ui/progress'
 import { Checkbox } from '../components/ui/checkbox'
-import { FiSearch, FiMenu, FiCheck, FiAlertTriangle, FiClipboard, FiChevronDown, FiCreditCard, FiRefreshCw } from 'react-icons/fi'
+import { FiSearch, FiCheck, FiAlertTriangle, FiClipboard, FiChevronDown, FiCreditCard, FiChevronLeft, FiChevronRight, FiWifi, FiWifiOff, FiLoader, FiInfo } from 'react-icons/fi'
+import { transformTicketToRCACase } from '../api/rcaService'
+import useWebSocketOnly from '../hooks/useWebSocketOnly'
+import NotificationContainer from '../components/ui/NotificationContainer'
 import ChatBot from '../components/ChatBot'
 import { isChatbotEnabled } from '../config/navigation'
 
@@ -15,6 +18,10 @@ const RCADashboard = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState(null)
+  const [showInfoPopup, setShowInfoPopup] = useState(false)
+  const [autoShowReason, setAutoShowReason] = useState(null)
+  const [userManuallyClosed, setUserManuallyClosed] = useState(false)
   const [filters, setFilters] = useState({
     sources: [],
     priorities: [],
@@ -22,66 +29,173 @@ const RCADashboard = () => {
     stages: []
   })
   const filterDropdownRef = useRef(null)
+  const infoPopupRef = useRef(null)
 
-  // Handle click outside to close filter dropdown
+  // WebSocket-only hook for all data operations (NO REST API calls)
+  const {
+    isConnected: wsConnected,
+    connectionError: wsError,
+    tickets: wsTickets,
+    newTickets,
+    pollingStatus,
+    setPollingStatus,
+    lastPollingEvent,
+    notifications,
+    removeNotification,
+    clearNotifications,
+    pagination: wsPagination,
+    isLoading: wsLoading,
+    isInitialLoad: wsInitialLoad,
+    dataStatistics,
+    fetchTickets: wsFetchTickets,
+    fetchStatistics: wsFetchStatistics,
+    nextPage: wsNextPage,
+    prevPage: wsPrevPage,
+    goToPage: wsGoToPage,
+    changePageSize: wsChangePageSize
+  } = useWebSocketOnly(import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081')
+
+  // Handle click outside to close filter dropdown and info popup
   useEffect(() => {
     const handleClickOutside = (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      
       if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target)) {
         setShowFilterDropdown(false)
       }
+      if (infoPopupRef.current && !infoPopupRef.current.contains(event.target)) {
+        // Close popup when clicking outside, regardless of auto-show reason
+        setShowInfoPopup(false)
+        setAutoShowReason(null) // Clear auto-show reason when manually closed
+        setUserManuallyClosed(true) // Mark as manually closed to prevent auto-reopening
+      }
     }
 
-    if (showFilterDropdown) {
+    if (showFilterDropdown || showInfoPopup) {
       document.addEventListener('mousedown', handleClickOutside)
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showFilterDropdown])
+  }, [showFilterDropdown, showInfoPopup])
 
-  // Summary data
+  // Fetch tickets via WebSocket (NO REST API calls)
+  const fetchTickets = (page = 1, limit = 10, isBackgroundRefresh = false) => {
+    console.log('🔄 Fetching tickets via WebSocket (NO REST API calls):', { page, limit, isBackgroundRefresh })
+    wsFetchTickets(page, limit, filters, isBackgroundRefresh)
+    if (!isBackgroundRefresh) {
+      setLastUpdated(new Date())
+    }
+  }
+
+  // Initial data fetch via WebSocket (NO REST API calls)
+  useEffect(() => {
+    if (wsConnected && wsInitialLoad) {
+      console.log('🚀 Initial data fetch via WebSocket (NO REST API calls)')
+      fetchTickets(1, 10)
+      wsFetchStatistics() // Also fetch statistics via WebSocket
+      
+    }
+  }, [wsConnected, wsInitialLoad])
+
+  // Auto-show info popup when any service is disconnected
+  useEffect(() => {
+    const isBackendDisconnected = !wsConnected
+    const isServiceNowDisconnected = wsConnected && (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false)
+    
+    // Only auto-show if user hasn't manually closed it
+    if (!userManuallyClosed) {
+      if (isBackendDisconnected) {
+        setShowInfoPopup(true)
+        setAutoShowReason('Backend disconnected')
+      } else if (isServiceNowDisconnected) {
+        setShowInfoPopup(true)
+        setAutoShowReason('ServiceNow disconnected')
+      } else if (autoShowReason) {
+        // Auto-hide popup when all services are connected (with a small delay)
+        setTimeout(() => {
+          setShowInfoPopup(false)
+          setAutoShowReason(null)
+          setUserManuallyClosed(false) // Reset manual close flag when services reconnect
+        }, 3000) // 3 second delay to let user see the reconnection
+      }
+    }
+  }, [wsConnected, pollingStatus, autoShowReason, userManuallyClosed])
+
+  // Periodic popup every 20 seconds when there are service issues
+  useEffect(() => {
+    const isBackendDisconnected = !wsConnected
+    const isServiceNowDisconnected = wsConnected && (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false)
+    
+    // Only show periodic popup if there are service issues
+    if (isBackendDisconnected || isServiceNowDisconnected) {
+      const interval = setInterval(() => {
+        // Show popup every 20 seconds to remind user of issues
+        setShowInfoPopup(true)
+        if (isBackendDisconnected) {
+          setAutoShowReason('Backend disconnected')
+        } else if (isServiceNowDisconnected) {
+          setAutoShowReason('ServiceNow disconnected')
+        }
+      }, 20000) // 20 seconds
+
+      return () => clearInterval(interval)
+    }
+  }, [wsConnected, pollingStatus])
+
+  // Pagination handlers (WebSocket only)
+  const handlePageChange = (newPage) => {
+    wsGoToPage(newPage, filters)
+  }
+
+  const handleLimitChange = (newLimit) => {
+    wsChangePageSize(newLimit, filters)
+  }
+
+  // Summary data - calculated from WebSocket data and statistics
   const summaryData = [
     {
-      title: 'Active Tickets',
-      value: '45',
-      subtitle: '3 created today',
+      title: 'Total Tickets',
+      value: (dataStatistics?.total || wsPagination.totalCount || 0).toString(),
+      subtitle: `${wsTickets.length} on current page`,
       subtitleColor: 'text-green-600',
       icon: <FiCreditCard className="text-2xl text-green-600" />,
       bgColor: 'bg-white',
       borderColor: 'border-gray-200'
     },
     {
-      title: 'SLA Breached',
-      value: '7',
-      subtitle: 'Needs attention',
+      title: 'Active Tickets',
+      value: (dataStatistics?.open || wsTickets.filter(ticket => ticket.status && !['Closed', 'Resolved', 'Cancelled'].includes(ticket.status)).length).toString(),
+      subtitle: 'Currently open',
+      subtitleColor: 'text-blue-600',
+      icon: <FiAlertTriangle className="text-2xl text-blue-600" />,
+      bgColor: 'bg-white',
+      borderColor: 'border-gray-200'
+    },
+    {
+      title: 'High Priority',
+      value: wsTickets.filter(ticket => ticket.priority === 'P1' || ticket.priority === '1 - Critical' || ticket.priority === '2 - High').length.toString(),
+      subtitle: 'P1 & P2 tickets',
       subtitleColor: 'text-red-600',
-      icon: <FiAlertTriangle className="text-2xl text-red-600" />,
+      icon: <FiClipboard className="text-2xl text-red-600" />,
       bgColor: 'bg-white',
       borderColor: 'border-gray-200'
     },
     {
-      title: 'Awaiting Review',
-      value: '12',
-      subtitle: 'Awaiting approval',
-      subtitleColor: 'text-yellow-600',
-      icon: <FiClipboard className="text-2xl text-yellow-600" />,
-      bgColor: 'bg-white',
-      borderColor: 'border-gray-200'
-    },
-    {
-      title: 'Avg Resolution',
-      value: '4.2',
-      subtitle: 'hrs',
-      subtitleColor: 'text-green-600',
-      icon: <FiCheck className="text-2xl text-green-600" />,
+      title: 'Page Info',
+      value: `${wsPagination.currentPage}/${wsPagination.totalPages}`,
+      subtitle: `${wsPagination.limit} per page`,
+      subtitleColor: 'text-gray-600',
+      icon: <FiCheck className="text-2xl text-gray-600" />,
       bgColor: 'bg-white',
       borderColor: 'border-gray-200'
     }
   ]
 
-  // RCA Cases data
-  const rcaCases = [
+  // RCA Cases data - use WebSocket tickets (NO REST API calls)
+  const rcaCases = wsTickets.length > 0 ? wsTickets : [
     {
       id: 'RCA-001',
       ticketId: 'INC0012345',
@@ -253,8 +367,8 @@ const RCADashboard = () => {
   ]
 
   // Filter options
-  const sourceOptions = ['Jira', 'Zendesk', 'Remedy', 'Servicenow']
-  const priorityOptions = ['P1', 'P2', 'P3']
+  const sourceOptions = ['ServiceNow', 'Jira', 'Zendesk', 'Remedy']
+  const priorityOptions = ['1 - Critical', '2 - High', '3 - Moderate', '4 - Low', '5 - Planning']
   const stageOptions = ['Investigation', 'Analysis', 'Resolution', 'Compliant']
 
   // Filter handlers
@@ -391,19 +505,10 @@ const RCADashboard = () => {
                           (filters.dateRange.startDate || filters.dateRange.endDate) || filters.stages.length > 0
 
   // Function to determine which stage page to navigate to
-  const getStageNavigationPath = (stage, ticketId) => {
-    switch (stage.toLowerCase()) {
-      case 'investigation':
-        return `/investigation/${ticketId}`
-      case 'analysis':
-        return `/analysis/${ticketId}`
-      case 'resolution':
-        return `/resolution/${ticketId}`
-      case 'compliant':
-        return `/complete-rca/${ticketId}` // For completed cases, go to Complete RCA page
-      default:
-        return `/complaint/${ticketId}` // Default to complaint page
-    }
+  const getStageNavigationPath = (stage, case_) => {
+    // Always route to analysis page for resolve functionality
+    // Use both _id and ticket_id in the URL
+    return `/analysis/${case_.id}/${case_.ticketId}`
   }
 
   const filteredCases = rcaCases.filter(case_ => {
@@ -440,22 +545,151 @@ const RCADashboard = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* Notification Container */}
+      <NotificationContainer 
+        notifications={notifications}
+        removeNotification={removeNotification}
+        clearNotifications={clearNotifications}
+      />
+      
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-6">
         {/* Page Header */}
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">RCA Dashboard</h1>
           <div className="flex items-center gap-3">
-            <Button 
-              variant="outline" 
-              className="flex items-center gap-2"
-              onClick={() => window.location.reload()}
+            <h1 className="text-3xl font-bold text-gray-900">RCA Dashboard</h1>
+            {newTickets.length > 0 && (
+              <div className="flex items-center gap-1 text-sm text-green-600">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span>{newTickets.length} new ticket{newTickets.length > 1 ? 's' : ''}</span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {/* WebSocket Connection Status */}
+            <div className="flex items-center gap-2">
+              <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                !wsConnected 
+                  ? 'bg-red-100 text-red-800' 
+                  : (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false)
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-green-100 text-green-800'
+              }`}>
+                {!wsConnected ? <FiWifiOff className="w-3 h-3" /> : 
+                 (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false) ? 
+                 <FiAlertTriangle className="w-3 h-3" /> : <FiWifi className="w-3 h-3" />}
+                {!wsConnected ? 'Disconnected' : 
+                 (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false) ? 
+                 'Partial' : 'Connected'}
+              </div>
+            </div>
+            
+            {/* Info Button for Connectivity Status */}
+            <div className="relative" ref={infoPopupRef}>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowInfoPopup(!showInfoPopup)}
+                className={`relative flex items-center justify-center ${
+                  autoShowReason 
+                    ? 'border-red-500 bg-red-50 text-red-700' 
+                    : ''
+                }`}
+              >
+                <FiInfo className="text-lg" />
+                {autoShowReason && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                )}
+              </Button>
+
+              {/* Info Popup */}
+              {showInfoPopup && (
+                <div className="absolute right-0 top-10 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4">
+          {/* Popup Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-gray-900">Service Status</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowInfoPopup(false)
+                setAutoShowReason(null)
+                setUserManuallyClosed(true)
+              }}
+              className="h-6 w-6 p-0"
             >
-              <FiRefreshCw className="w-4 h-4" />
-              Refresh
+              ×
             </Button>
-            <Button variant="outline" size="sm">
-              <FiMenu className="text-lg" />
-            </Button>
+          </div>
+                  
+                  
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-gray-900 text-sm border-b border-gray-200 pb-2">
+                      System Connectivity Status
+                    </h3>
+                    
+                    {/* Backend Connection Status */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">Backend</span>
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          wsConnected 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {wsConnected ? <FiWifi className="w-3 h-3" /> : <FiWifiOff className="w-3 h-3" />}
+                          {wsConnected ? 'Connected' : 'Disconnected'}
+                        </div>
+                      </div>
+                      
+                      {wsError && (
+                        <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                          Backend disconnected
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ServiceNow Connection Status */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">ServiceNow Integration</span>
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          wsConnected && pollingStatus?.isActive !== false && pollingStatus?.isHealthy !== false
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          <FiInfo className="w-3 h-3" />
+                          {wsConnected && pollingStatus?.isActive !== false && pollingStatus?.isHealthy !== false ? 'Active' : 'Disconnected'}
+                        </div>
+                      </div>
+                      
+                      
+                      {!wsConnected && (
+                        <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                          Backend disconnected - ServiceNow unavailable
+                        </div>
+                      )}
+                      
+                      {wsConnected && (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false) && (
+                        <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                          ServiceNow is disconnected
+                        </div>
+                      )}
+                    </div>
+
+
+                    {/* Close Button */}
+                    <div className="pt-2 border-t border-gray-200">
+                      <button
+                        onClick={() => setShowInfoPopup(false)}
+                        className="w-full text-xs text-gray-500 hover:text-gray-700 text-center"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -479,26 +713,23 @@ const RCADashboard = () => {
 
 
         {/* Main Content Area */}
-        <div className="mb-6">
+        <div className="mb-6 max-w-full">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900">Tickets</h2>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Tickets {wsLoading && <span className="text-sm text-gray-500">(Loading...)</span>}
+            </h2>
             {hasActiveFilters && (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">
-                  {filters.sources.length > 0 && `${filters.sources.length} source${filters.sources.length > 1 ? 's' : ''} selected`}
-                  {filters.sources.length > 0 && (filters.priorities.length > 0 || (filters.dateRange.startDate || filters.dateRange.endDate) || filters.stages.length > 0) && ', '}
-                  {filters.priorities.length > 0 && `${filters.priorities.length} priorit${filters.priorities.length > 1 ? 'ies' : 'y'} selected`}
-                  {filters.priorities.length > 0 && ((filters.dateRange.startDate || filters.dateRange.endDate) || filters.stages.length > 0) && ', '}
-                  {(filters.dateRange.startDate || filters.dateRange.endDate) && 'date range selected'}
-                  {(filters.dateRange.startDate || filters.dateRange.endDate) && filters.stages.length > 0 && ', '}
-                  {filters.stages.length > 0 && `${filters.stages.length} stage${filters.stages.length > 1 ? 's' : ''} selected`}
-                </span>
+                <span className="text-sm text-gray-500">Active filters:</span>
+                <Button variant="outline" size="sm" onClick={clearAllFilters}>
+                  Clear All
+                </Button>
               </div>
             )}
           </div>
 
           {/* Search Bar with Filter Dropdown */}
-          <div className="relative mb-6" ref={filterDropdownRef}>
+          <div className="relative mb-6 max-w-full" ref={filterDropdownRef}>
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
                 <Input
@@ -559,7 +790,7 @@ const RCADashboard = () => {
 
             {/* Filter Dropdown */}
             {showFilterDropdown && (
-              <Card className="absolute top-full left-0 right-0 mt-2 z-10 bg-white border border-gray-200 shadow-lg">
+              <Card className="absolute top-full left-0 right-0 mt-2 z-20 bg-white border border-gray-200 shadow-lg">
                 <CardContent className="p-6">
                   <div className="flex gap-8">
                     {/* Source Filter */}
@@ -691,8 +922,97 @@ const RCADashboard = () => {
               </Card>
             )}
           </div>
+
+          {/* Active Filter Badges */}
+          {hasActiveFilters && (
+            <div className="mb-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-gray-600 font-medium">Active filters:</span>
+                
+                {/* Source Badges */}
+                {filters.sources.map((source) => (
+                  <Badge 
+                    key={`source-${source}`}
+                    variant="secondary" 
+                    className="bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer"
+                    onClick={() => handleSourceFilter(source, false)}
+                  >
+                    Source: {source}
+                    <span className="ml-1 text-blue-600">×</span>
+                  </Badge>
+                ))}
+                
+                {/* Priority Badges */}
+                {filters.priorities.map((priority) => (
+                  <Badge 
+                    key={`priority-${priority}`}
+                    variant="secondary" 
+                    className="bg-orange-100 text-orange-800 hover:bg-orange-200 cursor-pointer"
+                    onClick={() => handlePriorityFilter(priority, false)}
+                  >
+                    Priority: {priority}
+                    <span className="ml-1 text-orange-600">×</span>
+                  </Badge>
+                ))}
+                
+                {/* Date Range Badge */}
+                {(filters.dateRange.startDate || filters.dateRange.endDate) && (
+                  <Badge 
+                    variant="secondary" 
+                    className="bg-green-100 text-green-800 hover:bg-green-200 cursor-pointer"
+                    onClick={() => {
+                      setFilters(prev => ({
+                        ...prev,
+                        dateRange: { startDate: '', endDate: '' }
+                      }))
+                    }}
+                  >
+                    Date: {filters.dateRange.startDate || 'Any'} to {filters.dateRange.endDate || 'Any'}
+                    <span className="ml-1 text-green-600">×</span>
+                  </Badge>
+                )}
+                
+                {/* Stage Badges */}
+                {filters.stages.map((stage) => (
+                  <Badge 
+                    key={`stage-${stage}`}
+                    variant="secondary" 
+                    className="bg-purple-100 text-purple-800 hover:bg-purple-200 cursor-pointer"
+                    onClick={() => handleStageFilter(stage, false)}
+                  >
+                    Stage: {stage}
+                    <span className="ml-1 text-purple-600">×</span>
+                  </Badge>
+                ))}
+                
+                {/* Clear All Button */}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={clearAllFilters}
+                  className="text-xs h-6 px-2"
+                >
+                  Clear All
+                </Button>
+              </div>
+            </div>
+          )}
             
-          {filteredCases.length === 0 ? (
+          {wsInitialLoad ? (
+            <div className="text-center py-12">
+              <div className="text-gray-400 mb-4">
+                <FiLoader className="text-4xl mx-auto animate-spin" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Loading tickets...</h3>
+              <p className="text-gray-500">Fetching data from the server</p>
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg max-w-md mx-auto">
+                <p className="text-sm text-blue-800">
+                  <strong>First time setup:</strong> If this is your first time running the application, 
+                  the initial data import may take a few minutes. Please be patient.
+                </p>
+              </div>
+            </div>
+          ) : filteredCases.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-gray-400 mb-4">
                 <FiSearch className="text-4xl mx-auto" />
@@ -701,7 +1021,9 @@ const RCADashboard = () => {
               <p className="text-gray-500 mb-4">
                 {hasActiveFilters 
                   ? 'Try adjusting your filters or search terms'
-                  : 'No RCA cases match your search criteria'
+                  : wsTickets.length === 0 
+                    ? 'No tickets available from the server'
+                    : 'No RCA cases match your search criteria'
                 }
               </p>
               {hasActiveFilters && (
@@ -711,63 +1033,90 @@ const RCADashboard = () => {
               )}
             </div>
           ) : (
-            <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+            <div className="bg-white shadow-sm rounded-lg overflow-hidden relative">
+              {/* Subtle loading overlay for background refreshes */}
+              {wsLoading && !wsInitialLoad && (
+                <div className="absolute inset-0 bg-white bg-opacity-50 z-10 flex items-center justify-center">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 bg-white px-3 py-2 rounded-lg shadow-sm">
+                    <FiLoader className="w-4 h-4 animate-spin" />
+                    <span>Updating...</span>
+                  </div>
+                </div>
+              )}
               {/* Desktop Table View */}
-              <div className="hidden lg:block overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+              <div className="hidden lg:block relative">
+                {/* Loading overlay for pagination */}
+                {wsLoading && !wsInitialLoad && (
+                  <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <FiLoader className="text-2xl mx-auto animate-spin text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600">Loading page...</p>
+                    </div>
+                  </div>
+                )}
+                <table className="w-full table-fixed divide-y divide-gray-200">
                   <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <tr className="h-12">
+                      <th className="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Ticket ID
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-auto px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Ticket Details
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-28 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Priority
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Source
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-48 px-8 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredCases.map((case_, index) => (
-                      <tr key={index} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {highlightText(case_.ticketId, searchTerm)}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
+                    {filteredCases.map((case_, index) => {
+                      const isNewTicket = newTickets.some(ticket => ticket.ticketId === case_.ticketId)
+                      return (
+                        <tr key={index} className={`hover:bg-gray-50 transition-colors h-16 ${isNewTicket ? 'bg-green-50 border-l-4 border-l-green-500' : ''}`}>
+                          <td className="px-6 py-4 whitespace-nowrap align-middle">
+                            <div className="flex items-center gap-2">
+                              <div className="text-sm font-medium text-gray-900">
+                                {highlightText(case_.ticketId, searchTerm)}
+                              </div>
+                              {isNewTicket && (
+                                <Badge className="bg-green-100 text-green-800 text-xs animate-pulse">
+                                  New
+                                </Badge>
+                              )}
+                            </div>
+                          </td>
+                        <td className="px-4 py-4 align-middle">
+                          <div className="max-w-md">
+                            <div className="text-sm font-medium text-gray-900 truncate" title={case_.title}>
                               {highlightText(case_.title, searchTerm)}
                             </div>
-                            <div className="text-sm text-gray-500">
+                            <div className="text-sm text-gray-500 truncate" title={`${case_.id} • ${case_.system}`}>
                               {highlightText(case_.id, searchTerm)} • {highlightText(case_.system, searchTerm)}
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap align-middle">
                           <Badge className={`${case_.priorityColor} border-0 font-medium`}>
                             {case_.priority}
                           </Badge>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap align-middle">
                           <span className="text-sm font-medium text-gray-900">
                             {highlightText(case_.source, searchTerm)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex items-center space-x-2">
+                        <td className="px-8 py-4 whitespace-nowrap text-sm font-medium align-middle">
+                          <div className="flex items-center space-x-2 mr-8">
                             <Button 
                               size="sm" 
                               className="bg-green-600 hover:bg-green-700 text-white"
-                              onClick={() => navigate(getStageNavigationPath(case_.stage, case_.id))}
+                              onClick={() => navigate(getStageNavigationPath(case_.stage, case_))}
                             >
                               Resolve
                             </Button>
@@ -781,86 +1130,223 @@ const RCADashboard = () => {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
 
               {/* Mobile Card View */}
-              <div className="lg:hidden">
-                {filteredCases.map((case_, index) => (
-                  <div key={index} className="border-b border-gray-200 p-4 last:border-b-0">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <p className="text-xs text-gray-500 mb-1">
-                          Ticket ID: {highlightText(case_.ticketId, searchTerm)}
-                        </p>
-                        <h3 className="text-sm font-medium text-gray-900 mb-1">
-                          {highlightText(case_.title, searchTerm)}
-                        </h3>
-                        <p className="text-xs text-gray-500 mb-2">
-                          {highlightText(case_.id, searchTerm)} • {highlightText(case_.system, searchTerm)}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Source: {highlightText(case_.source, searchTerm)}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end space-y-1">
-                        <Badge className={`${case_.priorityColor} border-0 font-medium text-xs`}>
-                          {case_.priority}
-                        </Badge>
-                      </div>
-                    </div>
-                    
-                    <div className="mb-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-gray-700">Source</span>
-                        <span className="text-xs font-medium text-gray-900">
-                          {highlightText(case_.source, searchTerm)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-end">
-                      <div className="flex items-center space-x-2">
-                        <Button 
-                          size="sm" 
-                          className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1"
-                          onClick={() => navigate(getStageNavigationPath(case_.stage, case_.id))}
-                        >
-                          Resolve
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => navigate(`/complaint/${case_.id}`)}
-                          className="text-xs px-3 py-1"
-                        >
-                          View
-                        </Button>
-                      </div>
+              <div className="lg:hidden relative">
+                {/* Loading overlay for pagination */}
+                {wsLoading && !wsInitialLoad && (
+                  <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <FiLoader className="text-2xl mx-auto animate-spin text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600">Loading page...</p>
                     </div>
                   </div>
-                ))}
+                )}
+                {filteredCases.map((case_, index) => {
+                  const isNewTicket = newTickets.some(ticket => ticket.ticketId === case_.ticketId)
+                  return (
+                    <div key={index} className={`border-b border-gray-200 p-3 last:border-b-0 ${isNewTicket ? 'bg-green-50 border-l-4 border-l-green-500' : ''}`}>
+                      {/* Header with Ticket ID and Priority */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1 min-w-0 pr-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-xs text-gray-500 truncate">
+                              Ticket ID: {highlightText(case_.ticketId, searchTerm)}
+                            </p>
+                            {isNewTicket && (
+                              <Badge className="bg-green-100 text-green-800 text-xs animate-pulse flex-shrink-0">
+                                New
+                              </Badge>
+                            )}
+                          </div>
+                          <h3 className="text-sm font-medium text-gray-900 mb-1 break-words">
+                            {highlightText(case_.title, searchTerm)}
+                          </h3>
+                          <p className="text-xs text-gray-500 mb-2 break-words">
+                            {highlightText(case_.id, searchTerm)} • {highlightText(case_.system, searchTerm)}
+                          </p>
+                          <p className="text-xs text-gray-500 break-words">
+                            Source: {highlightText(case_.source, searchTerm)}
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0">
+                          <Badge className={`${case_.priorityColor} border-0 font-medium text-xs`}>
+                            {case_.priority}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center justify-center">
+                        <div className="flex items-center space-x-2">
+                          <Button 
+                            size="sm" 
+                            className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1"
+                            onClick={() => navigate(getStageNavigationPath(case_.stage, case_.id))}
+                          >
+                            Resolve
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => navigate(`/complaint/${case_.id}`)}
+                            className="text-xs px-3 py-1"
+                          >
+                            View
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {wsTickets.length > 0 && (
+            <div className="mt-6">
+              {/* Mobile Pagination */}
+              <div className="lg:hidden space-y-4">
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-sm text-gray-700">Show:</span>
+                  <select
+                    value={wsPagination.limit}
+                    onChange={(e) => handleLimitChange(parseInt(e.target.value))}
+                    className="border border-gray-300 rounded-md px-2 py-1 text-sm"
+                    disabled={wsLoading && !wsInitialLoad}
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                  <span className="text-sm text-gray-700">per page</span>
+                </div>
+                <div className="text-sm text-gray-700 text-center">
+                  Showing {((wsPagination.currentPage - 1) * wsPagination.limit) + 1} to {Math.min(wsPagination.currentPage * wsPagination.limit, wsPagination.totalCount)} of {wsPagination.totalCount} results
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(wsPagination.currentPage - 1)}
+                    disabled={!wsPagination.hasPrevPage || (wsLoading && !wsInitialLoad)}
+                    className="flex items-center gap-1"
+                  >
+                    <FiChevronLeft className="w-4 h-4" />
+                    Previous
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(3, wsPagination.totalPages) }, (_, i) => {
+                      const pageNum = Math.max(1, Math.min(wsPagination.totalPages - 2, wsPagination.currentPage - 1)) + i
+                      if (pageNum > wsPagination.totalPages) return null
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={pageNum === wsPagination.currentPage ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNum)}
+                          disabled={wsLoading && !wsInitialLoad}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(wsPagination.currentPage + 1)}
+                    disabled={!wsPagination.hasNextPage || (wsLoading && !wsInitialLoad)}
+                    className="flex items-center gap-1"
+                  >
+                    Next
+                    <FiChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Desktop Pagination */}
+              <div className="hidden lg:flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-700">Show:</span>
+                    <select
+                      value={wsPagination.limit}
+                      onChange={(e) => handleLimitChange(parseInt(e.target.value))}
+                      className="border border-gray-300 rounded-md px-2 py-1 text-sm"
+                      disabled={wsLoading && !wsInitialLoad}
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                    </select>
+                    <span className="text-sm text-gray-700">per page</span>
+                  </div>
+                  <div className="text-sm text-gray-700">
+                    Showing {((wsPagination.currentPage - 1) * wsPagination.limit) + 1} to {Math.min(wsPagination.currentPage * wsPagination.limit, wsPagination.totalCount)} of {wsPagination.totalCount} results
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(wsPagination.currentPage - 1)}
+                    disabled={!wsPagination.hasPrevPage || (wsLoading && !wsInitialLoad)}
+                    className="flex items-center gap-1"
+                  >
+                    <FiChevronLeft className="w-4 h-4" />
+                    Previous
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, wsPagination.totalPages) }, (_, i) => {
+                      const pageNum = Math.max(1, Math.min(wsPagination.totalPages - 4, wsPagination.currentPage - 2)) + i
+                      if (pageNum > wsPagination.totalPages) return null
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={pageNum === wsPagination.currentPage ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNum)}
+                          disabled={wsLoading && !wsInitialLoad}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(wsPagination.currentPage + 1)}
+                    disabled={!wsPagination.hasNextPage || (wsLoading && !wsInitialLoad)}
+                    className="flex items-center gap-1"
+                  >
+                    Next
+                    <FiChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           )}
         </div>
       </div>
-
-      {/* ChatBot - Only render if enabled in config */}
-      {isChatbotEnabled() && (
-        <ChatBot 
-          pageContext={{
-            pageName: 'RCA Dashboard',
-            totalTickets: filteredCases.length,
-          activeTickets: summaryData[0].value,
-          slaBreached: summaryData[1].value,
-          awaitingReview: summaryData[2].value,
-          avgResolution: summaryData[3].value
-        }}
-      />
-      )}
     </div>
   )
 }
