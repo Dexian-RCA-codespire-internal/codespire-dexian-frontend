@@ -224,39 +224,7 @@ const RCAWorkflow = ({
 
       {/* Right Sidebar */}
       <div className="lg:col-span-1 space-y-6">
-         {/* AI Suggestions */}
-         {(aiSuggestions.length > 0 || aiSuggestionsLoading) && (
-           <Card className="bg-white shadow-sm">
-             <CardHeader>
-               <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
-                 <FiZap className="w-5 h-5 mr-2 text-yellow-500" />
-                 AI Suggestions
-               </CardTitle>
-             </CardHeader>
-             <CardContent className="space-y-3">
-               {aiSuggestionsLoading ? (
-                 // Skeleton loader for AI suggestions
-                 Array.from({ length: 3 }).map((_, index) => (
-                   <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                     <Skeleton className="h-4 w-full mb-2" />
-                     <Skeleton className="h-4 w-3/4 mb-1" />
-                     <Skeleton className="h-4 w-1/2" />
-                   </div>
-                 ))
-               ) : (
-                 aiSuggestions.map((suggestion, index) => (
-                   <div 
-                     key={index} 
-                     className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
-                     onClick={() => onResponseChange(suggestion)}
-                   >
-                     <p className="text-sm text-gray-700">{suggestion}</p>
-                   </div>
-                 ))
-               )}
-             </CardContent>
-           </Card>
-         )}
+         
 
         {/* Similar Cases */}
         {(similarCases && similarCases.results && similarCases.results.length > 0) || similarCasesLoading ? (
@@ -326,6 +294,40 @@ const RCAWorkflow = ({
             </CardContent>
           </Card>
         ) : null}
+
+        {/* AI Suggestions */}
+        {(aiSuggestions.length > 0 || aiSuggestionsLoading) && (
+           <Card className="bg-white shadow-sm">
+             <CardHeader>
+               <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
+                 <FiZap className="w-5 h-5 mr-2 text-yellow-500" />
+                 AI Suggestions
+               </CardTitle>
+             </CardHeader>
+             <CardContent className="space-y-3">
+               {aiSuggestionsLoading ? (
+                 // Skeleton loader for AI suggestions
+                 Array.from({ length: 3 }).map((_, index) => (
+                   <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                     <Skeleton className="h-4 w-full mb-2" />
+                     <Skeleton className="h-4 w-3/4 mb-1" />
+                     <Skeleton className="h-4 w-1/2" />
+                   </div>
+                 ))
+               ) : (
+                 aiSuggestions.map((suggestion, index) => (
+                   <div 
+                     key={index} 
+                     className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
+                     onClick={() => onResponseChange(suggestion)}
+                   >
+                     <p className="text-sm text-gray-700">{suggestion}</p>
+                   </div>
+                 ))
+               )}
+             </CardContent>
+           </Card>
+         )}
       </div>
       </div>
     </div>
