@@ -5,6 +5,7 @@ import Header from './Header'
 import Sidebar from './Sidebar'
 import SubSidebar from './SubSidebar'
 import ChatBot from '../ChatBot/ChatBot'
+import { isChatbotEnabled } from '../../config/navigation'
 
 const MainLayout = () => {
   const [isSubSidebarOpen, setIsSubSidebarOpen] = useState(false)
@@ -52,8 +53,8 @@ const MainLayout = () => {
         </main>
       </div>
       
-      {/* Global ChatBot - Available on all pages */}
-      <ChatBot />
+      {/* Global ChatBot - Available on all pages (if enabled) */}
+      {isChatbotEnabled() && <ChatBot />}
     </div>
   )
 }

@@ -10,6 +10,7 @@ const ChatBot = ({ pageContext = null, className = '' }) => {
   const [isMinimized, setIsMinimized] = useState(false)
   const [inputMessage, setInputMessage] = useState('')
   const inputRef = useRef(null)
+  const chatBotRef = useRef(null)
   
   const {
     messages,
@@ -26,6 +27,25 @@ const ChatBot = ({ pageContext = null, className = '' }) => {
       setTimeout(() => {
         inputRef.current?.focus()
       }, 100)
+    }
+  }, [isOpen, isMinimized])
+
+  // Click outside to minimize ChatBot
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (chatBotRef.current && !chatBotRef.current.contains(event.target)) {
+        if (isOpen && !isMinimized) {
+          setIsMinimized(true)
+        }
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [isOpen, isMinimized])
 
@@ -65,7 +85,7 @@ const ChatBot = ({ pageContext = null, className = '' }) => {
   }
 
   return (
-    <div className={`fixed bottom-6 right-6 z-50 ${className}`}>
+    <div ref={chatBotRef} className={`fixed bottom-6 right-6 z-50 ${className}`}>
       {/* Chat Window */}
       {isOpen && (
         <Card className={`w-80 h-96 bg-white shadow-2xl border border-gray-200 transition-all duration-300 ${

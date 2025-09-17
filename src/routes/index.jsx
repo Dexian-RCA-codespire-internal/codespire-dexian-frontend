@@ -14,6 +14,7 @@ import CustomerRCASummary from '../pages/CustomerRCASummary'
 import AlertCorrelation from '../pages/AlertCorrelation'
 import ComplianceAudit from '../pages/ComplianceAudit'
 import AddIntegration from '../pages/ai-rca-guidance/AddIntegration'
+import NotFound from '../pages/NotFound'
 import { isFeatureEnabled } from '../config/navigation'
 
 import Login from '../pages/Auth/Login.jsx'
@@ -60,6 +61,9 @@ export default function RoutesIndex() {
         {isFeatureEnabled('customerRcaSummary') && <Route path="customer-rca-summary" element={<CustomerRCASummary />} />}
         {isFeatureEnabled('alertCorrelation') && <Route path="alert-correlation" element={<AlertCorrelation />} />}
         {isFeatureEnabled('complianceAudit') && <Route path="compliance-audit" element={<ComplianceAudit />} />}
+        
+        {/* Catch-all route for 404 - must be last */}
+        <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
   )
