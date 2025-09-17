@@ -358,7 +358,11 @@ const RCADashboard = () => {
       ...prev,
       dateRange: {
         ...prev.dateRange,
-        [field]: value
+        [field]: value,
+        // If startDate is set but endDate is empty, set endDate to startDate
+        ...(field === 'startDate' && value && !prev.dateRange.endDate ? { endDate: value } : {}),
+        // If endDate is set but startDate is empty, set startDate to endDate  
+        ...(field === 'endDate' && value && !prev.dateRange.startDate ? { startDate: value } : {})
       }
     }))
   }
@@ -474,37 +478,8 @@ const RCADashboard = () => {
     return `/analysis/${case_.id}/${case_.ticketId}`
   }
 
-  const filteredCases = rcaCases.filter(case_ => {
-    const matchesSearch = case_.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         case_.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         case_.ticketId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         case_.source.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchesSource = filters.sources.length === 0 || filters.sources.includes(case_.source)
-    const matchesPriority = filters.priorities.length === 0 || filters.priorities.includes(case_.priority)
-    
-    // Date range filtering
-    const matchesDateRange = () => {
-      if (!filters.dateRange.startDate && !filters.dateRange.endDate) return true
-      
-      const caseDate = new Date(case_.createdDate)
-      const startDate = filters.dateRange.startDate ? new Date(filters.dateRange.startDate) : null
-      const endDate = filters.dateRange.endDate ? new Date(filters.dateRange.endDate) : null
-      
-      if (startDate && endDate) {
-        return caseDate >= startDate && caseDate <= endDate
-      } else if (startDate) {
-        return caseDate >= startDate
-      } else if (endDate) {
-        return caseDate <= endDate
-      }
-      return true
-    }
-    
-    const matchesStage = filters.stages.length === 0 || filters.stages.includes(case_.stage)
-    
-    return matchesSearch && matchesSource && matchesPriority && matchesDateRange() && matchesStage
-  })
+  // Use tickets directly from backend - no frontend filtering needed
+  const filteredCases = rcaCases
 
   return (
     <div className="min-h-screen bg-white">
