@@ -98,6 +98,14 @@ const RCADashboard = () => {
     }
   }, [wsConnected, wsInitialLoad])
 
+  // Refetch data when filters change (server-side filtering)
+  useEffect(() => {
+    if (wsConnected && !wsInitialLoad) {
+      console.log('🔍 Filters changed, refetching with server-side filtering:', filters)
+      fetchTickets(1, wsPagination.limit)
+    }
+  }, [filters, wsConnected, wsInitialLoad])
+
   // Removed automatic popup logic - user wants manual control only
 
   // Pagination handlers (WebSocket only)
@@ -1121,7 +1129,7 @@ const RCADashboard = () => {
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="flex items-center justify-center">
+                      <div className="flex items-center justify-end">
                         <div className="flex items-center space-x-2">
                           <Button 
                             size="sm" 
