@@ -98,50 +98,7 @@ const RCADashboard = () => {
     }
   }, [wsConnected, wsInitialLoad])
 
-  // Auto-show info popup when any service is disconnected
-  useEffect(() => {
-    const isBackendDisconnected = !wsConnected
-    const isServiceNowDisconnected = wsConnected && (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false)
-    
-    // Only auto-show if user hasn't manually closed it
-    if (!userManuallyClosed) {
-      if (isBackendDisconnected) {
-        setShowInfoPopup(true)
-        setAutoShowReason('Backend disconnected')
-      } else if (isServiceNowDisconnected) {
-        setShowInfoPopup(true)
-        setAutoShowReason('ServiceNow disconnected')
-      } else if (autoShowReason) {
-        // Auto-hide popup when all services are connected (with a small delay)
-        setTimeout(() => {
-          setShowInfoPopup(false)
-          setAutoShowReason(null)
-          setUserManuallyClosed(false) // Reset manual close flag when services reconnect
-        }, 3000) // 3 second delay to let user see the reconnection
-      }
-    }
-  }, [wsConnected, pollingStatus, autoShowReason, userManuallyClosed])
-
-  // Periodic popup every 20 seconds when there are service issues
-  useEffect(() => {
-    const isBackendDisconnected = !wsConnected
-    const isServiceNowDisconnected = wsConnected && (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false)
-    
-    // Only show periodic popup if there are service issues
-    if (isBackendDisconnected || isServiceNowDisconnected) {
-      const interval = setInterval(() => {
-        // Show popup every 20 seconds to remind user of issues
-        setShowInfoPopup(true)
-        if (isBackendDisconnected) {
-          setAutoShowReason('Backend disconnected')
-        } else if (isServiceNowDisconnected) {
-          setAutoShowReason('ServiceNow disconnected')
-        }
-      }, 20000) // 20 seconds
-
-      return () => clearInterval(interval)
-    }
-  }, [wsConnected, pollingStatus])
+  // Removed automatic popup logic - user wants manual control only
 
   // Pagination handlers (WebSocket only)
   const handlePageChange = (newPage) => {
@@ -675,15 +632,7 @@ const RCADashboard = () => {
                     </div>
 
 
-                    {/* Close Button */}
-                    <div className="pt-2 border-t border-gray-200">
-                      <button
-                        onClick={() => setShowInfoPopup(false)}
-                        className="w-full text-xs text-gray-500 hover:text-gray-700 text-center"
-                      >
-                        Close
-                      </button>
-                    </div>
+                    {/* Close button removed - user only wants X button */}
                   </div>
                 </div>
               )}
@@ -1082,11 +1031,7 @@ const RCADashboard = () => {
                               <div className="text-sm font-medium text-gray-900">
                                 {highlightText(case_.ticketId, searchTerm)}
                               </div>
-                              {isNewTicket && (
-                                <Badge className="bg-green-100 text-green-800 text-xs animate-pulse">
-                                  New
-                                </Badge>
-                              )}
+                              {/* NEW tag removed - user doesn't want it */}
                             </div>
                           </td>
                         <td className="px-4 py-4 align-middle">
@@ -1094,8 +1039,8 @@ const RCADashboard = () => {
                             <div className="text-sm font-medium text-gray-900 truncate" title={case_.title}>
                               {highlightText(case_.title, searchTerm)}
                             </div>
-                            <div className="text-sm text-gray-500 truncate" title={`${case_.id} • ${case_.system}`}>
-                              {highlightText(case_.id, searchTerm)} • {highlightText(case_.system, searchTerm)}
+                            <div className="text-sm text-gray-500 truncate" title={case_.system}>
+                              {highlightText(case_.system, searchTerm)}
                             </div>
                           </div>
                         </td>
@@ -1156,17 +1101,13 @@ const RCADashboard = () => {
                             <p className="text-xs text-gray-500 truncate">
                               Ticket ID: {highlightText(case_.ticketId, searchTerm)}
                             </p>
-                            {isNewTicket && (
-                              <Badge className="bg-green-100 text-green-800 text-xs animate-pulse flex-shrink-0">
-                                New
-                              </Badge>
-                            )}
+                            {/* NEW tag removed - user doesn't want it */}
                           </div>
                           <h3 className="text-sm font-medium text-gray-900 mb-1 break-words">
                             {highlightText(case_.title, searchTerm)}
                           </h3>
                           <p className="text-xs text-gray-500 mb-2 break-words">
-                            {highlightText(case_.id, searchTerm)} • {highlightText(case_.system, searchTerm)}
+                            {highlightText(case_.system, searchTerm)}
                           </p>
                           <p className="text-xs text-gray-500 break-words">
                             Source: {highlightText(case_.source, searchTerm)}

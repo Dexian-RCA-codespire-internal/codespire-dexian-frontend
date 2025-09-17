@@ -197,6 +197,10 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
 
   // Create handleNotification callback after addNotification is defined
   const handleNotification = useCallback((data) => {
+    // Skip notifications for new tickets - user doesn't want them
+    if (data.message && (data.message.includes('new ticket') || data.message.includes('New ticket'))) {
+      return;
+    }
     addNotification(data);
   }, [addNotification]);
 
