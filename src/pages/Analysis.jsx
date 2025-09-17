@@ -274,7 +274,28 @@ const Analysis = () => {
         // Clear response for next step
         setAnalysisResponse('')
       } else {
-        // Complete RCA - also call the resolve API
+        // Complete RCA - check if all previous steps are complete
+        if (!areAllPreviousStepsComplete()) {
+          // Show alert about incomplete steps
+          const incompleteSteps = []
+          if (!stepData.problem_step1 || stepData.problem_step1.trim().length === 0) {
+            incompleteSteps.push('Problem Definition (Step 1)')
+          }
+          if (!stepData.timeline_step2 || stepData.timeline_step2.trim().length === 0) {
+            incompleteSteps.push('Timeline & Context (Step 2)')
+          }
+          if (!stepData.impact_step3 || stepData.impact_step3.trim().length === 0) {
+            incompleteSteps.push('Impact Assessment (Step 3)')
+          }
+          if (!stepData.findings_step4 || stepData.findings_step4.trim().length === 0) {
+            incompleteSteps.push('Investigation Findings (Step 4)')
+          }
+          
+          alert(`Cannot complete RCA. The following steps are not completed:\n\n${incompleteSteps.join('\n')}\n\nPlease complete these steps first.`)
+          return
+        }
+        
+        // All steps complete - call the resolve API
         const resolveResponse = await ticketService.resolveTicket({
           rootCause: analysisResponse,
           ticket: ticketData
@@ -313,6 +334,15 @@ const Analysis = () => {
 
   const getCurrentStepData = () => {
     return rcaSteps.find(step => step.step === rcaStep) || rcaSteps[0]
+  }
+
+  // Check if all previous steps have data
+  const areAllPreviousStepsComplete = () => {
+    if (rcaStep < 5) return true // Not on final step yet
+    
+    // Check if steps 1-4 have data
+    const requiredSteps = ['problem_step1', 'timeline_step2', 'impact_step3', 'findings_step4']
+    return requiredSteps.every(stepKey => stepData[stepKey] && stepData[stepKey].trim().length > 0)
   }
 
   const handleSaveProgress = () => {
