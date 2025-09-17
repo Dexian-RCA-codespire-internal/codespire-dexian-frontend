@@ -126,6 +126,29 @@ const Analysis = () => {
         const ticket = response.data || response
         setTicketData(ticket)
         
+        // Load existing step data from ticket
+        if (ticket) {
+          const existingStepData = {
+            problem_step1: ticket.problem_step1 || '',
+            timeline_step2: ticket.timeline_step2 || '',
+            impact_step3: ticket.impact_step3 || '',
+            findings_step4: ticket.findings_step4 || '',
+            root_cause_step5: ticket.root_cause_step5 || ''
+          }
+          setStepData(existingStepData)
+          
+          // Find and navigate to first incomplete step
+          const firstIncompleteStep = findFirstIncompleteStepWithData(existingStepData)
+          setRcaStep(firstIncompleteStep)
+          
+          // Load the response for the current step
+          const stepKey = `${firstIncompleteStep === 1 ? 'problem' : 
+                           firstIncompleteStep === 2 ? 'timeline' : 
+                           firstIncompleteStep === 3 ? 'impact' : 
+                           firstIncompleteStep === 4 ? 'findings' : 'root_cause'}_step${firstIncompleteStep}`
+          setAnalysisResponse(existingStepData[stepKey] || '')
+        }
+        
         // Fetch similar cases after ticket data is loaded
         if (ticket) {
           const similarCasesData = await fetchSimilarCases(ticket)
@@ -343,6 +366,46 @@ const Analysis = () => {
     // Check if steps 1-4 have data
     const requiredSteps = ['problem_step1', 'timeline_step2', 'impact_step3', 'findings_step4']
     return requiredSteps.every(stepKey => stepData[stepKey] && stepData[stepKey].trim().length > 0)
+  }
+
+  // Find the first incomplete step
+  const findFirstIncompleteStep = () => {
+    const steps = [
+      { step: 1, key: 'problem_step1', name: 'Problem Definition' },
+      { step: 2, key: 'timeline_step2', name: 'Timeline & Context' },
+      { step: 3, key: 'impact_step3', name: 'Impact Assessment' },
+      { step: 4, key: 'findings_step4', name: 'Investigation Findings' },
+      { step: 5, key: 'root_cause_step5', name: 'Root Cause Analysis' }
+    ]
+    
+    for (const stepInfo of steps) {
+      if (!stepData[stepInfo.key] || stepData[stepInfo.key].trim().length === 0) {
+        return stepInfo.step
+      }
+    }
+    
+    // If all steps are complete, return step 5
+    return 5
+  }
+
+  // Find the first incomplete step with provided data
+  const findFirstIncompleteStepWithData = (stepDataToCheck) => {
+    const steps = [
+      { step: 1, key: 'problem_step1', name: 'Problem Definition' },
+      { step: 2, key: 'timeline_step2', name: 'Timeline & Context' },
+      { step: 3, key: 'impact_step3', name: 'Impact Assessment' },
+      { step: 4, key: 'findings_step4', name: 'Investigation Findings' },
+      { step: 5, key: 'root_cause_step5', name: 'Root Cause Analysis' }
+    ]
+    
+    for (const stepInfo of steps) {
+      if (!stepDataToCheck[stepInfo.key] || stepDataToCheck[stepInfo.key].trim().length === 0) {
+        return stepInfo.step
+      }
+    }
+    
+    // If all steps are complete, return step 5
+    return 5
   }
 
   const handleSaveProgress = () => {
