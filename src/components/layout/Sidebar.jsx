@@ -9,6 +9,7 @@ import {
   AiOutlineCompass,
   AiOutlineBook,
   AiOutlineSend,
+  AiOutlineBarChart,
 } from "react-icons/ai";
 import { LuFolderOpen, LuUser } from "react-icons/lu";
 import { RiAiGenerate2 } from "react-icons/ri";
@@ -22,25 +23,37 @@ const Sidebar = ({ onSubSidebarToggle }) => {
 
   // Icon mapping for dynamic navigation
   const iconMap = {
-    AiOutlineHome,
-    RiAiGenerate2,
-    AiOutlineSearch,
-    AiOutlineBook,
-    FaRegFile,
-    BellIcon,
-    FiShield
+    AiOutlineHome: AiOutlineHome,
+    RiAiGenerate2: RiAiGenerate2,
+    AiOutlineSearch: AiOutlineSearch,
+    AiOutlineBook: AiOutlineBook,
+    FaRegFile: FaRegFile,
+    BellIcon: BellIcon,
+    FiShield: FiShield,
+    AiOutlineBarChart: AiOutlineBarChart
   };
 
   // Get filtered navigation items based on configuration
   const getNavigationItems = () => {
     const filteredItems = getFilteredNavigationItems();
-    return filteredItems.map(item => ({
-      ...item,
-      icon: iconMap[item.icon]
-    }));
+    return filteredItems.map(item => {
+      const IconComponent = iconMap[item.icon];
+      if (!IconComponent) {
+        console.error(`Icon not found for: ${item.icon}`);
+        return { ...item, icon: AiOutlineHome }; // Fallback icon
+      }
+      return {
+        ...item,
+        icon: IconComponent
+      };
+    });
   };
 
   const navigationItems = getNavigationItems();
+  
+  // Debug logging
+  console.log('Navigation items:', navigationItems);
+  console.log('Filtered items from config:', getFilteredNavigationItems());
 
   const handleItemClick = (item, e) => {
     if (item.hasSubItems) {

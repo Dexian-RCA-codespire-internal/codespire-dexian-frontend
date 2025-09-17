@@ -6,6 +6,8 @@ class ChatApiService {
     try {
       const response = await api.post('/chat/send-message', {
         message,
+        sessionId: context.sessionId || 'default',
+        service: context.service || 'gemini',
         context
       })
       return response.data
@@ -51,7 +53,7 @@ class ChatApiService {
   // Test service connection
   async testService(serviceName) {
     try {
-      const response = await api.get(`/chat/test-service/${serviceName}`)
+      const response = await api.get(`/chat/test-service?service=${serviceName}`)
       return response.data
     } catch (error) {
       console.error('Test service error:', error)
