@@ -157,13 +157,36 @@ const RCADashboard = () => {
     }
   ]
 
+  // Status to Stage mapping function
+  const getStageFromStatus = (status) => {
+    if (!status) return 'New'
+    
+    const statusLower = status.toLowerCase()
+    
+    // Map MongoDB status values to RCA stages
+    if (statusLower.includes('new') || statusLower.includes('pending')) {
+      return 'New'
+    } else if (statusLower.includes('progress') || statusLower.includes('assigned')) {
+      return 'Analysis'
+    } else if (statusLower.includes('resolved') || statusLower.includes('closed')) {
+      return 'Resolved'
+    } else if (statusLower.includes('cancelled') || statusLower.includes('closed')) {
+      return 'Closed/Cancelled'
+    } else {
+      return 'New' // Default fallback
+    }
+  }
+
   // RCA Cases data - ONLY use real data from MongoDB via WebSocket
-  const rcaCases = wsTickets
+  const rcaCases = wsTickets.map(ticket => ({
+    ...ticket,
+    stage: getStageFromStatus(ticket.status) // Add mapped stage
+  }))
 
   // Filter options
   const sourceOptions = ['ServiceNow', 'Jira', 'Zendesk', 'Remedy']
   const priorityOptions = ['1 - Critical', '2 - High', '3 - Moderate', '4 - Low', '5 - Planning']
-  const stageOptions = ['Investigation', 'Analysis', 'Resolution', 'Compliant']
+  const stageOptions = ['New', 'Analysis', 'Resolved', 'Closed/Cancelled']
 
   // Filter handlers
   const handleSourceFilter = (source, checked) => {
