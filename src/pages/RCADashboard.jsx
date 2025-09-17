@@ -10,8 +10,6 @@ import { FiSearch, FiCheck, FiAlertTriangle, FiClipboard, FiChevronDown, FiCredi
 import { transformTicketToRCACase } from '../api/rcaService'
 import useWebSocketOnly from '../hooks/useWebSocketOnly'
 import NotificationContainer from '../components/ui/NotificationContainer'
-import ChatBot from '../components/ChatBot'
-import { isChatbotEnabled } from '../config/navigation'
 
 const RCADashboard = () => {
   const navigate = useNavigate()

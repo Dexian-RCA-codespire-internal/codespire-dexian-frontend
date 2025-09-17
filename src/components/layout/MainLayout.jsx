@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import Header from './Header'
 import Sidebar from './Sidebar'
 import SubSidebar from './SubSidebar'
+import ChatBot from '../ChatBot/ChatBot'
 
 const MainLayout = () => {
   const [isSubSidebarOpen, setIsSubSidebarOpen] = useState(false)
@@ -50,6 +51,9 @@ const MainLayout = () => {
           </motion.div>
         </main>
       </div>
+      
+      {/* Global ChatBot - Available on all pages */}
+      <ChatBot />
     </div>
   )
 }

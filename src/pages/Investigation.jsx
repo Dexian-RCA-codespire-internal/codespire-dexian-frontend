@@ -8,8 +8,6 @@ import { Badge } from '../components/ui/badge'
 import { RCAWorkflow } from '../components/RCA'
 import { FiUpload, FiImage, FiFileText, FiFile, FiUser, FiPlus, FiClock, FiMoreHorizontal, FiSearch, FiBarChart, FiPaperclip, FiSend } from 'react-icons/fi'
 import { getTicketById } from '../utils/ticketData'
-import ChatBot from '../components/ChatBot'
-import { isChatbotEnabled } from '../config/navigation'
 
 const Investigation = () => {
   const { ticketId } = useParams()
@@ -171,17 +169,6 @@ const Investigation = () => {
         />
       </div>
 
-      {/* ChatBot - Only render if enabled in config */}
-      {isChatbotEnabled() && (
-        <ChatBot 
-          pageContext={{
-            pageName: 'Investigation',
-            ticketData: ticketData,
-          currentStep: rcaStep,
-          totalSteps: 5
-        }}
-      />
-      )}
     </div>
   )
 }

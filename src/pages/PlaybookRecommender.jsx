@@ -9,8 +9,6 @@ import {
   AiOutlineArrowUp,
   AiOutlineArrowDown
 } from 'react-icons/ai'
-import ChatBot from '../components/ChatBot'
-import { isChatbotEnabled } from '../config/navigation'
 
 const PlaybookRecommender = () => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -751,18 +749,6 @@ const PlaybookRecommender = () => {
           )}
         </div>
 
-        {/* ChatBot - Only render if enabled in config */}
-        {isChatbotEnabled() && (
-          <ChatBot 
-            pageContext={{
-              pageName: 'Playbook Recommender',
-              totalPlaybooks: playbooks.length,
-              filteredPlaybooks: filteredPlaybooks.length,
-              selectedTags: selectedTags,
-              searchTerm: searchTerm
-            }}
-          />
-        )}
       </div>
     </div>
   )
