@@ -157,177 +157,8 @@ const RCADashboard = () => {
     }
   ]
 
-  // RCA Cases data - use WebSocket tickets (NO REST API calls)
-  const rcaCases = wsTickets.length > 0 ? wsTickets : [
-    {
-      id: 'RCA-001',
-      ticketId: 'INC0012345',
-      title: 'Server Outage',
-      source: 'Jira',
-      system: 'E-commerce Platform',
-      priority: 'P1',
-      priorityColor: 'bg-red-100 text-red-800',
-      progress: 20,
-      progressColor: 'bg-red-500',
-      daysOpen: 3,
-      stage: 'Investigation',
-      createdDate: '2024-01-15'
-    },
-    {
-      id: 'RCA-002',
-      ticketId: 'INC0012346',
-      title: 'Payment Failure',
-      source: 'Servicenow',
-      system: 'Payment Gateway',
-      priority: 'P1',
-      priorityColor: 'bg-red-100 text-red-800',
-      progress: 40,
-      progressColor: 'bg-red-500',
-      daysOpen: 5,
-      stage: 'Analysis',
-      createdDate: '2024-01-13'
-    },
-    {
-      id: 'RCA-003',
-      ticketId: 'INC0012347',
-      title: 'Data Sync Issue',
-      source: 'Jira',
-      system: 'CRM System',
-      priority: 'P2',
-      priorityColor: 'bg-yellow-100 text-yellow-800',
-      progress: 50,
-      progressColor: 'bg-yellow-500',
-      daysOpen: 8,
-      stage: 'Analysis',
-      createdDate: '2024-01-10'
-    },
-    {
-      id: 'RCA-004',
-      ticketId: 'INC0012348',
-      title: 'Login Errors',
-      source: 'Zendesk',
-      system: 'User Portal',
-      priority: 'P1',
-      priorityColor: 'bg-red-100 text-red-800',
-      progress: 60,
-      progressColor: 'bg-red-500',
-      daysOpen: 2,
-      stage: 'Resolution',
-      createdDate: '2024-01-16'
-    },
-    {
-      id: 'RCA-005',
-      ticketId: 'INC0012349',
-      title: 'Page Load Slowness',
-      source: 'Remedy',
-      system: 'Web Application',
-      priority: 'P2',
-      priorityColor: 'bg-yellow-100 text-yellow-800',
-      progress: 70,
-      progressColor: 'bg-yellow-500',
-      daysOpen: 12,
-      stage: 'Resolution',
-      createdDate: '2024-01-06'
-    },
-    {
-      id: 'RCA-006',
-      ticketId: 'INC0012350',
-      title: 'Report Generation Bug',
-      source: 'Zendesk',
-      system: 'Reporting System',
-      priority: 'P3',
-      priorityColor: 'bg-green-100 text-green-800',
-      progress: 100,
-      progressColor: 'bg-green-500',
-      daysOpen: 1,
-      stage: 'Compliant',
-      createdDate: '2024-01-17'
-    },
-    {
-      id: 'RCA-007',
-      ticketId: 'INC0012351',
-      title: 'Database Connection Pool Exhaustion',
-      source: 'Jira',
-      system: 'Customer Portal',
-      priority: 'P1',
-      priorityColor: 'bg-red-100 text-red-800',
-      progress: 25,
-      progressColor: 'bg-red-500',
-      daysOpen: 4,
-      stage: 'Investigation',
-      createdDate: '2024-01-14'
-    },
-    {
-      id: 'RCA-008',
-      ticketId: 'INC0012352',
-      title: 'API Rate Limiting Issues',
-      source: 'ServiceNow',
-      system: 'Integration Platform',
-      priority: 'P1',
-      priorityColor: 'bg-red-100 text-red-800',
-      progress: 60,
-      progressColor: 'bg-red-500',
-      daysOpen: 6,
-      stage: 'Analysis',
-      createdDate: '2024-01-12'
-    },
-    {
-      id: 'RCA-009',
-      ticketId: 'INC0012353',
-      title: 'Memory Leak in Background Jobs',
-      source: 'Remedy',
-      system: 'Data Processing Engine',
-      priority: 'P2',
-      priorityColor: 'bg-yellow-100 text-yellow-800',
-      progress: 80,
-      progressColor: 'bg-yellow-500',
-      daysOpen: 9,
-      stage: 'Resolution',
-      createdDate: '2024-01-09'
-    },
-    {
-      id: 'RCA-010',
-      ticketId: 'INC0012354',
-      title: 'SSL Certificate Expiration',
-      source: 'Zendesk',
-      system: 'External API Gateway',
-      priority: 'P1',
-      priorityColor: 'bg-red-100 text-red-800',
-      progress: 90,
-      progressColor: 'bg-red-500',
-      daysOpen: 2,
-      stage: 'Resolution',
-      createdDate: '2024-01-16'
-    },
-    {
-      id: 'RCA-011',
-      ticketId: 'INC0012355',
-      title: 'User Session Timeout Problems',
-      source: 'Jira',
-      system: 'Authentication Service',
-      priority: 'P2',
-      priorityColor: 'bg-yellow-100 text-yellow-800',
-      progress: 45,
-      progressColor: 'bg-yellow-500',
-      daysOpen: 7,
-      stage: 'Analysis',
-      createdDate: '2024-01-11'
-    },
-    {
-      id: 'RCA-012',
-      ticketId: 'INC0012356',
-      title: 'File Upload Size Limit Exceeded',
-      source: 'ServiceNow',
-      system: 'Document Management',
-      priority: 'P3',
-      priorityColor: 'bg-green-100 text-green-800',
-      progress: 100,
-      progressColor: 'bg-green-500',
-      daysOpen: 1,
-      stage: 'Compliant',
-      createdDate: '2024-01-17'
-    }
-  ]
+  // RCA Cases data - ONLY use real data from MongoDB via WebSocket
+  const rcaCases = wsTickets
 
   // Filter options
   const sourceOptions = ['ServiceNow', 'Jira', 'Zendesk', 'Remedy']
@@ -383,25 +214,25 @@ const RCADashboard = () => {
     const term = searchTerm.toLowerCase()
     const suggestions = []
     
-    // Get unique values from all tickets
-    const allTitles = [...new Set(rcaCases.map(c => c.title))]
-    const allSystems = [...new Set(rcaCases.map(c => c.system))]
-    const allSources = [...new Set(rcaCases.map(c => c.source))]
-    const allStages = [...new Set(rcaCases.map(c => c.stage))]
-    const allIds = [...new Set(rcaCases.map(c => c.id))]
-    const allTicketIds = [...new Set(rcaCases.map(c => c.ticketId))]
+    // Get unique values from real tickets only
+    const allTitles = [...new Set(wsTickets.map(c => c.short_description || c.title))].filter(Boolean)
+    const allSystems = [...new Set(wsTickets.map(c => c.category || c.system))].filter(Boolean)
+    const allSources = [...new Set(wsTickets.map(c => c.source))].filter(Boolean)
+    const allStages = [...new Set(wsTickets.map(c => c.stage))].filter(Boolean)
+    const allIds = [...new Set(wsTickets.map(c => c._id || c.id))].filter(Boolean)
+    const allTicketIds = [...new Set(wsTickets.map(c => c.ticket_id || c.ticketId))].filter(Boolean)
     
     // Search in titles
     allTitles.forEach(title => {
       if (title.toLowerCase().includes(term)) {
-        suggestions.push({ text: title, type: 'Title', field: 'title' })
+        suggestions.push({ text: title, type: 'Title', field: 'short_description' })
       }
     })
     
     // Search in systems
     allSystems.forEach(system => {
       if (system.toLowerCase().includes(term)) {
-        suggestions.push({ text: system, type: 'System', field: 'system' })
+        suggestions.push({ text: system, type: 'System', field: 'category' })
       }
     })
     
@@ -422,14 +253,14 @@ const RCADashboard = () => {
     // Search in IDs
     allIds.forEach(id => {
       if (id.toLowerCase().includes(term)) {
-        suggestions.push({ text: id, type: 'RCA ID', field: 'id' })
+        suggestions.push({ text: id, type: 'RCA ID', field: '_id' })
       }
     })
     
     // Search in Ticket IDs
     allTicketIds.forEach(ticketId => {
       if (ticketId.toLowerCase().includes(term)) {
-        suggestions.push({ text: ticketId, type: 'Ticket ID', field: 'ticketId' })
+        suggestions.push({ text: ticketId, type: 'Ticket ID', field: 'ticket_id' })
       }
     })
     
