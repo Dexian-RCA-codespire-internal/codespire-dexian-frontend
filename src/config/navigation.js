@@ -13,6 +13,7 @@ export const navigationConfig = {
   customerRcaSummary: false,     // Customer RCA Summary
   alertCorrelation: false,       // Alert Correlation
   complianceAudit: false,        // Compliance & Audit
+  userManagement: false,          // User Management
 }
 
 // Helper function to get enabled navigation items
@@ -69,6 +70,12 @@ export const navigationItems = {
     path: "/compliance-audit",
     label: "Compliance & Audit",
     icon: "FiShield",
+    hasSubItems: false
+  },
+  userManagement: {
+    path: "/user-management",
+    label: "User Management",
+    icon: "LuUser",
     hasSubItems: false
   }
 }

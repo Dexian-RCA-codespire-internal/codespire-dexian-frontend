@@ -28,7 +28,8 @@ const Sidebar = ({ onSubSidebarToggle }) => {
     AiOutlineBook,
     FaRegFile,
     BellIcon,
-    FiShield
+    FiShield,
+    LuUser
   };
 
   // Get filtered navigation items based on configuration
