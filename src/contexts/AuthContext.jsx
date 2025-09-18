@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import api from '../api'
+import { authService } from '../api/services/authService'
 
 const AuthContext = createContext()
 
@@ -23,34 +23,23 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      // Check if user data exists in localStorage
+      // Only use localStorage - no API calls on app startup
       const savedUser = localStorage.getItem('user')
+      
       if (savedUser) {
+        console.log('📱 Using cached user data (no session API call)')
         const userData = JSON.parse(savedUser)
         setUser(userData)
         setIsAuthenticated(true)
-      }
-
-      // Try to get current user profile from backend
-      try {
-        const response = await api.get('/auth/profile')
-        if (response.data && response.data.user) {
-          setUser(response.data.user)
-          setIsAuthenticated(true)
-          // Update localStorage with fresh data
-          localStorage.setItem('user', JSON.stringify(response.data.user))
-        }
-      } catch (error) {
-        // If profile fetch fails, user might not be authenticated
-        console.log('Profile fetch failed, user might not be authenticated')
-        if (savedUser) {
-          // Keep the saved user data but mark as potentially stale
-          setUser(JSON.parse(savedUser))
-          setIsAuthenticated(true)
-        }
+      } else {
+        console.log('👤 No cached user data found')
+        setUser(null)
+        setIsAuthenticated(false)
       }
     } catch (error) {
       console.error('Auth check error:', error)
+      setUser(null)
+      setIsAuthenticated(false)
     } finally {
       setIsLoading(false)
     }
@@ -58,45 +47,84 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await api.post('/auth/login', { email, password })
-      if (response.data && response.data.user) {
-        setUser(response.data.user)
+      const response = await authService.signin({ email, password })
+      console.log('✅ SuperTokens login response:', response)
+
+      if (response.status === "OK" && response.user) {
+        setUser(response.user)
         setIsAuthenticated(true)
-        localStorage.setItem('user', JSON.stringify(response.data.user))
-        return { success: true, data: response.data }
+        localStorage.setItem('user', JSON.stringify(response.user))
+        localStorage.setItem('isAuthenticated', 'true')
+        return { success: true, data: response }
       }
-      return { success: false, error: 'Login failed' }
+      return { success: false, error: response.message || 'Login failed' }
     } catch (error) {
       console.error('Login error:', error)
       return { 
         success: false, 
-        error: error.response?.data?.error || 'Login failed' 
+        error: error.message || 'Login failed' 
       }
     }
   }
 
   const logout = async () => {
     try {
-      await api.post('/auth/logout')
+      await authService.logout()
+      console.log('✅ SuperTokens logout successful')
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
       setUser(null)
       setIsAuthenticated(false)
       localStorage.removeItem('user')
+      localStorage.removeItem('isAuthenticated')
+      localStorage.removeItem('lastSessionCheck')
+      localStorage.removeItem('workingSessionEndpoint')
     }
   }
 
   const register = async (userData) => {
     try {
-      const response = await api.post('/auth/register', userData)
-      return { success: true, data: response.data }
+      const response = await authService.signup(userData)
+      console.log('✅ SuperTokens registration response:', response)
+
+      if (response.status === "OK") {
+        return { success: true, data: response }
+      }
+      return { success: false, error: response.message || 'Registration failed' }
     } catch (error) {
       console.error('Registration error:', error)
       return { 
         success: false, 
-        error: error.response?.data?.error || 'Registration failed' 
+        error: error.message || 'Registration failed' 
       }
+    }
+  }
+
+  // Manual session check function (call only when needed)
+  const checkSessionManually = async () => {
+    try {
+      console.log('🔍 Manual session check requested')
+      const sessionResponse = await authService.getSession()
+      console.log('✅ Manual session check response:', sessionResponse)
+
+      if (sessionResponse.status === "OK" && sessionResponse.user) {
+        setUser(sessionResponse.user)
+        setIsAuthenticated(true)
+        localStorage.setItem('user', JSON.stringify(sessionResponse.user))
+        localStorage.setItem('isAuthenticated', 'true')
+        return { success: true, data: sessionResponse }
+      } else {
+        // Clear invalid session data
+        setUser(null)
+        setIsAuthenticated(false)
+        localStorage.removeItem('user')
+        localStorage.removeItem('isAuthenticated')
+        return { success: false, error: 'Session invalid' }
+      }
+    } catch (error) {
+      console.error('Manual session check error:', error)
+      return { success: false, error: error.message }
     }
   }
 
@@ -107,7 +135,8 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     register,
-    checkAuthStatus
+    checkAuthStatus,
+    checkSessionManually
   }
 
   return (

@@ -4,7 +4,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from '../../
 import { ArrowLeft, Mail, Link as LinkIcon, AlertCircle, CheckCircle } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { validateOTP } from '../../utils/validation'
-import EmailVerification from 'supertokens-auth-react/recipe/emailverification'
+import { authService } from '../../api/services/authService'
 
 export default function VerifyOTP() {
   const [otp, setOtp] = useState("")
@@ -21,9 +21,11 @@ export default function VerifyOTP() {
     setError("")
   }
 
-  // Get email from navigation state or use default
+  // Get email and session data from navigation state or use default
   const email = location.state?.email || ''
   const fromRegistration = location.state?.fromRegistration || false
+  const deviceId = location.state?.deviceId || ''
+  const preAuthSessionId = location.state?.preAuthSessionId || ''
 
   // Countdown timer for resend
   useEffect(() => {
@@ -52,47 +54,11 @@ export default function VerifyOTP() {
     clearError()
     
     try {
-      // Get the verification token from localStorage or state
-      const verificationToken = localStorage.getItem('verificationToken') || location.state?.verificationToken
-      
-      if (!verificationToken) {
-        setError('Verification token not found. Please try registering again.')
-        navigate('/register')
-        return
-      }
+      // Use SuperTokens API for OTP verification
+      const response = await authService.verifyOTP(email, otp, deviceId, preAuthSessionId)
+      console.log('✅ SuperTokens OTP verification response:', response)
 
-      // Step 1: Use your custom backend OTP verification
-      const customResponse = await fetch('http://localhost:8081/api/v1/auth/verify-custom-otp', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          token: verificationToken,
-          otp: otp
-        })
-      })
-
-      const customData = await customResponse.json()
-      console.log('✅ Custom OTP verification response:', customData)
-
-      if (customResponse.ok && customData.success) {
-        // Step 2: Update SuperTokens verification status
-        try {
-          const superTokensResponse = await EmailVerification.verifyEmail({
-            method: "userInputCode",
-            userInputCode: otp
-          })
-          console.log('✅ SuperTokens verification updated:', superTokensResponse)
-        } catch (superTokensError) {
-          console.log('⚠️ Could not update SuperTokens verification:', superTokensError)
-          // Continue anyway since custom verification was successful
-        }
-
-        // Clear the verification token
-        localStorage.removeItem('verificationToken')
-        
+      if (response.status === "OK") {
         setSuccessMessage('Email verified successfully!')
         setTimeout(() => {
           if (fromRegistration) {
@@ -106,11 +72,11 @@ export default function VerifyOTP() {
           }
         }, 2000)
       } else {
-        setError(customData.message || 'OTP verification failed. Please try again.')
+        setError(response.message || 'OTP verification failed. Please try again.')
         setIsVerifying(false)
       }
     } catch (err) {
-      console.error('SuperTokens verifyEmail error:', err)
+      console.error('SuperTokens OTP verification error:', err)
       setError('OTP verification failed. Please try again.')
       setIsVerifying(false)
     }
@@ -127,33 +93,19 @@ export default function VerifyOTP() {
     clearError()
     
     try {
-      // Use your custom backend to generate new OTP
-      const response = await fetch('http://localhost:8081/api/v1/auth/generate-email-verification-token', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          email: email
-        })
-      })
+      // Use SuperTokens API to resend OTP
+      const response = await authService.resendOTP(email, deviceId, preAuthSessionId)
+      console.log('✅ SuperTokens resend OTP response:', response)
 
-      const data = await response.json()
-      console.log('✅ Custom resend OTP response:', data)
-
-      if (response.ok && data.success) {
-        // Store the new verification token
-        localStorage.setItem('verificationToken', data.token)
-        
+      if (response.status === "OK") {
         setResendLeft(30)
         setSuccessMessage('OTP has been resent to your email')
         setTimeout(() => setSuccessMessage(''), 3000)
       } else {
-        setError(data.message || 'Failed to resend OTP. Please try again.')
+        setError(response.message || 'Failed to resend OTP. Please try again.')
       }
     } catch (err) {
-      console.error('Custom resend OTP error:', err)
+      console.error('SuperTokens resend OTP error:', err)
       setError('Failed to resend OTP. Please try again.')
     } finally {
       setIsResending(false)
@@ -171,19 +123,18 @@ export default function VerifyOTP() {
     clearError()
     
     try {
-      // Use SuperTokens EmailVerification.sendVerificationEmail for magic link
-      const response = await EmailVerification.sendVerificationEmail()
-
-      console.log('✅ SuperTokens sendVerificationEmail (verification link) response:', response)
+      // Use SuperTokens API to send magic link
+      const response = await authService.sendMagicLink(email)
+      console.log('✅ SuperTokens send magic link response:', response)
 
       if (response.status === "OK") {
         setSuccessMessage('Verification link has been sent to your email')
         setTimeout(() => setSuccessMessage(''), 5000)
       } else {
-        setError('Failed to send verification link. Please try again.')
+        setError(response.message || 'Failed to send verification link. Please try again.')
       }
     } catch (err) {
-      console.error('SuperTokens sendVerificationEmail (verification link) error:', err)
+      console.error('SuperTokens send magic link error:', err)
       setError('Failed to send verification link. Please try again.')
     } finally {
       setIsSendingMagicLink(false)

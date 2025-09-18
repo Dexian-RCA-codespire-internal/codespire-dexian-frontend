@@ -4,8 +4,7 @@ import { MdEmail, MdLock, MdVisibility, MdVisibilityOff } from 'react-icons/md'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { validateLoginForm } from '../../utils/validation'
 import { AlertCircle, CheckCircle } from 'lucide-react'
-import { Session } from 'supertokens-auth-react/recipe/session'
-import EmailPassword from 'supertokens-auth-react/recipe/emailpassword'
+import { authService } from '../../api/services/authService'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -91,18 +90,14 @@ export default function Login() {
     console.log('📡 Using SuperTokens EmailPassword.signIn...')
 
     try {
-      // Use SuperTokens EmailPassword.signIn
-      const response = await EmailPassword.signIn({
-        formFields: [{
-          id: "email",
-          value: email.trim()
-        }, {
-          id: "password", 
-          value: password
-        }]
-      })
+      // Use SuperTokens API for signin
+      const credentials = {
+        email: email.trim(),
+        password: password
+      }
 
-      console.log('✅ SuperTokens signIn successful:', response)
+      const response = await authService.signin(credentials)
+      console.log('✅ SuperTokens signin response:', response)
 
       if (response.status === "OK") {
         console.log('✅ Login successful, redirecting to dashboard...')
@@ -129,7 +124,7 @@ export default function Login() {
         }
       }
     } catch (err) {
-      console.error('SuperTokens signIn error:', err)
+      console.error('SuperTokens signin error:', err)
       setError('Login failed. Please try again.')
     } finally {
       setIsLoading(false)

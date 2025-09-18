@@ -4,7 +4,7 @@ import { Mail, Lock, User, Eye, EyeOff, Phone, ChevronDown, Search, AlertCircle,
 import { Link, useNavigate } from 'react-router-dom'
 import { COUNTRY_CODES, searchCountries } from '../../constants/countryCodes'
 import { validateRegistrationForm, getPasswordStrength, getPasswordRequirements } from '../../utils/validation'
-import EmailPassword from 'supertokens-auth-react/recipe/emailpassword'
+import { authService } from '../../api/services/authService'
 
 export default function Register() {
   const navigate = useNavigate()
@@ -125,63 +125,35 @@ export default function Register() {
     setIsLoading(true)
 
     try {
-      // Use SuperTokens EmailPassword.signUp with additional fields
-      const response = await EmailPassword.signUp({
-        formFields: [{
-          id: "email",
-          value: formData.email.trim()
-        }, {
-          id: "password",
-          value: formData.password
-        }, {
-          id: "firstName",
-          value: formData.firstName.trim()
-        }, {
-          id: "lastName",
-          value: formData.lastName.trim()
-        }, {
-          id: "phone",
-          value: `${selectedCountry.code}${formData.phone}`
-        }]
-      })
+      // Use SuperTokens API for signup
+      const userData = {
+        email: formData.email.trim(),
+        password: formData.password,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        phone: `${selectedCountry.code}${formData.phone}`
+      }
 
-      console.log('✅ SuperTokens signUp response:', response)
+      const response = await authService.signup(userData)
+      console.log('✅ SuperTokens signup response:', response)
 
       if (response.status === "OK") {
-        // After successful registration, generate email verification token
+        // After successful registration, send OTP for email verification
+        navigate('/verify-otp', { 
+          state: { 
+            email: formData.email,
+            fromRegistration: true,
+            deviceId: response.deviceId,
+            preAuthSessionId: response.preAuthSessionId
+          } 
+        })
         try {
-          const verifyResponse = await fetch('http://localhost:8081/api/v1/auth/generate-email-verification-token', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              email: formData.email.trim()
-            })
-          })
+          // const otpResponse = await authService.sendOTP(formData.email.trim())
+          // console.log('✅ OTP sent:', otpResponse)
 
-          const verifyData = await verifyResponse.json()
-          console.log('✅ Email verification token generated:', verifyData)
-
-          if (verifyResponse.ok && verifyData.success) {
-            // Store the verification token
-            localStorage.setItem('verificationToken', verifyData.token)
-            
-            // Navigate to OTP verification
-            navigate('/verify-otp', { 
-              state: { 
-                email: formData.email,
-                fromRegistration: true,
-                verificationToken: verifyData.token
-              } 
-            })
-          } else {
-            setError(verifyData.message || 'Failed to send verification email')
-          }
         } catch (err) {
-          console.error('Failed to generate verification token:', err)
-          setError('Registration successful but failed to send verification email')
+          console.error('Failed to send OTP:', err)
+          setError('Registration successful but failed to send verification OTP')
         }
       } else {
         // Handle different response statuses
@@ -202,7 +174,7 @@ export default function Register() {
         }
       }
     } catch (err) {
-      console.error('SuperTokens signUp error:', err)
+      console.error('SuperTokens signup error:', err)
       setError('Registration failed. Please try again.')
     } finally {
       setIsLoading(false)
