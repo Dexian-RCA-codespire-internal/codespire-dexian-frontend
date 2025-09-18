@@ -227,13 +227,13 @@ const RCAWorkflow = ({
          
 
         {/* Similar Cases */}
-        {(similarCases && similarCases.results && similarCases.results.length > 0) || similarCasesLoading ? (
+        {(similarCases && similarCases.results && similarCases.results.length > 0) || similarCasesLoading || (similarCases && similarCases.results && similarCases.results.length === 0) ? (
           <Card className="bg-white shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
                 <FiSearch className="w-5 h-5 mr-2 text-blue-500" />
                 Similar Cases
-                {similarCases && similarCases.total_results && (
+                {similarCases && similarCases.total_results > 0 && (
                   <Badge variant="secondary" className="ml-2">
                     {similarCases.total_results} found
                   </Badge>
@@ -260,7 +260,7 @@ const RCAWorkflow = ({
                     </div>
                   </div>
                 ))
-              ) : (
+              ) : similarCases && similarCases.results && similarCases.results.length > 0 ? (
                 similarCases.results.map((caseItem, index) => (
                   <div key={caseItem.ticket_id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="flex items-center justify-between mb-2">
@@ -290,6 +290,10 @@ const RCAWorkflow = ({
                     </div>
                   </div>
                 ))
+              ) : (
+                <div className="p-4 text-center text-gray-500">
+                  <p className="text-sm">No similar tickets found</p>
+                </div>
               )}
             </CardContent>
           </Card>
