@@ -149,13 +149,14 @@ const Analysis = () => {
           setAnalysisResponse(existingStepData[stepKey] || '')
         }
         
-        // Fetch similar cases after ticket data is loaded
+        // Start fetching similar cases and AI suggestions after ticket data is loaded
         if (ticket) {
-          const similarCasesData = await fetchSimilarCases(ticket)
-          // Fetch AI suggestions after similar cases are loaded
-          if (similarCasesData) {
-            await fetchAISuggestions(similarCasesData, ticket)
-          }
+          // Start both requests in parallel for better UX
+          fetchSimilarCases(ticket).then(similarCasesData => {
+            if (similarCasesData) {
+              fetchAISuggestions(similarCasesData, ticket)
+            }
+          })
         }
       } catch (err) {
         console.error('Error fetching ticket data:', err)
@@ -444,7 +445,7 @@ const Analysis = () => {
           
           
 
-          {/* RCA Workflow with skeleton loaders */}
+          {/* RCA Workflow with skeleton loaders - only show ticket data skeleton */}
           <RCAWorkflow
             currentStep={rcaStep}
             totalSteps={5}
@@ -456,8 +457,8 @@ const Analysis = () => {
             onPrevious={handleRcaPrevious}
             aiSuggestions={[]}
             similarCases={null}
-            aiSuggestionsLoading={true}
-            similarCasesLoading={true}
+            aiSuggestionsLoading={false}
+            similarCasesLoading={false}
             nextButtonText={rcaStep === 5 ? "Complete RCA →" : "Next Step →"}
             showPrevious={rcaStep > 1}
             canProceed={analysisResponse.trim().length > 0}
