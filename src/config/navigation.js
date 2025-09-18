@@ -14,8 +14,7 @@ export const navigationConfig = {
   customerRcaSummary: true,     // Customer RCA Summary
   alertCorrelation: true,       // Alert Correlation
   complianceAudit: true,        // Compliance & Audit
-            // Chart Bot
-  
+  userManagement: false,          // User Management
   // UI Components
   chatbot: true,                // ChatBot component visibility
 }
@@ -81,10 +80,10 @@ export const navigationItems = {
     icon: "FiShield",
     hasSubItems: false
   },
-  chartBot: {
-    path: "/chart-bot",
-    label: "Chart Bot",
-    icon: "AiOutlineBarChart",
+  userManagement: {
+    path: "/user-management",
+    label: "User Management",
+    icon: "LuUser",
     hasSubItems: false
   }
 }

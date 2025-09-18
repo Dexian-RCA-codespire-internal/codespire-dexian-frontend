@@ -13,6 +13,7 @@ import PlaybookRecommender from '../pages/PlaybookRecommender'
 import CustomerRCASummary from '../pages/CustomerRCASummary'
 import AlertCorrelation from '../pages/AlertCorrelation'
 import ComplianceAudit from '../pages/ComplianceAudit'
+import UserManagement from '../pages/UserManagement'
 import AddIntegration from '../pages/ai-rca-guidance/AddIntegration'
 import { isFeatureEnabled } from '../config/navigation'
 
@@ -60,6 +61,7 @@ export default function RoutesIndex() {
         {isFeatureEnabled('customerRcaSummary') && <Route path="customer-rca-summary" element={<CustomerRCASummary />} />}
         {isFeatureEnabled('alertCorrelation') && <Route path="alert-correlation" element={<AlertCorrelation />} />}
         {isFeatureEnabled('complianceAudit') && <Route path="compliance-audit" element={<ComplianceAudit />} />}
+        {isFeatureEnabled('userManagement') && <Route path="user-management" element={<UserManagement />} />}
       </Route>
     </Routes>
   )

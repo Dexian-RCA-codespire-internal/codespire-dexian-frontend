@@ -30,7 +30,8 @@ const Sidebar = ({ onSubSidebarToggle }) => {
     FaRegFile: FaRegFile,
     BellIcon: BellIcon,
     FiShield: FiShield,
-    AiOutlineBarChart: AiOutlineBarChart
+    AiOutlineBarChart: AiOutlineBarChart,
+    LuUser: LuUser
   };
 
   // Get filtered navigation items based on configuration
