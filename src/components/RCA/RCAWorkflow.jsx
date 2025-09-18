@@ -24,7 +24,8 @@ const RCAWorkflow = ({
   canProceed = true,
   onSaveProgress,
   onGenerateReport,
-  ticketData = null
+  ticketData = null,
+  onStepClick = null
 }) => {
   return (
     <div className="space-y-8">
@@ -117,19 +118,32 @@ const RCAWorkflow = ({
                 const isCompleted = stepNumber < currentStep
                 const isCurrent = stepNumber === currentStep
                 const isFuture = stepNumber > currentStep
+                const isClickable = onStepClick
                 
                 return (
-                  <div key={stepNumber} className="flex flex-col items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${
+                  <div 
+                    key={stepNumber} 
+                    className={`flex flex-col items-center ${
+                      isClickable ? 'cursor-pointer' : 'cursor-default'
+                    }`}
+                    onClick={() => {
+                      if (isClickable) {
+                        onStepClick(stepNumber)
+                      }
+                    }}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-200 ${
                       isCompleted 
-                        ? 'bg-green-600 text-white' 
+                        ? 'bg-green-600 text-white hover:bg-green-700' 
                         : isCurrent 
-                        ? 'bg-green-600 text-white' 
-                        : 'bg-gray-200 text-gray-600'
-                    }`}>
+                        ? 'bg-green-600 text-white hover:bg-green-700' 
+                        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                    } ${isClickable ? 'hover:scale-105 cursor-pointer' : 'cursor-default'}`}>
                       {isCompleted ? <FiCheck className="w-4 h-4" /> : stepNumber}
                     </div>
-                    <span className="text-xs text-gray-500 mt-1">
+                    <span className={`text-xs mt-1 transition-colors duration-200 ${
+                      isClickable ? 'text-gray-700 hover:text-gray-900' : 'text-gray-500'
+                    }`}>
                       {stepNumber === 1 ? 'Problem' :
                        stepNumber === 2 ? 'Timeline' :
                        stepNumber === 3 ? 'Impact' :
@@ -210,39 +224,7 @@ const RCAWorkflow = ({
 
       {/* Right Sidebar */}
       <div className="lg:col-span-1 space-y-6">
-         {/* AI Suggestions */}
-         {(aiSuggestions.length > 0 || aiSuggestionsLoading) && (
-           <Card className="bg-white shadow-sm">
-             <CardHeader>
-               <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
-                 <FiZap className="w-5 h-5 mr-2 text-yellow-500" />
-                 AI Suggestions
-               </CardTitle>
-             </CardHeader>
-             <CardContent className="space-y-3">
-               {aiSuggestionsLoading ? (
-                 // Skeleton loader for AI suggestions
-                 Array.from({ length: 3 }).map((_, index) => (
-                   <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                     <Skeleton className="h-4 w-full mb-2" />
-                     <Skeleton className="h-4 w-3/4 mb-1" />
-                     <Skeleton className="h-4 w-1/2" />
-                   </div>
-                 ))
-               ) : (
-                 aiSuggestions.map((suggestion, index) => (
-                   <div 
-                     key={index} 
-                     className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
-                     onClick={() => onResponseChange(suggestion)}
-                   >
-                     <p className="text-sm text-gray-700">{suggestion}</p>
-                   </div>
-                 ))
-               )}
-             </CardContent>
-           </Card>
-         )}
+         
 
         {/* Similar Cases */}
         {(similarCases && similarCases.results && similarCases.results.length > 0) || similarCasesLoading ? (
@@ -312,6 +294,40 @@ const RCAWorkflow = ({
             </CardContent>
           </Card>
         ) : null}
+
+        {/* AI Suggestions */}
+        {(aiSuggestions.length > 0 || aiSuggestionsLoading) && (
+           <Card className="bg-white shadow-sm">
+             <CardHeader>
+               <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
+                 <FiZap className="w-5 h-5 mr-2 text-yellow-500" />
+                 AI Suggestions
+               </CardTitle>
+             </CardHeader>
+             <CardContent className="space-y-3">
+               {aiSuggestionsLoading ? (
+                 // Skeleton loader for AI suggestions
+                 Array.from({ length: 3 }).map((_, index) => (
+                   <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                     <Skeleton className="h-4 w-full mb-2" />
+                     <Skeleton className="h-4 w-3/4 mb-1" />
+                     <Skeleton className="h-4 w-1/2" />
+                   </div>
+                 ))
+               ) : (
+                 aiSuggestions.map((suggestion, index) => (
+                   <div 
+                     key={index} 
+                     className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
+                     onClick={() => onResponseChange(suggestion)}
+                   >
+                     <p className="text-sm text-gray-700">{suggestion}</p>
+                   </div>
+                 ))
+               )}
+             </CardContent>
+           </Card>
+         )}
       </div>
       </div>
     </div>

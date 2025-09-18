@@ -150,5 +150,20 @@ export const ticketService = {
       currentTicket
     });
     return response.data;
+  },
+
+  // Resolve ticket with root cause analysis
+  resolveTicket: async ({ rootCause, ticket }) => {
+    const response = await api.post('/v1/tickets/resolve', {
+      rootCause,
+      ticket
+    });
+    return response.data;
+  },
+
+  // Update ticket with RCA step data
+  updateTicketSteps: async ({ ticketId, stepData }) => {
+    const response = await api.put(`/v1/tickets/${ticketId}`, stepData);
+    return response.data;
   }
 };
