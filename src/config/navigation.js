@@ -12,11 +12,10 @@ export const navigationConfig = {
   playbookRecommender: true,    // Playbook Recommender
   customerRcaSummary: true,     // Customer RCA Summary
   alertCorrelation: true,       // Alert Correlation
-  complianceAudit: true,        // Compliance & Audit
-  chartBot: false,             // Chart Bot
+  complianceAudit: true,        // Compliance & Aud
   
   // UI Components
-  chatbot: true,               // ChatBot component visibility
+  chatbot: false,               // ChatBot component visibility
 }
 
 // Helper function to get enabled navigation items

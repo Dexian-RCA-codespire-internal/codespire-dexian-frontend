@@ -21,36 +21,6 @@ import { getFilteredNavigationItems, isFeatureEnabled } from "../../config/navig
 const Sidebar = ({ onSubSidebarToggle }) => {
   const location = useLocation();
 
-  // Check if we're on an invalid/404 page
-  const isValidRoute = () => {
-    const path = location.pathname;
-    
-    // Valid exact routes
-    if (path === '/') return true;
-    
-    // Valid auth routes
-    if (path.match(/^\/auth/)) return true;
-    
-    // Valid protected routes with proper patterns
-    const validRoutes = [
-      /^\/rca-dashboard$/,  // Exact match for rca-dashboard
-      /^\/investigation\/[^\/]+$/,  // investigation with ticketId
-      /^\/analysis\/[^\/]+\/[^\/]+$/,  // analysis with id and ticketId
-      /^\/resolution\/[^\/]+$/,  // resolution with ticketId
-      /^\/complete-rca\/[^\/]+$/,  // complete-rca with ticketId
-      /^\/pattern-detector$/,  // exact match
-      /^\/playbook-recommender$/,  // exact match
-      /^\/customer-rca-summary$/,  // exact match
-      /^\/alert-correlation$/,  // exact match
-      /^\/compliance-audit$/,  // exact match
-      /^\/ai-rca-guidance\/add-integration$/  // exact match for add-integration
-    ];
-    
-    return validRoutes.some(route => route.test(path));
-  };
-  
-  const is404Page = !isValidRoute();
-
 
   // Icon mapping for dynamic navigation
   const iconMap = {
@@ -87,12 +57,6 @@ const Sidebar = ({ onSubSidebarToggle }) => {
   console.log('Filtered items from config:', getFilteredNavigationItems());
 
   const handleItemClick = (item, e) => {
-    // Disable navigation on 404 pages
-    if (is404Page) {
-      e.preventDefault();
-      return;
-    }
-    
     if (item.hasSubItems) {
       e.preventDefault(); // Prevent navigation
       onSubSidebarToggle(true);
@@ -130,9 +94,7 @@ const Sidebar = ({ onSubSidebarToggle }) => {
                     onClick={(e) => handleItemClick(item, e)}
                     className={({ isActive }) =>
                       `flex flex-col items-center justify-center px-1 py-2 transition-colors duration-200 relative ${
-                        is404Page
-                          ? "text-gray-400 cursor-not-allowed opacity-50"
-                          : isActive
+                        isActive
                           ? "text-lime-500 border-l-4 border-lime-500 font-bold "
                           : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                       }`
@@ -150,9 +112,7 @@ const Sidebar = ({ onSubSidebarToggle }) => {
                   <button
                     onClick={(e) => handleItemClick(item, e)}
                     className={`flex items-center justify-center px-1 py-2 transition-colors duration-200 relative w-full ${
-                      is404Page
-                        ? "text-gray-400 cursor-not-allowed opacity-50"
-                        : item.label === "AI RCA" && isAIRCAActive
+                      item.label === "AI RCA" && isAIRCAActive
                         ? "text-lime-500 border-l-4 border-lime-500 font-bold "
                         : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                     }`}
