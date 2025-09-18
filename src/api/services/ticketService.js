@@ -141,5 +141,14 @@ export const ticketService = {
   getSimilarTickets: async (ticketData) => {
     const response = await api.post('/v1/ticket-similarity/similar', ticketData);
     return response.data;
+  },
+
+  // Get AI suggestions based on similar tickets
+  getAISuggestions: async (similarTickets, currentTicket) => {
+    const response = await api.post('/v1/ticket-similarity/suggestions', {
+      similarTickets,
+      currentTicket
+    });
+    return response.data;
   }
 };
