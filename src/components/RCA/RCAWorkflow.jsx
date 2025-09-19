@@ -353,10 +353,10 @@ const RCAWorkflow = ({
                        index={index}
                        isStreaming={suggestion.isStreaming}
                        onComplete={() => {
-                         // Handle suggestion completion if needed
-                         const suggestionText = suggestion.text || suggestion.description || '';
-                         onResponseChange(suggestionText);
+                         // Suggestion completed - no auto-population
+                         // User can click on suggestion if they want to use it
                        }}
+                       onClick={(suggestionText) => onResponseChange(suggestionText)}
                      />
                    ))}
                  </div>

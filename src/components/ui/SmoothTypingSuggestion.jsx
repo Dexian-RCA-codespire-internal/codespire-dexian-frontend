@@ -6,7 +6,8 @@ const SmoothTypingSuggestion = ({
   suggestion, 
   index, 
   isStreaming, 
-  onComplete = () => {} 
+  onComplete = () => {},
+  onClick = () => {}
 }) => {
   const [isTyping, setIsTyping] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
@@ -38,6 +39,7 @@ const SmoothTypingSuggestion = ({
           ? 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-300 hover:from-yellow-100 hover:to-amber-100 shadow-md' 
           : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
       }`}
+      onClick={() => onClick(suggestion.text || suggestion.fullText || '')}
     >
       <div className="flex items-start gap-3">
         {/* Ranking Badge */}

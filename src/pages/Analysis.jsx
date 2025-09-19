@@ -104,20 +104,33 @@ const Analysis = () => {
         console.log('🔌 Attempting to connect to WebSocket...')
         webSocketService.connect()
         
-        // Wait a moment for connection
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        // Wait a shorter time for connection
+        await new Promise(resolve => setTimeout(resolve, 500))
         console.log('WebSocket status after wait:', webSocketService.getConnectionStatus())
       }
       
+      // Add timeout for WebSocket connection
+      const connectionTimeout = setTimeout(() => {
+        console.log('⏰ WebSocket connection timeout, falling back to regular API')
+        fetchAISuggestions(similarCasesData, currentTicket)
+      }, 3000)
+
       if (webSocketService.getConnectionStatus()) {
+        clearTimeout(connectionTimeout)
         console.log('✅ WebSocket connected, starting streaming...')
         setWsConnected(true)
         setIsStreaming(true)
         setStreamingText('')
         
-        // Get suggestions from API first
-        const response = await ticketService.getAISuggestions(similarCasesData.results, currentTicket)
-        const suggestions = response.suggestions || response.data?.suggestions || []
+        // Get suggestions from API first with timeout
+        try {
+          const response = await Promise.race([
+            ticketService.getAISuggestions(similarCasesData.results, currentTicket),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('API timeout')), 10000)
+            )
+          ])
+          const suggestions = response.suggestions || response.data?.suggestions || []
         
         if (suggestions.length > 0) {
           console.log('🎯 Streaming all suggestions:', suggestions.length)
@@ -190,8 +203,22 @@ const Analysis = () => {
           
           // Keep streaming state true to maintain the typing UI as final display
           // No need to set isStreaming to false - the typing suggestions become the final display
+          
+          // Ensure streaming suggestions are properly set for display
+          setStreamingSuggestions(prev => prev.map((suggestion, index) => ({
+            ...suggestion,
+            text: suggestions[index]?.suggestion || suggestions[index]?.description || suggestions[index]?.text || '',
+            isComplete: true,
+            isStreaming: false
+          })))
+        }
+        } catch (apiError) {
+          console.error('❌ API call failed or timed out:', apiError)
+          clearTimeout(connectionTimeout)
+          fetchAISuggestions(similarCasesData, currentTicket)
         }
       } else {
+        clearTimeout(connectionTimeout)
         console.log('❌ WebSocket not connected, falling back to regular API')
         console.log('WebSocket service:', webSocketService)
         console.log('Socket instance:', webSocketService.getSocket())
@@ -221,6 +248,9 @@ const Analysis = () => {
         // Pass the full suggestion objects to maintain structure and confidence data
         setAiSuggestions(suggestions)
         setAiSuggestionsData(suggestions) // Store full objects for future use
+        
+        // Set streaming to false since we're using fallback (no streaming)
+        setIsStreaming(false)
       }
     } catch (err) {
       console.error('Error fetching AI suggestions:', err)
@@ -269,11 +299,17 @@ const Analysis = () => {
         
         // Start fetching similar cases and AI suggestions after ticket data is loaded
         if (ticket) {
+          // Set AI suggestions loading state immediately for better UX
+          setAiSuggestionsLoading(true)
+          
           // Start both requests in parallel for better UX
           fetchSimilarCases(ticket).then(similarCasesData => {
             if (similarCasesData) {
               // Try streaming first
               fetchAISuggestionsStream(similarCasesData, ticket)
+            } else {
+              // If no similar cases, stop loading
+              setAiSuggestionsLoading(false)
             }
           })
         }
@@ -328,52 +364,27 @@ const Analysis = () => {
     {
       step: 1,
       title: 'Problem Definition',
-      aiGuidance: 'What specific problem or incident occurred? Please describe the symptoms observed.',
-      aiSuggestions: [
-        'Payment gateway timeouts during peak traffic',
-        'User authentication failures after deployment',
-        'Database connection pool exhaustion'
-      ]
+      aiGuidance: 'What specific problem or incident occurred? Please describe the symptoms observed.'
     },
     {
       step: 2,
       title: 'Timeline & Context',
-      aiGuidance: 'When did this issue first occur? What events preceded it?',
-      aiSuggestions: [
-        'Started after recent deployment at 2:30 PM',
-        'Coincided with traffic spike during marketing campaign',
-        'Followed database maintenance window'
-      ]
+      aiGuidance: 'When did this issue first occur? What events preceded it?'
     },
     {
       step: 3,
       title: 'Impact Assessment',
-      aiGuidance: 'What was the business and technical impact of this issue?',
-      aiSuggestions: [
-        '50% increase in failed transactions',
-        'Customer support tickets increased by 200%',
-        'Revenue loss of $15K during outage'
-      ]
+      aiGuidance: 'What was the business and technical impact of this issue?'
     },
     {
       step: 4,
       title: 'Investigation Findings',
-      aiGuidance: 'What data have you gathered? What patterns or clues were discovered?',
-      aiSuggestions: [
-        'Database CPU spiked to 95% during incident',
-        'Error logs show connection timeout exceptions',
-        'Monitoring alerts triggered for response time SLA'
-      ]
+      aiGuidance: 'What data have you gathered? What patterns or clues were discovered?'
     },
     {
       step: 5,
       title: 'Root Cause Analysis',
-      aiGuidance: 'Based on your investigation, what is the underlying root cause?',
-      aiSuggestions: [
-        'Inefficient database query causing resource contention',
-        'Missing connection pool configuration limits',
-        'Inadequate load balancing for traffic spikes'
-      ]
+      aiGuidance: 'Based on your investigation, what is the underlying root cause?'
     }
   ]
 
@@ -624,8 +635,8 @@ const Analysis = () => {
           onResponseChange={setAnalysisResponse}
           onNext={handleRcaNext}
           onPrevious={handleRcaPrevious}
-          aiSuggestions={aiSuggestions.length > 0 ? aiSuggestions : getCurrentStepData().aiSuggestions}
-          isFallbackSuggestions={aiSuggestions.length === 0}
+          aiSuggestions={aiSuggestions}
+          isFallbackSuggestions={false}
           similarCases={similarCases}
           aiSuggestionsLoading={aiSuggestionsLoading}
           similarCasesLoading={similarCasesLoading}
