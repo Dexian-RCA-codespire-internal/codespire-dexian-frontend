@@ -369,7 +369,7 @@ const RCAWorkflow = ({
                      <Skeleton className="h-4 w-1/2" />
                    </div>
                  ))
-               ) : (
+               ) : aiSuggestions && aiSuggestions.length > 0 ? (
                  <motion.div 
                    initial={{ opacity: 0, y: 20 }}
                    animate={{ opacity: 1, y: 0 }}
@@ -434,6 +434,19 @@ const RCAWorkflow = ({
                    );
                  })}
                  </motion.div>
+               ) : (
+                 // No AI suggestions available
+                 <div className="text-center py-8">
+                   <div className="text-gray-400 mb-2">
+                     <FiZap className="w-8 h-8 mx-auto" />
+                   </div>
+                   <p className="text-gray-500 text-sm">
+                     No AI suggestions available
+                   </p>
+                   <p className="text-gray-400 text-xs mt-1">
+                     Similar tickets are required to generate suggestions
+                   </p>
+                 </div>
                )}
              </CardContent>
            </Card>

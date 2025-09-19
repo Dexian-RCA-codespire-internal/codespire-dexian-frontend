@@ -87,6 +87,15 @@ const Analysis = () => {
   // Test WebSocket connection and stream AI suggestions
   const fetchAISuggestionsStream = async (similarCasesData, currentTicket) => {
     try {
+      // Check if we have similar tickets first
+      if (!similarCasesData || !similarCasesData.results || similarCasesData.results.length === 0) {
+        console.log('⚠️ No similar tickets found, skipping AI suggestions')
+        setAiSuggestions([])
+        setAiSuggestionsData([])
+        setIsStreaming(false)
+        return
+      }
+
       console.log('🔌 Testing WebSocket connection...')
       console.log('Current WebSocket status:', webSocketService.getConnectionStatus())
       
@@ -179,13 +188,9 @@ const Analysis = () => {
           setAiSuggestions(suggestions)
           setAiSuggestionsData(suggestions)
           
-          // Add smooth transition delay before stopping streaming
-          setTimeout(() => {
-            setIsStreaming(false)
-          }, 800)
+          // Keep streaming state true to maintain the typing UI as final display
+          // No need to set isStreaming to false - the typing suggestions become the final display
         }
-        
-        setIsStreaming(false)
       } else {
         console.log('❌ WebSocket not connected, falling back to regular API')
         console.log('WebSocket service:', webSocketService)
