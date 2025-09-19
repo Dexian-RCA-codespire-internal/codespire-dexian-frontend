@@ -4,7 +4,8 @@ import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
-import { FiMessageCircle, FiZap, FiSearch, FiArrowRight, FiArrowLeft, FiCheck, FiSave, FiDownload } from 'react-icons/fi'
+import { FiMessageCircle, FiZap, FiSearch, FiArrowRight, FiArrowLeft, FiCheck, FiSave, FiDownload, FiEye } from 'react-icons/fi'
+import SimilarTicketModal from './SimilarTicketModal'
 
 const RCAWorkflow = ({ 
   currentStep, 
@@ -27,6 +28,21 @@ const RCAWorkflow = ({
   ticketData = null,
   onStepClick = null
 }) => {
+  // Modal state for viewing similar ticket details
+  const [selectedTicket, setSelectedTicket] = useState(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // Handle opening modal with ticket details
+  const handleViewTicket = (ticket) => {
+    setSelectedTicket(ticket)
+    setIsModalOpen(true)
+  }
+
+  // Handle closing modal
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setSelectedTicket(null)
+  }
   return (
     <div className="space-y-8">
       {/* Header Section */}
@@ -262,7 +278,7 @@ const RCAWorkflow = ({
                 ))
               ) : similarCases && similarCases.results && similarCases.results.length > 0 ? (
                 similarCases.results.map((caseItem, index) => (
-                  <div key={caseItem.ticket_id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div key={caseItem.ticket_id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex-1">
                         <p className="text-sm font-medium text-gray-900">{caseItem.ticket_id}</p>
@@ -282,11 +298,22 @@ const RCAWorkflow = ({
                         {/* <span className="text-xs text-gray-500">Rank #{caseItem.rank}</span> */}
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-                      {/* <span><strong>Status:</strong> {caseItem.status}</span>
-                      <span><strong>Priority:</strong> {caseItem.priority}</span>
-                      <span><strong>Category:</strong> {caseItem.category}</span> */}
-                      <span><strong>Source:</strong> {caseItem.source}</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap gap-2 text-xs text-gray-600">
+                        {/* <span><strong>Status:</strong> {caseItem.status}</span>
+                        <span><strong>Priority:</strong> {caseItem.priority}</span>
+                        <span><strong>Category:</strong> {caseItem.category}</span> */}
+                        <span><strong>Source:</strong> {caseItem.source}</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewTicket(caseItem)}
+                        className="h-7 px-2 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                      >
+                        <FiEye className="w-3 h-3 mr-1" />
+                        View Details
+                      </Button>
                     </div>
                   </div>
                 ))
@@ -334,6 +361,14 @@ const RCAWorkflow = ({
          )}
       </div>
       </div>
+
+      {/* Similar Ticket Details Modal */}
+      <SimilarTicketModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        ticket={selectedTicket}
+        currentTicket={ticketData}
+      />
     </div>
   )
 }
