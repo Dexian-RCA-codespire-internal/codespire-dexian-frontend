@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
@@ -358,11 +359,6 @@ const RCAWorkflow = ({
                        }}
                      />
                    ))}
-                   {wsConnected && (
-                     <div className="text-xs text-green-600 bg-green-50 p-2 rounded">
-                       ✅ WebSocket Connected - Streaming in real-time
-                     </div>
-                   )}
                  </div>
                ) : aiSuggestionsLoading ? (
                  // Skeleton loader for AI suggestions
@@ -374,7 +370,13 @@ const RCAWorkflow = ({
                    </div>
                  ))
                ) : (
-                 aiSuggestions.map((suggestion, index) => {
+                 <motion.div 
+                   initial={{ opacity: 0, y: 20 }}
+                   animate={{ opacity: 1, y: 0 }}
+                   transition={{ duration: 0.5, ease: "easeOut" }}
+                   className="space-y-3"
+                 >
+                   {aiSuggestions.map((suggestion, index) => {
                    const rank = index + 1;
                    const isBestMatch = rank === 1 && !isFallbackSuggestions; // Only show golden highlighting for real AI suggestions
                    
@@ -385,8 +387,11 @@ const RCAWorkflow = ({
                    
                    
                    return (
-                     <div 
-                       key={index} 
+                     <motion.div 
+                       key={index}
+                       initial={{ opacity: 0, y: 10 }}
+                       animate={{ opacity: 1, y: 0 }}
+                       transition={{ duration: 0.3, delay: index * 0.1, ease: "easeOut" }}
                        className={`p-3 rounded-lg border transition-colors cursor-pointer ${
                          isBestMatch 
                            ? 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-300 hover:from-yellow-100 hover:to-amber-100 shadow-md' 
@@ -425,9 +430,10 @@ const RCAWorkflow = ({
                            </p>
                          </div>
                        </div>
-                     </div>
+                     </motion.div>
                    );
-                 })
+                 })}
+                 </motion.div>
                )}
              </CardContent>
            </Card>

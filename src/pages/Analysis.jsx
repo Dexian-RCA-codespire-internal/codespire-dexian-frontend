@@ -175,12 +175,14 @@ const Analysis = () => {
             await new Promise(resolve => setTimeout(resolve, 500))
           }
           
-          // Set final suggestions after streaming is complete
+          // Set final suggestions immediately when streaming completes
+          setAiSuggestions(suggestions)
+          setAiSuggestionsData(suggestions)
+          
+          // Add smooth transition delay before stopping streaming
           setTimeout(() => {
-            setAiSuggestions(suggestions)
-            setAiSuggestionsData(suggestions)
             setIsStreaming(false)
-          }, 1000)
+          }, 800)
         }
         
         setIsStreaming(false)

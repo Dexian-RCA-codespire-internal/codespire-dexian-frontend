@@ -86,11 +86,6 @@ const SmoothTypingSuggestion = ({
                 </motion.span>
               )}
             </AnimatePresence>
-            {suggestion.confidence && (
-              <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
-                {suggestion.confidence} confidence
-              </span>
-            )}
           </div>
           
           <motion.div 
