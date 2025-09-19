@@ -4,6 +4,7 @@ import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
+import SmoothTypingSuggestion from '../ui/SmoothTypingSuggestion'
 import { FiMessageCircle, FiZap, FiSearch, FiArrowRight, FiArrowLeft, FiCheck, FiSave, FiDownload, FiEye } from 'react-icons/fi'
 import SimilarTicketModal from './SimilarTicketModal'
 
@@ -27,7 +28,11 @@ const RCAWorkflow = ({
   onGenerateReport,
   ticketData = null,
   onStepClick = null,
-  isFallbackSuggestions = false
+  isFallbackSuggestions = false,
+  isStreaming = false,
+  streamingText = '',
+  streamingSuggestions = [],
+  wsConnected = false
 }) => {
   // Modal state for viewing similar ticket details
   const [selectedTicket, setSelectedTicket] = useState(null)
@@ -337,7 +342,29 @@ const RCAWorkflow = ({
                </CardTitle>
              </CardHeader>
              <CardContent className="space-y-3">
-               {aiSuggestionsLoading ? (
+               {isStreaming ? (
+                 // FIXED: Stream all suggestions with smooth typing
+                 <div className="space-y-3">
+                   {streamingSuggestions.map((suggestion, index) => (
+                     <SmoothTypingSuggestion
+                       key={suggestion.id || index}
+                       suggestion={suggestion}
+                       index={index}
+                       isStreaming={suggestion.isStreaming}
+                       onComplete={() => {
+                         // Handle suggestion completion if needed
+                         const suggestionText = suggestion.text || suggestion.description || '';
+                         onResponseChange(suggestionText);
+                       }}
+                     />
+                   ))}
+                   {wsConnected && (
+                     <div className="text-xs text-green-600 bg-green-50 p-2 rounded">
+                       ✅ WebSocket Connected - Streaming in real-time
+                     </div>
+                   )}
+                 </div>
+               ) : aiSuggestionsLoading ? (
                  // Skeleton loader for AI suggestions
                  Array.from({ length: 3 }).map((_, index) => (
                    <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -356,7 +383,6 @@ const RCAWorkflow = ({
                      ? suggestion 
                      : suggestion?.suggestion || suggestion?.text || suggestion?.description || JSON.stringify(suggestion);
                    
-                   const confidence = typeof suggestion === 'object' ? suggestion?.confidence : null;
                    
                    return (
                      <div 
@@ -389,17 +415,6 @@ const RCAWorkflow = ({
                              {isBestMatch && (
                                <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full font-medium">
                                  Recommended
-                               </span>
-                             )}
-                             {confidence && (
-                               <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                 confidence === 'high' 
-                                   ? 'bg-green-100 text-green-800' 
-                                   : confidence === 'medium'
-                                   ? 'bg-yellow-100 text-yellow-800'
-                                   : 'bg-gray-100 text-gray-800'
-                               }`}>
-                                 {confidence} confidence
                                </span>
                              )}
                            </div>

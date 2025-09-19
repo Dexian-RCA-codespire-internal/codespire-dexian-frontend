@@ -8,6 +8,8 @@ import { Textarea } from '../components/ui/textarea'
 import { Badge } from '../components/ui/badge'
 import { Skeleton } from '../components/ui/skeleton'
 import { RCAWorkflow } from '../components/RCA'
+import SmoothTypingSuggestion from '../components/ui/SmoothTypingSuggestion'
+import webSocketService from '../services/websocketService'
 import { FiUpload, FiImage, FiUser, FiPlus, FiClock, FiMoreHorizontal, FiSearch, FiZap, FiTrendingUp, FiAlertTriangle, FiCheckCircle } from 'react-icons/fi'
 
 const Analysis = () => {
@@ -30,6 +32,12 @@ const Analysis = () => {
   const [aiSuggestionsLoading, setAiSuggestionsLoading] = useState(false)
   const [aiSuggestionsError, setAiSuggestionsError] = useState(null)
   const [isFallbackSuggestions, setIsFallbackSuggestions] = useState(false) // Track if showing fallback suggestions
+  
+  // WebSocket streaming state
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [streamingText, setStreamingText] = useState('')
+  const [streamingSuggestions, setStreamingSuggestions] = useState([])
+  const [wsConnected, setWsConnected] = useState(false)
   
   const [analysisNotes, setAnalysisNotes] = useState('')
   const [rootCause, setRootCause] = useState('')
@@ -76,12 +84,124 @@ const Analysis = () => {
     }
   }
 
-  // Fetch AI suggestions based on similar cases
+  // Test WebSocket connection and stream AI suggestions
+  const fetchAISuggestionsStream = async (similarCasesData, currentTicket) => {
+    try {
+      console.log('🔌 Testing WebSocket connection...')
+      console.log('Current WebSocket status:', webSocketService.getConnectionStatus())
+      
+      // Connect to WebSocket if not connected
+      if (!webSocketService.getConnectionStatus()) {
+        console.log('🔌 Attempting to connect to WebSocket...')
+        webSocketService.connect()
+        
+        // Wait a moment for connection
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        console.log('WebSocket status after wait:', webSocketService.getConnectionStatus())
+      }
+      
+      if (webSocketService.getConnectionStatus()) {
+        console.log('✅ WebSocket connected, starting streaming...')
+        setWsConnected(true)
+        setIsStreaming(true)
+        setStreamingText('')
+        
+        // Get suggestions from API first
+        const response = await ticketService.getAISuggestions(similarCasesData.results, currentTicket)
+        const suggestions = response.suggestions || response.data?.suggestions || []
+        
+        if (suggestions.length > 0) {
+          console.log('🎯 Streaming all suggestions:', suggestions.length)
+          
+          // Initialize streaming suggestions array with empty text
+          const initialStreamingSuggestions = suggestions.map((suggestion, index) => ({
+            id: suggestion.id || index + 1,
+            text: '', // Start with empty text
+            fullText: suggestion.suggestion || suggestion.description || suggestion.text || '',
+            isComplete: false,
+            confidence: suggestion.confidence,
+            isStreaming: false
+          }))
+          setStreamingSuggestions(initialStreamingSuggestions)
+          
+          // Stream each suggestion one by one
+          for (let suggestionIndex = 0; suggestionIndex < suggestions.length; suggestionIndex++) {
+            console.log(`🎯 Starting suggestion ${suggestionIndex + 1}`)
+            
+            const currentSuggestion = suggestions[suggestionIndex]
+            const fullText = currentSuggestion.suggestion || currentSuggestion.description || currentSuggestion.text || ''
+            const words = fullText.split(' ')
+            
+            // Mark this suggestion as streaming
+            setStreamingSuggestions(prev => {
+              const newSuggestions = [...prev]
+              newSuggestions[suggestionIndex] = {
+                ...newSuggestions[suggestionIndex],
+                isStreaming: true
+              }
+              return newSuggestions
+            })
+            
+            // Stream this suggestion word by word
+            let currentText = ''
+            for (let wordIndex = 0; wordIndex < words.length; wordIndex++) {
+              currentText += (wordIndex > 0 ? ' ' : '') + words[wordIndex]
+              
+              setStreamingSuggestions(prev => {
+                const newSuggestions = [...prev]
+                newSuggestions[suggestionIndex] = {
+                  ...newSuggestions[suggestionIndex],
+                  text: currentText
+                }
+                return newSuggestions
+              })
+              
+              // Add delay between words
+              await new Promise(resolve => setTimeout(resolve, 100))
+            }
+            
+            // Mark this suggestion as complete
+            setStreamingSuggestions(prev => {
+              const newSuggestions = [...prev]
+              newSuggestions[suggestionIndex] = {
+                ...newSuggestions[suggestionIndex],
+                isComplete: true,
+                isStreaming: false
+              }
+              return newSuggestions
+            })
+            
+            // Add delay before starting next suggestion
+            await new Promise(resolve => setTimeout(resolve, 500))
+          }
+          
+          // Set final suggestions after streaming is complete
+          setTimeout(() => {
+            setAiSuggestions(suggestions)
+            setAiSuggestionsData(suggestions)
+            setIsStreaming(false)
+          }, 1000)
+        }
+        
+        setIsStreaming(false)
+      } else {
+        console.log('❌ WebSocket not connected, falling back to regular API')
+        console.log('WebSocket service:', webSocketService)
+        console.log('Socket instance:', webSocketService.getSocket())
+        fetchAISuggestions(similarCasesData, currentTicket)
+      }
+    } catch (err) {
+      console.error('Error in streaming:', err)
+      fetchAISuggestions(similarCasesData, currentTicket)
+    }
+  }
+
+  // Fallback: Fetch AI suggestions based on similar cases (regular API)
   const fetchAISuggestions = async (similarCasesData, currentTicket) => {
     try {
       setAiSuggestionsLoading(true)
       setAiSuggestionsError(null)
-      console.log('Fetching AI suggestions for similar cases:', similarCasesData)
+      console.log('Fetching AI suggestions for similar cases (fallback):', similarCasesData)
       
       if (similarCasesData && similarCasesData.results && similarCasesData.results.length > 0) {
         const response = await ticketService.getAISuggestions(similarCasesData.results, currentTicket)
@@ -145,7 +265,8 @@ const Analysis = () => {
           // Start both requests in parallel for better UX
           fetchSimilarCases(ticket).then(similarCasesData => {
             if (similarCasesData) {
-              fetchAISuggestions(similarCasesData, ticket)
+              // Try streaming first
+              fetchAISuggestionsStream(similarCasesData, ticket)
             }
           })
         }
@@ -501,6 +622,10 @@ const Analysis = () => {
           similarCases={similarCases}
           aiSuggestionsLoading={aiSuggestionsLoading}
           similarCasesLoading={similarCasesLoading}
+          isStreaming={isStreaming}
+          streamingText={streamingText}
+          streamingSuggestions={streamingSuggestions}
+          wsConnected={wsConnected}
           nextButtonText={rcaStep === 5 ? "Complete RCA →" : "Next Step →"}
           showPrevious={rcaStep > 1}
           canProceed={analysisResponse.trim().length > 0}
