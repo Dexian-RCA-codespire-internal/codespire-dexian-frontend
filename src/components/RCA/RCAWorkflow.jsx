@@ -26,7 +26,8 @@ const RCAWorkflow = ({
   onSaveProgress,
   onGenerateReport,
   ticketData = null,
-  onStepClick = null
+  onStepClick = null,
+  isFallbackSuggestions = false
 }) => {
   // Modal state for viewing similar ticket details
   const [selectedTicket, setSelectedTicket] = useState(null)
@@ -326,8 +327,8 @@ const RCAWorkflow = ({
           </Card>
         ) : null}
 
-        {/* AI Suggestions */}
-        {(aiSuggestions.length > 0 || aiSuggestionsLoading) && (
+        {/* AI Suggestions - Only show if similar tickets are available */}
+        {(aiSuggestions.length > 0 || aiSuggestionsLoading) && similarCases && similarCases.results && similarCases.results.length > 0 && (
            <Card className="bg-white shadow-sm">
              <CardHeader>
                <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
@@ -346,15 +347,72 @@ const RCAWorkflow = ({
                    </div>
                  ))
                ) : (
-                 aiSuggestions.map((suggestion, index) => (
-                   <div 
-                     key={index} 
-                     className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
-                     onClick={() => onResponseChange(suggestion)}
-                   >
-                     <p className="text-sm text-gray-700">{suggestion}</p>
-                   </div>
-                 ))
+                 aiSuggestions.map((suggestion, index) => {
+                   const rank = index + 1;
+                   const isBestMatch = rank === 1 && !isFallbackSuggestions; // Only show golden highlighting for real AI suggestions
+                   
+                   // Handle both string and object formats
+                   const suggestionText = typeof suggestion === 'string' 
+                     ? suggestion 
+                     : suggestion?.suggestion || suggestion?.text || suggestion?.description || JSON.stringify(suggestion);
+                   
+                   const confidence = typeof suggestion === 'object' ? suggestion?.confidence : null;
+                   
+                   return (
+                     <div 
+                       key={index} 
+                       className={`p-3 rounded-lg border transition-colors cursor-pointer ${
+                         isBestMatch 
+                           ? 'bg-gradient-to-r from-yellow-50 to-amber-50 border-yellow-300 hover:from-yellow-100 hover:to-amber-100 shadow-md' 
+                           : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                       }`}
+                       onClick={() => onResponseChange(suggestionText)}
+                     >
+                       <div className="flex items-start gap-3">
+                         {/* Ranking Badge */}
+                         <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                           isBestMatch 
+                             ? 'bg-gradient-to-r from-yellow-400 to-amber-500 text-white shadow-lg' 
+                             : 'bg-gray-400 text-white'
+                         }`}>
+                           {rank}
+                         </div>
+                         
+                         {/* Suggestion Content */}
+                         <div className="flex-1">
+                           <div className="flex items-center gap-2 mb-1">
+                             <p className={`text-sm font-medium ${
+                               isBestMatch ? 'text-amber-800' : 'text-gray-700'
+                             }`}>
+                               {isBestMatch ? '🥇 Best Match' : `Suggestion ${rank}`}
+                             </p>
+                             {isBestMatch && (
+                               <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full font-medium">
+                                 Recommended
+                               </span>
+                             )}
+                             {confidence && (
+                               <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                 confidence === 'high' 
+                                   ? 'bg-green-100 text-green-800' 
+                                   : confidence === 'medium'
+                                   ? 'bg-yellow-100 text-yellow-800'
+                                   : 'bg-gray-100 text-gray-800'
+                               }`}>
+                                 {confidence} confidence
+                               </span>
+                             )}
+                           </div>
+                           <p className={`text-sm leading-relaxed ${
+                             isBestMatch ? 'text-amber-700' : 'text-gray-700'
+                           }`}>
+                             {suggestionText}
+                           </p>
+                         </div>
+                       </div>
+                     </div>
+                   );
+                 })
                )}
              </CardContent>
            </Card>

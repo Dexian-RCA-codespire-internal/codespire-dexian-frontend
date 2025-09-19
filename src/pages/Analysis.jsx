@@ -29,6 +29,7 @@ const Analysis = () => {
   const [aiSuggestionsData, setAiSuggestionsData] = useState([]) // Store full suggestion objects
   const [aiSuggestionsLoading, setAiSuggestionsLoading] = useState(false)
   const [aiSuggestionsError, setAiSuggestionsError] = useState(null)
+  const [isFallbackSuggestions, setIsFallbackSuggestions] = useState(false) // Track if showing fallback suggestions
   
   const [analysisNotes, setAnalysisNotes] = useState('')
   const [rootCause, setRootCause] = useState('')
@@ -90,18 +91,8 @@ const Analysis = () => {
         const suggestions = response.suggestions || response.data?.suggestions || []
         console.log('Raw suggestions from API:', suggestions)
         
-        // Convert suggestion objects to strings for display
-        const suggestionStrings = suggestions.map(suggestion => {
-          if (typeof suggestion === 'string') {
-            return suggestion
-          } else if (suggestion && typeof suggestion === 'object') {
-            return suggestion.suggestion || suggestion.text || suggestion.description || JSON.stringify(suggestion)
-          }
-          return String(suggestion)
-        })
-        
-        console.log('Processed suggestion strings:', suggestionStrings)
-        setAiSuggestions(suggestionStrings)
+        // Pass the full suggestion objects to maintain structure and confidence data
+        setAiSuggestions(suggestions)
         setAiSuggestionsData(suggestions) // Store full objects for future use
       }
     } catch (err) {
@@ -456,6 +447,7 @@ const Analysis = () => {
             onNext={handleRcaNext}
             onPrevious={handleRcaPrevious}
             aiSuggestions={[]}
+            isFallbackSuggestions={false}
             similarCases={null}
             aiSuggestionsLoading={false}
             similarCasesLoading={false}
@@ -505,6 +497,7 @@ const Analysis = () => {
           onNext={handleRcaNext}
           onPrevious={handleRcaPrevious}
           aiSuggestions={aiSuggestions.length > 0 ? aiSuggestions : getCurrentStepData().aiSuggestions}
+          isFallbackSuggestions={aiSuggestions.length === 0}
           similarCases={similarCases}
           aiSuggestionsLoading={aiSuggestionsLoading}
           similarCasesLoading={similarCasesLoading}
