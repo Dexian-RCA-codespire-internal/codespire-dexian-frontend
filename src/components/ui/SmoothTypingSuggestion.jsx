@@ -31,30 +31,32 @@ const SmoothTypingSuggestion = ({
         delay: index * 0.2,
         ease: "easeOut"
       }}
-      className="p-4 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
+      className="p-4 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors min-h-[120px]"
     >
       <div className="flex items-start gap-3">
         {/* Status Icon */}
-        <motion.div 
-          className="flex-shrink-0 mt-1"
-          animate={{ 
-            scale: isTyping ? [1, 1.1, 1] : 1,
-            rotate: isTyping ? [0, 5, -5, 0] : 0
-          }}
-          transition={{ 
-            duration: 0.6, 
-            repeat: isTyping ? Infinity : 0,
-            ease: "easeInOut"
-          }}
-        >
-          {isTyping ? (
-            <FiLoader className="w-5 h-5 text-blue-500 animate-spin" />
-          ) : isComplete ? (
-            <FiCheckCircle className="w-5 h-5 text-green-500" />
-          ) : (
-            <div className="w-5 h-5 rounded-full bg-gray-300" />
-          )}
-        </motion.div>
+        <div className="flex-shrink-0 mt-1 w-5 h-5">
+          <motion.div 
+            className="w-full h-full"
+            animate={{ 
+              scale: isTyping ? [1, 1.1, 1] : 1,
+              rotate: isTyping ? [0, 5, -5, 0] : 0
+            }}
+            transition={{ 
+              duration: 0.6, 
+              repeat: isTyping ? Infinity : 0,
+              ease: "easeInOut"
+            }}
+          >
+            {isTyping ? (
+              <FiLoader className="w-5 h-5 text-blue-500 animate-spin" />
+            ) : isComplete ? (
+              <FiCheckCircle className="w-5 h-5 text-green-500" />
+            ) : (
+              <div className="w-5 h-5 rounded-full bg-gray-300" />
+            )}
+          </motion.div>
+        </div>
         
         {/* Content */}
         <div className="flex-1">
@@ -62,55 +64,27 @@ const SmoothTypingSuggestion = ({
             <span className="text-sm font-medium text-gray-700">
               Suggestion {index + 1}
             </span>
-            <AnimatePresence>
-              {isTyping && (
-                <motion.span
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full"
-                >
-                  Typing...
-                </motion.span>
-              )}
-            </AnimatePresence>
-            <AnimatePresence>
-              {isComplete && (
-                <motion.span
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full"
-                >
-                  Complete
-                </motion.span>
-              )}
-            </AnimatePresence>
           </div>
           
-          <motion.div 
-            className="text-sm text-gray-700 leading-relaxed"
-            layout
-          >
-            {suggestion.text || ''}
-            <AnimatePresence>
+          <div className="text-sm text-gray-700 leading-relaxed min-h-[60px]">
+            <div className="whitespace-pre-wrap break-words overflow-wrap-anywhere">
+              {suggestion.text || ''}
               {isTyping && (
                 <motion.span
                   initial={{ opacity: 0 }}
                   animate={{ opacity: [0, 1, 0] }}
-                  exit={{ opacity: 0 }}
                   transition={{ 
                     duration: 0.8, 
                     repeat: Infinity,
                     ease: "easeInOut"
                   }}
-                  className="text-blue-500 font-bold"
+                  className="inline-block ml-1 text-blue-500 font-bold"
                 >
                   |
                 </motion.span>
               )}
-            </AnimatePresence>
-          </motion.div>
+            </div>
+          </div>
         </div>
       </div>
     </motion.div>

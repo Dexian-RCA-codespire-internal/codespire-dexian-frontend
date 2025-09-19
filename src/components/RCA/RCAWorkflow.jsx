@@ -342,7 +342,7 @@ const RCAWorkflow = ({
                  AI Suggestions
                </CardTitle>
              </CardHeader>
-             <CardContent className="space-y-3">
+             <CardContent className="space-y-3 min-h-[400px]">
                {isStreaming ? (
                  // FIXED: Stream all suggestions with smooth typing
                  <div className="space-y-3">
