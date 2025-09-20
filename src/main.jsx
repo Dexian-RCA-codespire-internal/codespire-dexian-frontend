@@ -2,11 +2,11 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { Provider } from 'react-redux'
 import { HelmetProvider } from 'react-helmet-async'
-import { Toaster } from 'react-hot-toast'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import { store } from './store'
 import { AuthProvider } from './contexts/AuthContext'
+import { ToastProvider } from './contexts/ToastContext'
 import './index.css'
 
 // Import and initialize SuperTokens
@@ -15,17 +15,28 @@ console.log('🚀 Initializing SuperTokens...');
 initSuperTokens();
 console.log('✅ SuperTokens initialized');
 
+// Only use StrictMode in development to prevent duplicate toast notifications in production
+const isDevelopment = import.meta.env.DEV;
+
+const AppWrapper = ({ children }) => {
+  if (isDevelopment) {
+    return <React.StrictMode>{children}</React.StrictMode>;
+  }
+  return children;
+};
+
 createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
+  <AppWrapper>
     <HelmetProvider>
       <Provider store={store}>
         <BrowserRouter>
           <AuthProvider>
-            <App />
-            <Toaster position="top-right" />
+            <ToastProvider>
+              <App />
+            </ToastProvider>
           </AuthProvider>
         </BrowserRouter>
       </Provider>
     </HelmetProvider>
-  </React.StrictMode>
+  </AppWrapper>
 )
