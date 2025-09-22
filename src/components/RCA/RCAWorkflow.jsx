@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
+import AutoSuggestionTextarea from '../ui/AutoSuggestionTextarea'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
 import { FiMessageCircle, FiZap, FiSearch, FiArrowRight, FiArrowLeft, FiCheck, FiSave, FiDownload } from 'react-icons/fi'
@@ -186,13 +187,24 @@ const RCAWorkflow = ({
 
             {/* Response Input */}
             <div className="mb-8">
-              <Textarea
-                value={response}
-                onChange={(e) => onResponseChange(e.target.value)}
-                placeholder="Enter your response here..."
-                rows={8}
-                className="w-full resize-none"
-              />
+              {currentStep === 5 ? (
+                <AutoSuggestionTextarea
+                  value={response}
+                  onChange={(e) => onResponseChange(e)}
+                  placeholder="Enter your corrective actions here..."
+                  rows={8}
+                  className="w-full resize-none"
+                  reference={ticketData ? `${ticketData.short_description} ${ticketData.description || ''}`.trim() : ''}
+                />
+              ) : (
+                <Textarea
+                  value={response}
+                  onChange={(e) => onResponseChange(e.target.value)}
+                  placeholder="Enter your response here..."
+                  rows={8}
+                  className="w-full resize-none"
+                />
+              )}
             </div>
 
             {/* Navigation */}
