@@ -43,8 +43,8 @@ const Analysis = () => {
     problem_step1: '',
     timeline_step2: '',
     impact_step3: '',
-    findings_step4: '',
-    root_cause_step5: ''
+    root_cause_step4: '',
+    corrective_actions_step5: ''
   })
 
   // Fetch similar cases
@@ -132,8 +132,8 @@ const Analysis = () => {
             problem_step1: ticket.problem_step1 || '',
             timeline_step2: ticket.timeline_step2 || '',
             impact_step3: ticket.impact_step3 || '',
-            findings_step4: ticket.findings_step4 || '',
-            root_cause_step5: ticket.root_cause_step5 || ''
+            root_cause_step4: ticket.root_cause_step4 || ticket.findings_step4 || '',
+            corrective_actions_step5: ticket.corrective_actions_step5 || ticket.root_cause_step5 || ''
           }
           setStepData(existingStepData)
           
@@ -238,22 +238,22 @@ const Analysis = () => {
     },
     {
       step: 4,
-      title: 'Investigation Findings',
-      aiGuidance: 'What data have you gathered? What patterns or clues were discovered?',
-      aiSuggestions: [
-        'Database CPU spiked to 95% during incident',
-        'Error logs show connection timeout exceptions',
-        'Monitoring alerts triggered for response time SLA'
-      ]
-    },
-    {
-      step: 5,
       title: 'Root Cause Analysis',
       aiGuidance: 'Based on your investigation, what is the underlying root cause?',
       aiSuggestions: [
         'Inefficient database query causing resource contention',
         'Missing connection pool configuration limits',
         'Inadequate load balancing for traffic spikes'
+      ]
+    },
+    {
+      step: 5,
+      title: 'Corrective Actions',
+      aiGuidance: 'What specific actions will you take to prevent this issue from recurring?',
+      aiSuggestions: [
+        'Implement database query optimization and indexing',
+        'Configure proper connection pool limits and monitoring',
+        'Set up auto-scaling for traffic spikes'
       ]
     }
   ]
@@ -279,7 +279,7 @@ const Analysis = () => {
         [`${rcaStep === 1 ? 'problem' : 
            rcaStep === 2 ? 'timeline' : 
            rcaStep === 3 ? 'impact' : 
-           rcaStep === 4 ? 'findings' : 'root_cause'}_step${rcaStep}`]: analysisResponse,
+           rcaStep === 4 ? 'root_cause' : 'corrective_actions'}_step${rcaStep}`]: analysisResponse,
         status: rcaStep === 5 ? 'Resolved' : 'In Progress'
       }
 
@@ -311,8 +311,8 @@ const Analysis = () => {
           if (!stepData.impact_step3 || stepData.impact_step3.trim().length === 0) {
             incompleteSteps.push('Impact Assessment (Step 3)')
           }
-          if (!stepData.findings_step4 || stepData.findings_step4.trim().length === 0) {
-            incompleteSteps.push('Investigation Findings (Step 4)')
+          if (!stepData.root_cause_step4 || stepData.root_cause_step4.trim().length === 0) {
+            incompleteSteps.push('Root Cause Analysis (Step 4)')
           }
           
           alert(`Cannot complete RCA. The following steps are not completed:\n\n${incompleteSteps.join('\n')}\n\nPlease complete these steps first.`)
@@ -346,7 +346,7 @@ const Analysis = () => {
       const stepKey = `${previousStep === 1 ? 'problem' : 
                        previousStep === 2 ? 'timeline' : 
                        previousStep === 3 ? 'impact' : 
-                       previousStep === 4 ? 'findings' : 'root_cause'}_step${previousStep}`
+                       previousStep === 4 ? 'root_cause' : 'corrective_actions'}_step${previousStep}`
       
       if (stepData[stepKey]) {
         setAnalysisResponse(stepData[stepKey])
@@ -365,7 +365,7 @@ const Analysis = () => {
     if (rcaStep < 5) return true // Not on final step yet
     
     // Check if steps 1-4 have data
-    const requiredSteps = ['problem_step1', 'timeline_step2', 'impact_step3', 'findings_step4']
+    const requiredSteps = ['problem_step1', 'timeline_step2', 'impact_step3', 'root_cause_step4']
     return requiredSteps.every(stepKey => stepData[stepKey] && stepData[stepKey].trim().length > 0)
   }
 
@@ -375,8 +375,8 @@ const Analysis = () => {
       { step: 1, key: 'problem_step1', name: 'Problem Definition' },
       { step: 2, key: 'timeline_step2', name: 'Timeline & Context' },
       { step: 3, key: 'impact_step3', name: 'Impact Assessment' },
-      { step: 4, key: 'findings_step4', name: 'Investigation Findings' },
-      { step: 5, key: 'root_cause_step5', name: 'Root Cause Analysis' }
+      { step: 4, key: 'root_cause_step4', name: 'Root Cause Analysis' },
+      { step: 5, key: 'corrective_actions_step5', name: 'Corrective Actions' }
     ]
     
     for (const stepInfo of steps) {
@@ -395,8 +395,8 @@ const Analysis = () => {
       { step: 1, key: 'problem_step1', name: 'Problem Definition' },
       { step: 2, key: 'timeline_step2', name: 'Timeline & Context' },
       { step: 3, key: 'impact_step3', name: 'Impact Assessment' },
-      { step: 4, key: 'findings_step4', name: 'Investigation Findings' },
-      { step: 5, key: 'root_cause_step5', name: 'Root Cause Analysis' }
+      { step: 4, key: 'root_cause_step4', name: 'Root Cause Analysis' },
+      { step: 5, key: 'corrective_actions_step5', name: 'Corrective Actions' }
     ]
     
     for (const stepInfo of steps) {
@@ -428,7 +428,7 @@ const Analysis = () => {
     const stepKey = `${stepNumber === 1 ? 'problem' : 
                      stepNumber === 2 ? 'timeline' : 
                      stepNumber === 3 ? 'impact' : 
-                     stepNumber === 4 ? 'findings' : 'root_cause'}_step${stepNumber}`
+                     stepNumber === 4 ? 'root_cause' : 'corrective_actions'}_step${stepNumber}`
     
     if (stepData[stepKey]) {
       setAnalysisResponse(stepData[stepKey])

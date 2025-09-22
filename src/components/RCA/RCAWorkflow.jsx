@@ -147,7 +147,7 @@ const RCAWorkflow = ({
                       {stepNumber === 1 ? 'Problem' :
                        stepNumber === 2 ? 'Timeline' :
                        stepNumber === 3 ? 'Impact' :
-                       stepNumber === 4 ? 'Findings' : 'Root Cause'}
+                       stepNumber === 4 ? 'Root Cause' : 'Corrective actions'}
                     </span>
                   </div>
                 )
