@@ -59,36 +59,6 @@ const RCAWorkflow = ({
         </div>
       </div>
 
-           
-      {/* Ticket Information Header */}
-      {ticketData ? (
-        <div className="p-4 bg-white rounded-lg shadow-sm border">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {ticketData.short_description || 'No Title'}
-          </h1>
-          <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-            <span><strong>Ticket ID:</strong> {ticketData.ticket_id}</span>
-            <span><strong>Source:</strong> {ticketData.source}</span>
-            <span><strong>Status:</strong> {ticketData.status}</span>
-            <span><strong>Priority:</strong> {ticketData.priority}</span>
-            <span><strong>Category:</strong> {ticketData.category}</span>
-          </div>
-        </div>
-      ) : (
-        <div className="p-4 bg-white rounded-lg shadow-sm border">
-          <div className="flex items-center gap-3 mb-2">
-            <Skeleton className="h-8 w-48" />
-          </div>
-          <div className="flex flex-wrap gap-4">
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-4 w-36" />
-          </div>
-        </div>
-      )}
-
       {/* RCA Progress Card */}
       <Card className="bg-white shadow-sm">
         <CardContent className="p-4">
@@ -157,6 +127,35 @@ const RCAWorkflow = ({
         </CardContent>
       </Card>
 
+{/* Ticket Information Header */}
+{ticketData ? (
+        <div className="p-4 bg-white rounded-lg shadow-sm border">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            {ticketData.short_description || 'No Title'}
+          </h1>
+          <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+            <span><strong>Ticket ID:</strong> {ticketData.ticket_id}</span>
+            <span><strong>Source:</strong> {ticketData.source}</span>
+            <span><strong>Status:</strong> {ticketData.status}</span>
+            <span><strong>Priority:</strong> {ticketData.priority}</span>
+            <span><strong>Category:</strong> {ticketData.category}</span>
+          </div>
+        </div>
+      ) : (
+        <div className="p-4 bg-white rounded-lg shadow-sm border">
+          <div className="flex items-center gap-3 mb-2">
+            <Skeleton className="h-8 w-48" />
+          </div>
+          <div className="flex flex-wrap gap-4">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-36" />
+          </div>
+        </div>
+      )}
+      
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Main Content Area */}

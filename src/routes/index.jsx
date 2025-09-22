@@ -26,6 +26,7 @@ import VerifyPasswordResetOTP from '../pages/Auth/VerifyPasswordResetOTP.jsx'
 import ResetPasswordWithOTP from '../pages/Auth/ResetPasswordWithOTP.jsx'
 import VerifyOTP from '../pages/Auth/VerifyOTP.jsx'
 import VerifyMagicLink from '../pages/Auth/VerifyMagicLink.jsx'
+import RCACompletion from '../pages/RCACompletion.jsx'
 
 export default function RoutesIndex() {
   return (
@@ -57,6 +58,7 @@ export default function RoutesIndex() {
         <Route path="analysis/:id/:ticketId" element={<Analysis />} />
         <Route path="resolution/:ticketId" element={<Resolution />} />
         <Route path="complete-rca/:ticketId" element={<CompleteRCA />} />
+        <Route path="rca-completion/:id/:ticketId" element={<RCACompletion />} />
         <Route path="ai-rca-guidance/add-integration" element={<AddIntegration />} />
         {isFeatureEnabled('patternDetector') && <Route path="pattern-detector" element={<PatternDetector />} />}
         {isFeatureEnabled('playbookRecommender') && <Route path="playbook-recommender" element={<PlaybookRecommender />} />}

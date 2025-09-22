@@ -319,17 +319,22 @@ const Analysis = () => {
           return
         }
         
-        // All steps complete - call the resolve API
-        const resolveResponse = await ticketService.resolveTicket({
-          rootCause: analysisResponse,
-          ticket: ticketData
+        // All steps complete - navigate to RCA completion page
+        console.log('All RCA steps completed, navigating to completion page')
+        
+        // Navigate to RCA completion page with all the data
+        navigate(`/rca-completion/${id}/${ticketId}`, {
+          state: {
+            ticketData: ticketData,
+            stepData: {
+              ...stepData,
+              [`${rcaStep === 1 ? 'problem' : 
+                 rcaStep === 2 ? 'timeline' : 
+                 rcaStep === 3 ? 'impact' : 
+                 rcaStep === 4 ? 'root_cause' : 'corrective_actions'}_step${rcaStep}`]: analysisResponse
+            }
+          }
         })
-        
-        console.log('Ticket resolved successfully:', resolveResponse)
-        
-        // Show success message and navigate
-        alert('RCA completed successfully! Ticket has been resolved.')
-        navigate('/rca-dashboard')
       }
     } catch (error) {
       console.error('Error saving step data:', error)
