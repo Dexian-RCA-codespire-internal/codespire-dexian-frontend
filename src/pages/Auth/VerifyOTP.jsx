@@ -5,6 +5,7 @@ import { ArrowLeft, Mail, Link as LinkIcon, AlertCircle, CheckCircle } from 'luc
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { validateOTP } from '../../utils/validation'
 import { authService } from '../../api/services/authService'
+import { emailVerificationService } from '../../api/services/emailVerificationService'
 
 export default function VerifyOTP() {
   const [otp, setOtp] = useState("")
@@ -54,11 +55,11 @@ export default function VerifyOTP() {
     clearError()
     
     try {
-      // Use SuperTokens API for OTP verification
-      const response = await authService.verifyOTP(email, otp, deviceId, preAuthSessionId)
-      console.log('✅ SuperTokens OTP verification response:', response)
+      // Use new email verification service for OTP verification
+      const response = await emailVerificationService.verifyOTP(email, otp, deviceId, preAuthSessionId)
+      console.log('✅ Email verification OTP response:', response)
 
-      if (response.status === "OK") {
+      if (response.success) {
         setSuccessMessage('Email verified successfully!')
         setTimeout(() => {
           if (fromRegistration) {
@@ -76,8 +77,8 @@ export default function VerifyOTP() {
         setIsVerifying(false)
       }
     } catch (err) {
-      console.error('SuperTokens OTP verification error:', err)
-      setError('OTP verification failed. Please try again.')
+      console.error('Email verification OTP error:', err)
+      setError(err.response?.data?.message || 'OTP verification failed. Please try again.')
       setIsVerifying(false)
     }
   }
@@ -93,20 +94,20 @@ export default function VerifyOTP() {
     clearError()
     
     try {
-      // Use SuperTokens API to resend OTP
-      const response = await authService.resendOTP(email, deviceId, preAuthSessionId)
-      console.log('✅ SuperTokens resend OTP response:', response)
+      // Use new email verification service to resend OTP
+      const response = await emailVerificationService.resendVerification(email, 'otp')
+      console.log('✅ Email verification resend OTP response:', response)
 
-      if (response.status === "OK") {
-        setResendLeft(30)
+      if (response.success) {
+        setResendLeft(60)
         setSuccessMessage('OTP has been resent to your email')
         setTimeout(() => setSuccessMessage(''), 3000)
       } else {
         setError(response.message || 'Failed to resend OTP. Please try again.')
       }
     } catch (err) {
-      console.error('SuperTokens resend OTP error:', err)
-      setError('Failed to resend OTP. Please try again.')
+      console.error('Email verification resend OTP error:', err)
+      setError(err.response?.data?.message || 'Failed to resend OTP. Please try again.')
     } finally {
       setIsResending(false)
     }
@@ -123,19 +124,19 @@ export default function VerifyOTP() {
     clearError()
     
     try {
-      // Use SuperTokens API to send magic link
-      const response = await authService.sendMagicLink(email)
-      console.log('✅ SuperTokens send magic link response:', response)
+      // Use new email verification service to send magic link
+      const response = await emailVerificationService.resendVerification(email, 'magic_link')
+      console.log('✅ Email verification magic link response:', response)
 
-      if (response.status === "OK") {
-        setSuccessMessage('Verification link has been sent to your email')
-        setTimeout(() => setSuccessMessage(''), 5000)
+      if (response.success) {
+        setSuccessMessage('Verification link has been sent to your email. Please check your inbox and click the link to verify your email.')
+        setTimeout(() => setSuccessMessage(''), 8000)
       } else {
         setError(response.message || 'Failed to send verification link. Please try again.')
       }
     } catch (err) {
-      console.error('SuperTokens send magic link error:', err)
-      setError('Failed to send verification link. Please try again.')
+      console.error('Email verification magic link error:', err)
+      setError(err.response?.data?.message || 'Failed to send verification link. Please try again.')
     } finally {
       setIsSendingMagicLink(false)
     }

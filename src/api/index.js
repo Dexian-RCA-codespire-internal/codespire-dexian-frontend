@@ -28,6 +28,8 @@ export { integrationService } from './services/integrationService.js'
 export { aiService } from './services/aiService.js'
 export { notificationService } from './services/notificationService.js'
 export { auditService } from './services/auditService.js'
+export { userService } from './services/userService.js'
+export { emailVerificationService } from './services/emailVerificationService.js'
 
 // Legacy export for backward compatibility
 export { getTickets, transformTicketToRCACase } from './rcaService.js'

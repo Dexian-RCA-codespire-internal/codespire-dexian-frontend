@@ -38,7 +38,7 @@ export default function RoutesIndex() {
       <Route path="/verify-password-reset-otp" element={<VerifyPasswordResetOTP />} />
       <Route path="/reset-password-with-otp" element={<ResetPasswordWithOTP />} />
       <Route path="/verify-otp" element={<VerifyOTP />} />
-      <Route path="/verify-magic-link/:token" element={<VerifyMagicLink />} />
+      <Route path="/verify-magic-link" element={<VerifyMagicLink />} />
       
       {/* Handle SuperTokens auth redirects */}
       <Route path="/auth" element={<Login />} />

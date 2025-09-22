@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { COUNTRY_CODES, searchCountries } from '../../constants/countryCodes'
 import { validateRegistrationForm, getPasswordStrength, getPasswordRequirements } from '../../utils/validation'
 import { authService } from '../../api/services/authService'
+import { emailVerificationService } from '../../api/services/emailVerificationService'
 
 export default function Register() {
   const navigate = useNavigate()
@@ -138,44 +139,55 @@ export default function Register() {
       console.log('✅ SuperTokens signup response:', response)
 
       if (response.status === "OK") {
-        // After successful registration, send OTP for email verification
-        navigate('/verify-otp', { 
-          state: { 
-            email: formData.email,
-            fromRegistration: true,
-            deviceId: response.deviceId,
-            preAuthSessionId: response.preAuthSessionId
-          } 
-        })
+        // After successful registration, automatically send OTP for email verification
         try {
-          // const otpResponse = await authService.sendOTP(formData.email.trim())
-          // console.log('✅ OTP sent:', otpResponse)
-
-        } catch (err) {
-          console.error('Failed to send OTP:', err)
-          setError('Registration successful but failed to send verification OTP')
+          console.log('📧 Sending OTP for email verification after registration...')
+          const otpResponse = await emailVerificationService.sendOTP(formData.email.trim())
+          console.log('✅ OTP sent automatically:', otpResponse)
+          
+          // Navigate to OTP verification page with the OTP session data
+          navigate('/verify-otp', { 
+            state: { 
+              email: formData.email,
+              fromRegistration: true,
+              deviceId: otpResponse.data.deviceId,
+              preAuthSessionId: otpResponse.data.preAuthSessionId,
+              otpSent: true
+            } 
+          })
+        } catch (otpErr) {
+          console.error('❌ Failed to send OTP automatically:', otpErr)
+          // Still navigate to OTP page, user can manually send OTP
+          navigate('/verify-otp', { 
+            state: { 
+              email: formData.email,
+              fromRegistration: true,
+              deviceId: response.deviceId,
+              preAuthSessionId: response.preAuthSessionId,
+              otpSent: false
+            } 
+          })
         }
       } else {
-        // Handle different response statuses
-        if (response.status === "FIELD_ERROR") {
-          const fieldErrors = response.formFields
-          if (fieldErrors) {
-            const errors = {}
-            fieldErrors.forEach(field => {
-              if (field.id === "email") errors.email = field.error
-              if (field.id === "password") errors.password = field.error
-            })
-            setValidationErrors(errors)
-          }
-        } else if (response.status === "SIGN_UP_NOT_ALLOWED") {
-          setError('Registration is not allowed at this time')
-        } else {
-          setError('Registration failed. Please try again.')
-        }
+        setError(response.message || 'Registration failed. Please try again.')
       }
     } catch (err) {
       console.error('SuperTokens signup error:', err)
-      setError('Registration failed. Please try again.')
+      if (err.response?.status === "FIELD_ERROR") {
+        const fieldErrors = err.response?.formFields
+        if (fieldErrors) {
+          const errors = {}
+          fieldErrors.forEach(field => {
+            if (field.id === "email") errors.email = field.error
+            if (field.id === "password") errors.password = field.error
+          })
+          setValidationErrors(errors)
+        }
+      } else if (err.response?.status === "SIGN_UP_NOT_ALLOWED") {
+        setError('Registration is not allowed at this time')
+      } else {
+        setError('Registration failed. Please try again.')
+      }
     } finally {
       setIsLoading(false)
     }
