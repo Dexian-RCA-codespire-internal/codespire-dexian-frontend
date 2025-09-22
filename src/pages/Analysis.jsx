@@ -8,6 +8,7 @@ import { Textarea } from '../components/ui/textarea'
 import { Badge } from '../components/ui/badge'
 import { Skeleton } from '../components/ui/skeleton'
 import { RCAWorkflow } from '../components/RCA'
+import PlaybookRecommender from '../components/PlaybookRecommender'
 import { FiUpload, FiImage, FiUser, FiPlus, FiClock, FiMoreHorizontal, FiSearch, FiZap, FiTrendingUp, FiAlertTriangle, FiCheckCircle } from 'react-icons/fi'
 
 const Analysis = () => {
@@ -121,9 +122,13 @@ const Analysis = () => {
         console.log('Fetching ticket data for ID:', id)
         
         const response = await ticketService.getTicketById(id)
-        console.log('Ticket data received:', response)
+        console.log('🎫 Analysis page - Ticket data received:', response)
         
         const ticket = response.data || response
+        console.log('🎫 Analysis page - Processed ticket data:', ticket)
+        console.log('🎫 Analysis page - Ticket ID:', ticket?.ticket_id)
+        console.log('🎫 Analysis page - Short description:', ticket?.short_description)
+        console.log('🎫 Analysis page - Description:', ticket?.description)
         setTicketData(ticket)
         
         // Load existing step data from ticket

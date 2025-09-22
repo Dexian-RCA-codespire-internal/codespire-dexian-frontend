@@ -177,6 +177,76 @@ const RCADashboard = () => {
     }
   }
 
+  // Calculate RCA progress based on completed steps
+  const calculateRCAProgress = (ticket) => {
+    if (!ticket) return { percentage: 0, completedSteps: 0, totalSteps: 5, currentStep: 1 }
+    
+    // Check multiple possible locations for step data (including direct fields)
+    const stepData = ticket.stepData || ticket.steps || ticket.rcaSteps || ticket.workflowData || {
+      problem_step1: ticket.problem_step1,
+      timeline_step2: ticket.timeline_step2,
+      impact_step3: ticket.impact_step3,
+      findings_step4: ticket.findings_step4,
+      root_cause_step5: ticket.root_cause_step5
+    }
+    
+    // Define the 5 RCA steps
+    const rcaSteps = [
+      'problem_step1',
+      'timeline_step2', 
+      'impact_step3',
+      'findings_step4',
+      'root_cause_step5'
+    ]
+    
+    // Count completed steps (steps with non-empty data)
+    const completedSteps = rcaSteps.filter(stepKey => {
+      const stepValue = stepData[stepKey]
+      return stepValue && stepValue.trim().length > 0
+    }).length
+    
+    // If we have step data, use it for progress calculation
+    if (Object.keys(stepData).length > 0 && completedSteps > 0) {
+      const progressPercentage = Math.round((completedSteps / rcaSteps.length) * 100)
+      
+      return {
+        percentage: progressPercentage,
+        completedSteps,
+        totalSteps: rcaSteps.length,
+        currentStep: completedSteps + 1 // Next step to work on
+      }
+    }
+    
+    // Fallback: Use ticket status to estimate progress
+    const statusBasedProgress = getStatusBasedProgress(ticket.status)
+    
+    return {
+      percentage: statusBasedProgress.percentage,
+      completedSteps: statusBasedProgress.completedSteps,
+      totalSteps: 5,
+      currentStep: statusBasedProgress.currentStep
+    }
+  }
+
+  // Fallback progress calculation based on ticket status
+  const getStatusBasedProgress = (status) => {
+    if (!status) return { percentage: 0, completedSteps: 0, currentStep: 1 }
+    
+    const statusLower = status.toLowerCase()
+    
+    if (statusLower.includes('new') || statusLower.includes('pending')) {
+      return { percentage: 0, completedSteps: 0, currentStep: 1 }
+    } else if (statusLower.includes('progress') || statusLower.includes('assigned')) {
+      return { percentage: 20, completedSteps: 1, currentStep: 2 } // Started RCA
+    } else if (statusLower.includes('resolved')) {
+      return { percentage: 80, completedSteps: 4, currentStep: 5 } // Almost done
+    } else if (statusLower.includes('closed')) {
+      return { percentage: 100, completedSteps: 5, currentStep: 5 } // Complete
+    } else {
+      return { percentage: 0, completedSteps: 0, currentStep: 1 }
+    }
+  }
+
   // RCA Cases data - ONLY use real data from MongoDB via WebSocket
   const rcaCases = wsTickets.map(ticket => ({
     ...ticket,
@@ -853,6 +923,9 @@ const RCADashboard = () => {
                       <th className="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Source
                       </th>
+                      <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Progress
+                      </th>
                       <th className="w-48 px-8 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
@@ -861,6 +934,7 @@ const RCADashboard = () => {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {filteredCases.map((case_, index) => {
                       const isNewTicket = newTickets.some(ticket => ticket.ticketId === case_.ticketId)
+                      const progress = calculateRCAProgress(case_)
                       return (
                         <tr key={index} className={`hover:bg-gray-50 transition-colors h-16 ${isNewTicket ? 'bg-green-50 border-l-4 border-l-green-500' : ''}`}>
                           <td className="px-6 py-4 whitespace-nowrap align-middle">
@@ -891,15 +965,50 @@ const RCADashboard = () => {
                             {highlightText(case_.source, searchTerm)}
                           </span>
                         </td>
+                        <td className="px-4 py-4 whitespace-nowrap align-middle">
+                          <div className="flex items-center space-x-2">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2">
+                                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${progress.percentage}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-sm font-medium text-gray-700 min-w-[3rem]">
+                                  {progress.percentage}%
+                                </span>
+                              </div>
+                              {/* Show indicator if using fallback progress */}
+                              {!case_.stepData && !case_.steps && !case_.rcaSteps && 
+                               !case_.problem_step1 && !case_.timeline_step2 && !case_.impact_step3 && 
+                               !case_.findings_step4 && !case_.root_cause_step5 && (
+                                <div className="text-xs text-amber-600 mt-1 text-center">
+                                  Status-based
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
                         <td className="px-8 py-4 whitespace-nowrap text-sm font-medium align-middle">
                           <div className="flex items-center space-x-2 mr-8">
-                            <Button 
-                              size="sm" 
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                              onClick={() => navigate(getStageNavigationPath(case_.stage, case_))}
-                            >
-                              Resolve
-                            </Button>
+                            {progress.percentage === 100 ? (
+                              <Button 
+                                size="sm" 
+                                className="bg-gray-500 text-white cursor-not-allowed"
+                                disabled
+                              >
+                                Resolved
+                              </Button>
+                            ) : (
+                              <Button 
+                                size="sm" 
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                                onClick={() => navigate(getStageNavigationPath(case_.stage, case_))}
+                              >
+                                Resolve
+                              </Button>
+                            )}
                             <Button 
                               variant="outline" 
                               size="sm"
@@ -929,6 +1038,7 @@ const RCADashboard = () => {
                 )}
                 {filteredCases.map((case_, index) => {
                   const isNewTicket = newTickets.some(ticket => ticket.ticketId === case_.ticketId)
+                  const progress = calculateRCAProgress(case_)
                   return (
                     <div key={index} className={`border-b border-gray-200 p-3 last:border-b-0 ${isNewTicket ? 'bg-green-50 border-l-4 border-l-green-500' : ''}`}>
                       {/* Header with Ticket ID and Priority */}
@@ -957,16 +1067,49 @@ const RCADashboard = () => {
                         </div>
                       </div>
 
+                      {/* Progress Section */}
+                      <div className="mb-3">
+                        <div className="flex items-center space-x-2">
+                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${progress.percentage}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-sm font-medium text-gray-700 min-w-[3rem]">
+                            {progress.percentage}%
+                          </span>
+                        </div>
+                        {/* Show indicator if using fallback progress */}
+                        {!case_.stepData && !case_.steps && !case_.rcaSteps && 
+                         !case_.problem_step1 && !case_.timeline_step2 && !case_.impact_step3 && 
+                         !case_.findings_step4 && !case_.root_cause_step5 && (
+                          <div className="text-xs text-amber-600 mt-1 text-center">
+                            Status-based progress
+                          </div>
+                        )}
+                      </div>
+
                       {/* Action Buttons */}
                       <div className="flex items-center justify-end">
                         <div className="flex items-center space-x-2">
-                          <Button 
-                            size="sm" 
-                            className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1"
-                            onClick={() => navigate(getStageNavigationPath(case_.stage, case_))}
-                          >
-                            Resolve
-                          </Button>
+                          {progress.percentage === 100 ? (
+                            <Button 
+                              size="sm" 
+                              className="bg-gray-500 text-white cursor-not-allowed text-xs px-3 py-1"
+                              disabled
+                            >
+                              Resolved
+                            </Button>
+                          ) : (
+                            <Button 
+                              size="sm" 
+                              className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1"
+                              onClick={() => navigate(getStageNavigationPath(case_.stage, case_))}
+                            >
+                              Resolve
+                            </Button>
+                          )}
                           <Button 
                             variant="outline" 
                             size="sm"
