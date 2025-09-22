@@ -128,8 +128,8 @@ const Complaint = () => {
   }
 
   const handleInvestigation = () => {
-    // Navigate to investigation page
-    navigate(`/investigation/${ticketId}`)
+    // Navigate to analysis page
+    navigate(`/analysis/${ticketId}`)
   }
 
   // RCA Workflow Handlers
@@ -137,8 +137,8 @@ const Complaint = () => {
     if (rcaStep < 5) {
       setRcaStep(rcaStep + 1)
     } else {
-      // Complete RCA and navigate to investigation
-      navigate(`/investigation/${ticketId}`)
+      // Complete RCA and navigate to analysis
+      navigate(`/analysis/${ticketId}`)
     }
   }
 
@@ -166,10 +166,10 @@ const Complaint = () => {
     // AI resolve functionality for high match cases
     console.log(`AI resolving case ${caseId} with 95% match`)
     // Here you would typically call an API to auto-resolve the case
-    // For now, we'll show a success message or navigate to resolution
+    // For now, we'll show a success message or navigate to analysis
     alert(`AI has automatically resolved case ${caseId} based on 95% match with previous similar case.`)
-    // Navigate to resolution page with AI resolution
-    navigate(`/resolution/${ticketId}?ai-resolved=true&similar-case=${caseId}`)
+    // Navigate to analysis page with AI resolution
+    navigate(`/analysis/${ticketId}?ai-resolved=true&similar-case=${caseId}`)
   }
 
   return (

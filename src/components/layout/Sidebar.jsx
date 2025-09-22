@@ -28,7 +28,8 @@ const Sidebar = ({ onSubSidebarToggle }) => {
     AiOutlineBook,
     FaRegFile,
     BellIcon,
-    FiShield
+    FiShield,
+    LuUser
   };
 
   // Get filtered navigation items based on configuration
@@ -58,7 +59,7 @@ const Sidebar = ({ onSubSidebarToggle }) => {
 
   return (
     <motion.aside
-      className="fixed left-0 top-16 bottom-0 w-18 bg-white border-r border-gray-200 shadow-sm z-40"
+      className="fixed left-0 top-16 bottom-0 w-24 bg-white border-r border-gray-200 shadow-sm z-40"
       initial={{ x: -64 }}
       animate={{ x: 0 }}
       transition={{ duration: 0.3, delay: 0.1 }}

@@ -15,4 +15,20 @@ api.interceptors.response.use(
   }
 )
 
+// Export the axios instance
 export default api
+
+// Export all API services
+export { authService } from './services/authService.js'
+export { clientService } from './services/clientService.js'
+export { rcaService } from './services/rcaService.js'
+export { ticketService } from './services/ticketService.js'
+export { dashboardService } from './services/dashboardService.js'
+export { integrationService } from './services/integrationService.js'
+export { aiService } from './services/aiService.js'
+export { notificationService } from './services/notificationService.js'
+export { auditService } from './services/auditService.js'
+export { playbookService } from './services/playbookService.js'
+
+// Legacy export for backward compatibility
+export { getTickets, transformTicketToRCACase } from './rcaService.js'

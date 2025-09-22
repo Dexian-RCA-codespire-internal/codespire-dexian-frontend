@@ -9,10 +9,11 @@ export const navigationConfig = {
   
   // Optional features (can be enabled/disabled)
   patternDetector: false,        // Pattern & Duplicate Detector
-  playbookRecommender: false,    // Playbook Recommender
+  playbookRecommender: true,    // Playbook Recommender
   customerRcaSummary: false,     // Customer RCA Summary
   alertCorrelation: false,       // Alert Correlation
   complianceAudit: false,        // Compliance & Audit
+  userManagement: false,          // User Management
 }
 
 // Helper function to get enabled navigation items
@@ -69,6 +70,12 @@ export const navigationItems = {
     path: "/compliance-audit",
     label: "Compliance & Audit",
     icon: "FiShield",
+    hasSubItems: false
+  },
+  userManagement: {
+    path: "/user-management",
+    label: "User Management",
+    icon: "LuUser",
     hasSubItems: false
   }
 }

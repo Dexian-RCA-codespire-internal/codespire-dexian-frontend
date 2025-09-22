@@ -14,6 +14,7 @@ import PlaybookRecommender from '../pages/PlaybookRecommender'
 import CustomerRCASummary from '../pages/CustomerRCASummary'
 import AlertCorrelation from '../pages/AlertCorrelation'
 import ComplianceAudit from '../pages/ComplianceAudit'
+import UserManagement from '../pages/UserManagement'
 import AddIntegration from '../pages/ai-rca-guidance/AddIntegration'
 import { isFeatureEnabled } from '../config/navigation'
 
@@ -53,7 +54,7 @@ export default function RoutesIndex() {
         <Route path="rca-dashboard" element={<RCADashboard />} />
         <Route path="complaint/:ticketId" element={<Complaint />} />
         <Route path="investigation/:ticketId" element={<Investigation />} />
-        <Route path="analysis/:ticketId" element={<Analysis />} />
+        <Route path="analysis/:id/:ticketId" element={<Analysis />} />
         <Route path="resolution/:ticketId" element={<Resolution />} />
         <Route path="complete-rca/:ticketId" element={<CompleteRCA />} />
         <Route path="ai-rca-guidance/add-integration" element={<AddIntegration />} />
@@ -62,6 +63,7 @@ export default function RoutesIndex() {
         {isFeatureEnabled('customerRcaSummary') && <Route path="customer-rca-summary" element={<CustomerRCASummary />} />}
         {isFeatureEnabled('alertCorrelation') && <Route path="alert-correlation" element={<AlertCorrelation />} />}
         {isFeatureEnabled('complianceAudit') && <Route path="compliance-audit" element={<ComplianceAudit />} />}
+        {isFeatureEnabled('userManagement') && <Route path="user-management" element={<UserManagement />} />}
       </Route>
     </Routes>
   )

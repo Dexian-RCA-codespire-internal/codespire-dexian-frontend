@@ -6,28 +6,20 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Progress } from '../components/ui/progress'
 import { Checkbox } from '../components/ui/checkbox'
-import { FiSearch, FiMenu, FiCheck, FiAlertTriangle, FiClipboard, FiChevronDown, FiCreditCard, FiRefreshCw, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
-import { getTickets, transformTicketToRCACase } from '../api/rcaService'
+import { FiSearch, FiCheck, FiAlertTriangle, FiClipboard, FiChevronDown, FiCreditCard, FiChevronLeft, FiChevronRight, FiWifi, FiWifiOff, FiLoader, FiInfo } from 'react-icons/fi'
+import { transformTicketToRCACase } from '../api/rcaService'
+import useWebSocketOnly from '../hooks/useWebSocketOnly'
+import NotificationContainer from '../components/ui/NotificationContainer'
 
 const RCADashboard = () => {
   const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [isInitialLoad, setIsInitialLoad] = useState(true)
-  const [apiTickets, setApiTickets] = useState([])
-  const [pollingEnabled, setPollingEnabled] = useState(true)
-  const [pollingInterval, setPollingInterval] = useState(30000) // 30 seconds
   const [lastUpdated, setLastUpdated] = useState(null)
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 0,
-    hasNext: false,
-    hasPrev: false
-  })
+  const [showInfoPopup, setShowInfoPopup] = useState(false)
+  const [autoShowReason, setAutoShowReason] = useState(null)
+  const [userManuallyClosed, setUserManuallyClosed] = useState(false)
   const [filters, setFilters] = useState({
     sources: [],
     priorities: [],
@@ -35,105 +27,102 @@ const RCADashboard = () => {
     stages: []
   })
   const filterDropdownRef = useRef(null)
+  const infoPopupRef = useRef(null)
 
-  // Handle click outside to close filter dropdown
+  // WebSocket-only hook for all data operations (NO REST API calls)
+  const {
+    isConnected: wsConnected,
+    connectionError: wsError,
+    tickets: wsTickets,
+    newTickets,
+    pollingStatus,
+    setPollingStatus,
+    lastPollingEvent,
+    notifications,
+    removeNotification,
+    clearNotifications,
+    pagination: wsPagination,
+    isLoading: wsLoading,
+    isInitialLoad: wsInitialLoad,
+    dataStatistics,
+    fetchTickets: wsFetchTickets,
+    fetchStatistics: wsFetchStatistics,
+    nextPage: wsNextPage,
+    prevPage: wsPrevPage,
+    goToPage: wsGoToPage,
+    changePageSize: wsChangePageSize
+  } = useWebSocketOnly(import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081')
+
+  // Handle click outside to close filter dropdown and info popup
   useEffect(() => {
     const handleClickOutside = (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      
       if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target)) {
         setShowFilterDropdown(false)
       }
+      if (infoPopupRef.current && !infoPopupRef.current.contains(event.target)) {
+        // Close popup when clicking outside, regardless of auto-show reason
+        setShowInfoPopup(false)
+        setAutoShowReason(null) // Clear auto-show reason when manually closed
+        setUserManuallyClosed(true) // Mark as manually closed to prevent auto-reopening
+      }
     }
 
-    if (showFilterDropdown) {
+    if (showFilterDropdown || showInfoPopup) {
       document.addEventListener('mousedown', handleClickOutside)
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showFilterDropdown])
+  }, [showFilterDropdown, showInfoPopup])
 
-  // Fetch tickets from API with pagination
-  const fetchTickets = async (page = 1, limit = 10, isBackgroundRefresh = false) => {
-    try {
-      // Only show loading spinner for initial load or manual refresh
-      if (!isBackgroundRefresh) {
-        setLoading(true)
-      }
-      
-      const response = await getTickets({ page, limit })
-      
-      if (response.success) {
-        const tickets = response.data || []
-        console.log('API Response:', response)
-        console.log('Tickets received:', tickets.length)
-        const transformedTickets = tickets.map(transformTicketToRCACase)
-        setApiTickets(transformedTickets)
-        
-        setPagination({
-          page: response.pagination.currentPage,
-          limit: response.pagination.limit,
-          total: response.pagination.totalCount,
-          totalPages: response.pagination.totalPages,
-          hasNext: response.pagination.hasNextPage,
-          hasPrev: response.pagination.hasPrevPage
-        })
-        
-        // Update last updated timestamp
-        setLastUpdated(new Date())
-        
-        // Mark initial load as complete
-        if (isInitialLoad) {
-          setIsInitialLoad(false)
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching tickets:', error)
-    } finally {
-      if (!isBackgroundRefresh) {
-        setLoading(false)
-      }
+  // Fetch tickets via WebSocket (NO REST API calls)
+  const fetchTickets = (page = 1, limit = 10, isBackgroundRefresh = false) => {
+    console.log('🔄 Fetching tickets via WebSocket (NO REST API calls):', { page, limit, isBackgroundRefresh })
+    wsFetchTickets(page, limit, filters, isBackgroundRefresh)
+    if (!isBackgroundRefresh) {
+      setLastUpdated(new Date())
     }
   }
 
-  // Initial data fetch
+  // Initial data fetch via WebSocket (NO REST API calls)
   useEffect(() => {
-    fetchTickets(1, 10)
-  }, [])
+    if (wsConnected && wsInitialLoad) {
+      console.log('🚀 Initial data fetch via WebSocket (NO REST API calls)')
+      fetchTickets(1, 10)
+      wsFetchStatistics() // Also fetch statistics via WebSocket
+      
+    }
+  }, [wsConnected, wsInitialLoad])
 
-  // Polling logic
+  // Refetch data when filters change (server-side filtering)
   useEffect(() => {
-    let intervalId
-    
-    if (pollingEnabled && !isInitialLoad) {
-      intervalId = setInterval(() => {
-        console.log('Auto-refreshing tickets...')
-        fetchTickets(pagination.page, pagination.limit, true) // Background refresh
-      }, pollingInterval)
+    if (wsConnected && !wsInitialLoad) {
+      console.log('🔍 Filters changed, refetching with server-side filtering:', filters)
+      fetchTickets(1, wsPagination.limit)
     }
-    
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId)
-      }
-    }
-  }, [pollingEnabled, pollingInterval, pagination.page, pagination.limit, isInitialLoad])
+  }, [filters, wsConnected, wsInitialLoad])
 
-  // Pagination handlers
+  // Removed automatic popup logic - user wants manual control only
+
+  // Pagination handlers (WebSocket only)
   const handlePageChange = (newPage) => {
-    fetchTickets(newPage, pagination.limit)
+    wsGoToPage(newPage, filters)
   }
 
   const handleLimitChange = (newLimit) => {
-    fetchTickets(1, newLimit)
+    wsChangePageSize(newLimit, filters)
   }
 
-  // Summary data - calculated from API tickets
+  // Summary data - calculated from WebSocket data and statistics
   const summaryData = [
     {
       title: 'Total Tickets',
-      value: pagination.total.toString(),
-      subtitle: `${apiTickets.length} on current page`,
+      value: (dataStatistics?.total || wsPagination.totalCount || 0).toString(),
+      subtitle: `${wsTickets.length} on current page`,
       subtitleColor: 'text-green-600',
       icon: <FiCreditCard className="text-2xl text-green-600" />,
       bgColor: 'bg-white',
@@ -141,7 +130,7 @@ const RCADashboard = () => {
     },
     {
       title: 'Active Tickets',
-      value: apiTickets.filter(ticket => ticket.status && !['Closed', 'Resolved', 'Cancelled'].includes(ticket.status)).length.toString(),
+      value: (dataStatistics?.open || wsTickets.filter(ticket => ticket.status && !['Closed', 'Resolved', 'Cancelled'].includes(ticket.status)).length).toString(),
       subtitle: 'Currently open',
       subtitleColor: 'text-blue-600',
       icon: <FiAlertTriangle className="text-2xl text-blue-600" />,
@@ -150,7 +139,7 @@ const RCADashboard = () => {
     },
     {
       title: 'High Priority',
-      value: apiTickets.filter(ticket => ticket.priority === 'P1' || ticket.priority === '1 - Critical' || ticket.priority === '2 - High').length.toString(),
+      value: wsTickets.filter(ticket => ticket.priority === 'P1' || ticket.priority === '1 - Critical' || ticket.priority === '2 - High').length.toString(),
       subtitle: 'P1 & P2 tickets',
       subtitleColor: 'text-red-600',
       icon: <FiClipboard className="text-2xl text-red-600" />,
@@ -159,8 +148,8 @@ const RCADashboard = () => {
     },
     {
       title: 'Page Info',
-      value: `${pagination.page}/${pagination.totalPages}`,
-      subtitle: `${pagination.limit} per page`,
+      value: `${wsPagination.currentPage}/${wsPagination.totalPages}`,
+      subtitle: `${wsPagination.limit} per page`,
       subtitleColor: 'text-gray-600',
       icon: <FiCheck className="text-2xl text-gray-600" />,
       bgColor: 'bg-white',
@@ -168,182 +157,36 @@ const RCADashboard = () => {
     }
   ]
 
-  // RCA Cases data - use API tickets or fallback to hardcoded data
-  const rcaCases = apiTickets.length > 0 ? apiTickets : [
-    {
-      id: 'RCA-001',
-      ticketId: 'INC0012345',
-      title: 'Server Outage',
-      source: 'Jira',
-      system: 'E-commerce Platform',
-      priority: 'P1',
-      priorityColor: 'bg-red-100 text-red-800',
-      progress: 20,
-      progressColor: 'bg-red-500',
-      daysOpen: 3,
-      stage: 'Investigation',
-      createdDate: '2024-01-15'
-    },
-    {
-      id: 'RCA-002',
-      ticketId: 'INC0012346',
-      title: 'Payment Failure',
-      source: 'Servicenow',
-      system: 'Payment Gateway',
-      priority: 'P1',
-      priorityColor: 'bg-red-100 text-red-800',
-      progress: 40,
-      progressColor: 'bg-red-500',
-      daysOpen: 5,
-      stage: 'Analysis',
-      createdDate: '2024-01-13'
-    },
-    {
-      id: 'RCA-003',
-      ticketId: 'INC0012347',
-      title: 'Data Sync Issue',
-      source: 'Jira',
-      system: 'CRM System',
-      priority: 'P2',
-      priorityColor: 'bg-yellow-100 text-yellow-800',
-      progress: 50,
-      progressColor: 'bg-yellow-500',
-      daysOpen: 8,
-      stage: 'Analysis',
-      createdDate: '2024-01-10'
-    },
-    {
-      id: 'RCA-004',
-      ticketId: 'INC0012348',
-      title: 'Login Errors',
-      source: 'Zendesk',
-      system: 'User Portal',
-      priority: 'P1',
-      priorityColor: 'bg-red-100 text-red-800',
-      progress: 60,
-      progressColor: 'bg-red-500',
-      daysOpen: 2,
-      stage: 'Resolution',
-      createdDate: '2024-01-16'
-    },
-    {
-      id: 'RCA-005',
-      ticketId: 'INC0012349',
-      title: 'Page Load Slowness',
-      source: 'Remedy',
-      system: 'Web Application',
-      priority: 'P2',
-      priorityColor: 'bg-yellow-100 text-yellow-800',
-      progress: 70,
-      progressColor: 'bg-yellow-500',
-      daysOpen: 12,
-      stage: 'Resolution',
-      createdDate: '2024-01-06'
-    },
-    {
-      id: 'RCA-006',
-      ticketId: 'INC0012350',
-      title: 'Report Generation Bug',
-      source: 'Zendesk',
-      system: 'Reporting System',
-      priority: 'P3',
-      priorityColor: 'bg-green-100 text-green-800',
-      progress: 100,
-      progressColor: 'bg-green-500',
-      daysOpen: 1,
-      stage: 'Compliant',
-      createdDate: '2024-01-17'
-    },
-    {
-      id: 'RCA-007',
-      ticketId: 'INC0012351',
-      title: 'Database Connection Pool Exhaustion',
-      source: 'Jira',
-      system: 'Customer Portal',
-      priority: 'P1',
-      priorityColor: 'bg-red-100 text-red-800',
-      progress: 25,
-      progressColor: 'bg-red-500',
-      daysOpen: 4,
-      stage: 'Investigation',
-      createdDate: '2024-01-14'
-    },
-    {
-      id: 'RCA-008',
-      ticketId: 'INC0012352',
-      title: 'API Rate Limiting Issues',
-      source: 'ServiceNow',
-      system: 'Integration Platform',
-      priority: 'P1',
-      priorityColor: 'bg-red-100 text-red-800',
-      progress: 60,
-      progressColor: 'bg-red-500',
-      daysOpen: 6,
-      stage: 'Analysis',
-      createdDate: '2024-01-12'
-    },
-    {
-      id: 'RCA-009',
-      ticketId: 'INC0012353',
-      title: 'Memory Leak in Background Jobs',
-      source: 'Remedy',
-      system: 'Data Processing Engine',
-      priority: 'P2',
-      priorityColor: 'bg-yellow-100 text-yellow-800',
-      progress: 80,
-      progressColor: 'bg-yellow-500',
-      daysOpen: 9,
-      stage: 'Resolution',
-      createdDate: '2024-01-09'
-    },
-    {
-      id: 'RCA-010',
-      ticketId: 'INC0012354',
-      title: 'SSL Certificate Expiration',
-      source: 'Zendesk',
-      system: 'External API Gateway',
-      priority: 'P1',
-      priorityColor: 'bg-red-100 text-red-800',
-      progress: 90,
-      progressColor: 'bg-red-500',
-      daysOpen: 2,
-      stage: 'Resolution',
-      createdDate: '2024-01-16'
-    },
-    {
-      id: 'RCA-011',
-      ticketId: 'INC0012355',
-      title: 'User Session Timeout Problems',
-      source: 'Jira',
-      system: 'Authentication Service',
-      priority: 'P2',
-      priorityColor: 'bg-yellow-100 text-yellow-800',
-      progress: 45,
-      progressColor: 'bg-yellow-500',
-      daysOpen: 7,
-      stage: 'Analysis',
-      createdDate: '2024-01-11'
-    },
-    {
-      id: 'RCA-012',
-      ticketId: 'INC0012356',
-      title: 'File Upload Size Limit Exceeded',
-      source: 'ServiceNow',
-      system: 'Document Management',
-      priority: 'P3',
-      priorityColor: 'bg-green-100 text-green-800',
-      progress: 100,
-      progressColor: 'bg-green-500',
-      daysOpen: 1,
-      stage: 'Compliant',
-      createdDate: '2024-01-17'
+  // Status to Stage mapping function
+  const getStageFromStatus = (status) => {
+    if (!status) return 'New'
+    
+    const statusLower = status.toLowerCase()
+    
+    // Map MongoDB status values to RCA stages
+    if (statusLower.includes('new') || statusLower.includes('pending')) {
+      return 'New'
+    } else if (statusLower.includes('progress') || statusLower.includes('assigned')) {
+      return 'Analysis'
+    } else if (statusLower.includes('resolved') || statusLower.includes('closed')) {
+      return 'Resolved'
+    } else if (statusLower.includes('cancelled') || statusLower.includes('closed')) {
+      return 'Closed/Cancelled'
+    } else {
+      return 'New' // Default fallback
     }
-  ]
+  }
+
+  // RCA Cases data - ONLY use real data from MongoDB via WebSocket
+  const rcaCases = wsTickets.map(ticket => ({
+    ...ticket,
+    stage: getStageFromStatus(ticket.status) // Add mapped stage
+  }))
 
   // Filter options
   const sourceOptions = ['ServiceNow', 'Jira', 'Zendesk', 'Remedy']
   const priorityOptions = ['1 - Critical', '2 - High', '3 - Moderate', '4 - Low', '5 - Planning']
-  const stageOptions = ['Investigation', 'Analysis', 'Resolution', 'Compliant']
+  const stageOptions = ['New', 'Analysis', 'Resolved', 'Closed/Cancelled']
 
   // Filter handlers
   const handleSourceFilter = (source, checked) => {
@@ -369,7 +212,11 @@ const RCADashboard = () => {
       ...prev,
       dateRange: {
         ...prev.dateRange,
-        [field]: value
+        [field]: value,
+        // If startDate is set but endDate is empty, set endDate to startDate
+        ...(field === 'startDate' && value && !prev.dateRange.endDate ? { endDate: value } : {}),
+        // If endDate is set but startDate is empty, set startDate to endDate  
+        ...(field === 'endDate' && value && !prev.dateRange.startDate ? { startDate: value } : {})
       }
     }))
   }
@@ -390,25 +237,25 @@ const RCADashboard = () => {
     const term = searchTerm.toLowerCase()
     const suggestions = []
     
-    // Get unique values from all tickets
-    const allTitles = [...new Set(rcaCases.map(c => c.title))]
-    const allSystems = [...new Set(rcaCases.map(c => c.system))]
-    const allSources = [...new Set(rcaCases.map(c => c.source))]
-    const allStages = [...new Set(rcaCases.map(c => c.stage))]
-    const allIds = [...new Set(rcaCases.map(c => c.id))]
-    const allTicketIds = [...new Set(rcaCases.map(c => c.ticketId))]
+    // Get unique values from real tickets only
+    const allTitles = [...new Set(wsTickets.map(c => c.short_description || c.title))].filter(Boolean)
+    const allSystems = [...new Set(wsTickets.map(c => c.category || c.system))].filter(Boolean)
+    const allSources = [...new Set(wsTickets.map(c => c.source))].filter(Boolean)
+    const allStages = [...new Set(wsTickets.map(c => c.stage))].filter(Boolean)
+    const allIds = [...new Set(wsTickets.map(c => c._id || c.id))].filter(Boolean)
+    const allTicketIds = [...new Set(wsTickets.map(c => c.ticket_id || c.ticketId))].filter(Boolean)
     
     // Search in titles
     allTitles.forEach(title => {
       if (title.toLowerCase().includes(term)) {
-        suggestions.push({ text: title, type: 'Title', field: 'title' })
+        suggestions.push({ text: title, type: 'Title', field: 'short_description' })
       }
     })
     
     // Search in systems
     allSystems.forEach(system => {
       if (system.toLowerCase().includes(term)) {
-        suggestions.push({ text: system, type: 'System', field: 'system' })
+        suggestions.push({ text: system, type: 'System', field: 'category' })
       }
     })
     
@@ -429,14 +276,14 @@ const RCADashboard = () => {
     // Search in IDs
     allIds.forEach(id => {
       if (id.toLowerCase().includes(term)) {
-        suggestions.push({ text: id, type: 'RCA ID', field: 'id' })
+        suggestions.push({ text: id, type: 'RCA ID', field: '_id' })
       }
     })
     
     // Search in Ticket IDs
     allTicketIds.forEach(ticketId => {
       if (ticketId.toLowerCase().includes(term)) {
-        suggestions.push({ text: ticketId, type: 'Ticket ID', field: 'ticketId' })
+        suggestions.push({ text: ticketId, type: 'Ticket ID', field: 'ticket_id' })
       }
     })
     
@@ -479,111 +326,154 @@ const RCADashboard = () => {
                           (filters.dateRange.startDate || filters.dateRange.endDate) || filters.stages.length > 0
 
   // Function to determine which stage page to navigate to
-  const getStageNavigationPath = (stage, ticketId) => {
-    switch (stage.toLowerCase()) {
-      case 'investigation':
-        return `/investigation/${ticketId}`
-      case 'analysis':
-        return `/analysis/${ticketId}`
-      case 'resolution':
-        return `/resolution/${ticketId}`
-      case 'compliant':
-        return `/complete-rca/${ticketId}` // For completed cases, go to Complete RCA page
-      default:
-        return `/complaint/${ticketId}` // Default to complaint page
-    }
+  const getStageNavigationPath = (stage, case_) => {
+    // Always route to analysis page for resolve functionality
+    // Use both _id and ticket_id in the URL
+    return `/analysis/${case_.id}/${case_.ticketId}`
   }
 
-  const filteredCases = rcaCases.filter(case_ => {
-    const matchesSearch = case_.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         case_.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         case_.ticketId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         case_.source.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchesSource = filters.sources.length === 0 || filters.sources.includes(case_.source)
-    const matchesPriority = filters.priorities.length === 0 || filters.priorities.includes(case_.priority)
-    
-    // Date range filtering
-    const matchesDateRange = () => {
-      if (!filters.dateRange.startDate && !filters.dateRange.endDate) return true
-      
-      const caseDate = new Date(case_.createdDate)
-      const startDate = filters.dateRange.startDate ? new Date(filters.dateRange.startDate) : null
-      const endDate = filters.dateRange.endDate ? new Date(filters.dateRange.endDate) : null
-      
-      if (startDate && endDate) {
-        return caseDate >= startDate && caseDate <= endDate
-      } else if (startDate) {
-        return caseDate >= startDate
-      } else if (endDate) {
-        return caseDate <= endDate
-      }
-      return true
-    }
-    
-    const matchesStage = filters.stages.length === 0 || filters.stages.includes(case_.stage)
-    
-    return matchesSearch && matchesSource && matchesPriority && matchesDateRange() && matchesStage
-  })
+  // Use tickets directly from backend - no frontend filtering needed
+  const filteredCases = rcaCases
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* Notification Container */}
+      <NotificationContainer 
+        notifications={notifications}
+        removeNotification={removeNotification}
+        clearNotifications={clearNotifications}
+      />
+      
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-6">
         {/* Page Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold text-gray-900">RCA Dashboard</h1>
-            {pollingEnabled && (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <div className={`w-2 h-2 rounded-full ${loading ? 'bg-blue-500 animate-spin' : 'bg-green-500 animate-pulse'}`} />
-                <span>
-                  {loading ? 'Refreshing...' : `Auto-refresh every ${pollingInterval / 1000}s`}
-                </span>
-              </div>
-            )}
-            {lastUpdated && (
-              <div className="text-sm text-gray-500">
-                Last updated: {lastUpdated.toLocaleTimeString()}
+            {newTickets.length > 0 && (
+              <div className="flex items-center gap-1 text-sm text-green-600">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span>{newTickets.length} new ticket{newTickets.length > 1 ? 's' : ''}</span>
               </div>
             )}
           </div>
           <div className="flex items-center gap-3">
-            {/* Polling Controls */}
+            {/* WebSocket Connection Status */}
             <div className="flex items-center gap-2">
-              <Button 
-                variant={pollingEnabled ? "default" : "outline"}
-                size="sm"
-                onClick={() => setPollingEnabled(!pollingEnabled)}
-                className="flex items-center gap-1"
-              >
-                <div className={`w-2 h-2 rounded-full ${pollingEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
-                {pollingEnabled ? 'Auto' : 'Manual'}
-              </Button>
-              <select
-                value={pollingInterval}
-                onChange={(e) => setPollingInterval(parseInt(e.target.value))}
-                className="border border-gray-300 rounded-md px-2 py-1 text-sm"
-                disabled={!pollingEnabled}
-              >
-                <option value={10000}>10s</option>
-                <option value={30000}>30s</option>
-                <option value={60000}>1m</option>
-                <option value={300000}>5m</option>
-              </select>
+              <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                !wsConnected 
+                  ? 'bg-red-100 text-red-800' 
+                  : (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false)
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-green-100 text-green-800'
+              }`}>
+                {!wsConnected ? <FiWifiOff className="w-3 h-3" /> : 
+                 (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false) ? 
+                 <FiAlertTriangle className="w-3 h-3" /> : <FiWifi className="w-3 h-3" />}
+                {!wsConnected ? 'Disconnected' : 
+                 (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false) ? 
+                 'Partial' : 'Connected'}
+              </div>
             </div>
             
-            <Button 
-              variant="outline" 
-              className="flex items-center gap-2"
-              onClick={() => fetchTickets(pagination.page, pagination.limit)}
-              disabled={loading}
+            {/* Info Button for Connectivity Status */}
+            <div className="relative" ref={infoPopupRef}>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setShowInfoPopup(!showInfoPopup)}
+                className={`relative flex items-center justify-center ${
+                  autoShowReason 
+                    ? 'border-red-500 bg-red-50 text-red-700' 
+                    : ''
+                }`}
+              >
+                <FiInfo className="text-lg" />
+                {autoShowReason && (
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                )}
+              </Button>
+
+              {/* Info Popup */}
+              {showInfoPopup && (
+                <div className="absolute right-0 top-10 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4">
+          {/* Popup Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-gray-900">Service Status</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowInfoPopup(false)
+                setAutoShowReason(null)
+                setUserManuallyClosed(true)
+              }}
+              className="h-6 w-6 p-0"
             >
-              <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              {loading ? 'Refreshing...' : 'Refresh'}
+              ×
             </Button>
-            <Button variant="outline" size="sm">
-              <FiMenu className="text-lg" />
-            </Button>
+          </div>
+                  
+                  
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-gray-900 text-sm border-b border-gray-200 pb-2">
+                      System Connectivity Status
+                    </h3>
+                    
+                    {/* Backend Connection Status */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">Backend</span>
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          wsConnected 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {wsConnected ? <FiWifi className="w-3 h-3" /> : <FiWifiOff className="w-3 h-3" />}
+                          {wsConnected ? 'Connected' : 'Disconnected'}
+                        </div>
+                      </div>
+                      
+                      {wsError && (
+                        <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                          Backend disconnected
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ServiceNow Connection Status */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">ServiceNow Integration</span>
+                        <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          wsConnected && pollingStatus?.isActive !== false && pollingStatus?.isHealthy !== false
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          <FiInfo className="w-3 h-3" />
+                          {wsConnected && pollingStatus?.isActive !== false && pollingStatus?.isHealthy !== false ? 'Active' : 'Disconnected'}
+                        </div>
+                      </div>
+                      
+                      
+                      {!wsConnected && (
+                        <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                          Backend disconnected - ServiceNow unavailable
+                        </div>
+                      )}
+                      
+                      {wsConnected && (pollingStatus?.isActive === false || pollingStatus?.isHealthy === false) && (
+                        <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                          ServiceNow is disconnected
+                        </div>
+                      )}
+                    </div>
+
+
+                    {/* Close button removed - user only wants X button */}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -607,10 +497,10 @@ const RCADashboard = () => {
 
 
         {/* Main Content Area */}
-        <div className="mb-6">
+        <div className="mb-6 max-w-full">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-900">
-              Tickets {loading && <span className="text-sm text-gray-500">(Loading...)</span>}
+              Tickets {wsLoading && <span className="text-sm text-gray-500">(Loading...)</span>}
             </h2>
             {hasActiveFilters && (
               <div className="flex items-center gap-2">
@@ -623,7 +513,7 @@ const RCADashboard = () => {
           </div>
 
           {/* Search Bar with Filter Dropdown */}
-          <div className="relative mb-6" ref={filterDropdownRef}>
+          <div className="relative mb-6 max-w-full" ref={filterDropdownRef}>
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
                 <Input
@@ -684,7 +574,7 @@ const RCADashboard = () => {
 
             {/* Filter Dropdown */}
             {showFilterDropdown && (
-              <Card className="absolute top-full left-0 right-0 mt-2 z-10 bg-white border border-gray-200 shadow-lg">
+              <Card className="absolute top-full left-0 right-0 mt-2 z-20 bg-white border border-gray-200 shadow-lg">
                 <CardContent className="p-6">
                   <div className="flex gap-8">
                     {/* Source Filter */}
@@ -892,13 +782,19 @@ const RCADashboard = () => {
             </div>
           )}
             
-          {isInitialLoad ? (
+          {wsInitialLoad ? (
             <div className="text-center py-12">
               <div className="text-gray-400 mb-4">
-                <FiRefreshCw className="text-4xl mx-auto animate-spin" />
+                <FiLoader className="text-4xl mx-auto animate-spin" />
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">Loading tickets...</h3>
               <p className="text-gray-500">Fetching data from the server</p>
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg max-w-md mx-auto">
+                <p className="text-sm text-blue-800">
+                  <strong>First time setup:</strong> If this is your first time running the application, 
+                  the initial data import may take a few minutes. Please be patient.
+                </p>
+              </div>
             </div>
           ) : filteredCases.length === 0 ? (
             <div className="text-center py-12">
@@ -909,7 +805,7 @@ const RCADashboard = () => {
               <p className="text-gray-500 mb-4">
                 {hasActiveFilters 
                   ? 'Try adjusting your filters or search terms'
-                  : apiTickets.length === 0 
+                  : wsTickets.length === 0 
                     ? 'No tickets available from the server'
                     : 'No RCA cases match your search criteria'
                 }
@@ -923,70 +819,84 @@ const RCADashboard = () => {
           ) : (
             <div className="bg-white shadow-sm rounded-lg overflow-hidden relative">
               {/* Subtle loading overlay for background refreshes */}
-              {loading && !isInitialLoad && (
+              {wsLoading && !wsInitialLoad && (
                 <div className="absolute inset-0 bg-white bg-opacity-50 z-10 flex items-center justify-center">
                   <div className="flex items-center gap-2 text-sm text-gray-600 bg-white px-3 py-2 rounded-lg shadow-sm">
-                    <FiRefreshCw className="w-4 h-4 animate-spin" />
+                    <FiLoader className="w-4 h-4 animate-spin" />
                     <span>Updating...</span>
                   </div>
                 </div>
               )}
               {/* Desktop Table View */}
-              <div className="hidden lg:block overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
+              <div className="hidden lg:block relative">
+                {/* Loading overlay for pagination */}
+                {wsLoading && !wsInitialLoad && (
+                  <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <FiLoader className="text-2xl mx-auto animate-spin text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600">Loading page...</p>
+                    </div>
+                  </div>
+                )}
+                <table className="w-full table-fixed divide-y divide-gray-200">
                   <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <tr className="h-12">
+                      <th className="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Ticket ID
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-auto px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Ticket Details
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-28 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Priority
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Source
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-48 px-8 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredCases.map((case_, index) => (
-                      <tr key={index} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {highlightText(case_.ticketId, searchTerm)}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
+                    {filteredCases.map((case_, index) => {
+                      const isNewTicket = newTickets.some(ticket => ticket.ticketId === case_.ticketId)
+                      return (
+                        <tr key={index} className={`hover:bg-gray-50 transition-colors h-16 ${isNewTicket ? 'bg-green-50 border-l-4 border-l-green-500' : ''}`}>
+                          <td className="px-6 py-4 whitespace-nowrap align-middle">
+                            <div className="flex items-center gap-2">
+                              <div className="text-sm font-medium text-gray-900">
+                                {highlightText(case_.ticketId, searchTerm)}
+                              </div>
+                              {/* NEW tag removed - user doesn't want it */}
+                            </div>
+                          </td>
+                        <td className="px-4 py-4 align-middle">
+                          <div className="max-w-md">
+                            <div className="text-sm font-medium text-gray-900 truncate" title={case_.title}>
                               {highlightText(case_.title, searchTerm)}
                             </div>
-                            <div className="text-sm text-gray-500">
-                              {highlightText(case_.id, searchTerm)} • {highlightText(case_.system, searchTerm)}
+                            <div className="text-sm text-gray-500 truncate" title={case_.system}>
+                              {highlightText(case_.system, searchTerm)}
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap align-middle">
                           <Badge className={`${case_.priorityColor} border-0 font-medium`}>
                             {case_.priority}
                           </Badge>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap align-middle">
                           <span className="text-sm font-medium text-gray-900">
                             {highlightText(case_.source, searchTerm)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex items-center space-x-2">
+                        <td className="px-8 py-4 whitespace-nowrap text-sm font-medium align-middle">
+                          <div className="flex items-center space-x-2 mr-8">
                             <Button 
                               size="sm" 
                               className="bg-green-600 hover:bg-green-700 text-white"
-                              onClick={() => navigate(getStageNavigationPath(case_.stage, case_.id))}
+                              onClick={() => navigate(getStageNavigationPath(case_.stage, case_))}
                             >
                               Resolve
                             </Button>
@@ -1000,82 +910,92 @@ const RCADashboard = () => {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
 
               {/* Mobile Card View */}
-              <div className="lg:hidden">
-                {filteredCases.map((case_, index) => (
-                  <div key={index} className="border-b border-gray-200 p-4 last:border-b-0">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <p className="text-xs text-gray-500 mb-1">
-                          Ticket ID: {highlightText(case_.ticketId, searchTerm)}
-                        </p>
-                        <h3 className="text-sm font-medium text-gray-900 mb-1">
-                          {highlightText(case_.title, searchTerm)}
-                        </h3>
-                        <p className="text-xs text-gray-500 mb-2">
-                          {highlightText(case_.id, searchTerm)} • {highlightText(case_.system, searchTerm)}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Source: {highlightText(case_.source, searchTerm)}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end space-y-1">
-                        <Badge className={`${case_.priorityColor} border-0 font-medium text-xs`}>
-                          {case_.priority}
-                        </Badge>
-                      </div>
-                    </div>
-                    
-                    <div className="mb-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-gray-700">Source</span>
-                        <span className="text-xs font-medium text-gray-900">
-                          {highlightText(case_.source, searchTerm)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-end">
-                      <div className="flex items-center space-x-2">
-                        <Button 
-                          size="sm" 
-                          className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1"
-                          onClick={() => navigate(getStageNavigationPath(case_.stage, case_.id))}
-                        >
-                          Resolve
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => navigate(`/complaint/${case_.id}`)}
-                          className="text-xs px-3 py-1"
-                        >
-                          View
-                        </Button>
-                      </div>
+              <div className="lg:hidden relative">
+                {/* Loading overlay for pagination */}
+                {wsLoading && !wsInitialLoad && (
+                  <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <FiLoader className="text-2xl mx-auto animate-spin text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600">Loading page...</p>
                     </div>
                   </div>
-                ))}
+                )}
+                {filteredCases.map((case_, index) => {
+                  const isNewTicket = newTickets.some(ticket => ticket.ticketId === case_.ticketId)
+                  return (
+                    <div key={index} className={`border-b border-gray-200 p-3 last:border-b-0 ${isNewTicket ? 'bg-green-50 border-l-4 border-l-green-500' : ''}`}>
+                      {/* Header with Ticket ID and Priority */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1 min-w-0 pr-2">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-xs text-gray-500 truncate">
+                              Ticket ID: {highlightText(case_.ticketId, searchTerm)}
+                            </p>
+                            {/* NEW tag removed - user doesn't want it */}
+                          </div>
+                          <h3 className="text-sm font-medium text-gray-900 mb-1 break-words">
+                            {highlightText(case_.title, searchTerm)}
+                          </h3>
+                          <p className="text-xs text-gray-500 mb-2 break-words">
+                            {highlightText(case_.system, searchTerm)}
+                          </p>
+                          <p className="text-xs text-gray-500 break-words">
+                            Source: {highlightText(case_.source, searchTerm)}
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0">
+                          <Badge className={`${case_.priorityColor} border-0 font-medium text-xs`}>
+                            {case_.priority}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center justify-end">
+                        <div className="flex items-center space-x-2">
+                          <Button 
+                            size="sm" 
+                            className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1"
+                            onClick={() => navigate(getStageNavigationPath(case_.stage, case_))}
+                          >
+                            Resolve
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => navigate(`/complaint/${case_.id}`)}
+                            className="text-xs px-3 py-1"
+                          >
+                            View
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
 
           {/* Pagination Controls */}
-          {apiTickets.length > 0 && (
-            <div className="mt-6 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
+          {wsTickets.length > 0 && (
+            <div className="mt-6">
+              {/* Mobile Pagination */}
+              <div className="lg:hidden space-y-4">
+                <div className="flex items-center justify-center gap-2">
                   <span className="text-sm text-gray-700">Show:</span>
                   <select
-                    value={pagination.limit}
+                    value={wsPagination.limit}
                     onChange={(e) => handleLimitChange(parseInt(e.target.value))}
                     className="border border-gray-300 rounded-md px-2 py-1 text-sm"
-                    disabled={loading && !isInitialLoad}
+                    disabled={wsLoading && !wsInitialLoad}
                   >
                     <option value={5}>5</option>
                     <option value={10}>10</option>
@@ -1084,53 +1004,120 @@ const RCADashboard = () => {
                   </select>
                   <span className="text-sm text-gray-700">per page</span>
                 </div>
-                <div className="text-sm text-gray-700">
-                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} results
+                <div className="text-sm text-gray-700 text-center">
+                  Showing {((wsPagination.currentPage - 1) * wsPagination.limit) + 1} to {Math.min(wsPagination.currentPage * wsPagination.limit, wsPagination.totalCount)} of {wsPagination.totalCount} results
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(wsPagination.currentPage - 1)}
+                    disabled={!wsPagination.hasPrevPage || (wsLoading && !wsInitialLoad)}
+                    className="flex items-center gap-1"
+                  >
+                    <FiChevronLeft className="w-4 h-4" />
+                    Previous
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(3, wsPagination.totalPages) }, (_, i) => {
+                      const pageNum = Math.max(1, Math.min(wsPagination.totalPages - 2, wsPagination.currentPage - 1)) + i
+                      if (pageNum > wsPagination.totalPages) return null
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={pageNum === wsPagination.currentPage ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNum)}
+                          disabled={wsLoading && !wsInitialLoad}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(wsPagination.currentPage + 1)}
+                    disabled={!wsPagination.hasNextPage || (wsLoading && !wsInitialLoad)}
+                    className="flex items-center gap-1"
+                  >
+                    Next
+                    <FiChevronRight className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
-              
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(pagination.page - 1)}
-                  disabled={!pagination.hasPrev || (loading && !isInitialLoad)}
-                  className="flex items-center gap-1"
-                >
-                  <FiChevronLeft className="w-4 h-4" />
-                  Previous
-                </Button>
-                
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                    const pageNum = Math.max(1, Math.min(pagination.totalPages - 4, pagination.page - 2)) + i
-                    if (pageNum > pagination.totalPages) return null
-                    
-                    return (
-                      <Button
-                        key={pageNum}
-                        variant={pageNum === pagination.page ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => handlePageChange(pageNum)}
-                        disabled={loading && !isInitialLoad}
-                        className="w-8 h-8 p-0"
-                      >
-                        {pageNum}
-                      </Button>
-                    )
-                  })}
+
+              {/* Desktop Pagination */}
+              <div className="hidden lg:flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-700">Show:</span>
+                    <select
+                      value={wsPagination.limit}
+                      onChange={(e) => handleLimitChange(parseInt(e.target.value))}
+                      className="border border-gray-300 rounded-md px-2 py-1 text-sm"
+                      disabled={wsLoading && !wsInitialLoad}
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                    </select>
+                    <span className="text-sm text-gray-700">per page</span>
+                  </div>
+                  <div className="text-sm text-gray-700">
+                    Showing {((wsPagination.currentPage - 1) * wsPagination.limit) + 1} to {Math.min(wsPagination.currentPage * wsPagination.limit, wsPagination.totalCount)} of {wsPagination.totalCount} results
+                  </div>
                 </div>
                 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(pagination.page + 1)}
-                  disabled={!pagination.hasNext || (loading && !isInitialLoad)}
-                  className="flex items-center gap-1"
-                >
-                  Next
-                  <FiChevronRight className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(wsPagination.currentPage - 1)}
+                    disabled={!wsPagination.hasPrevPage || (wsLoading && !wsInitialLoad)}
+                    className="flex items-center gap-1"
+                  >
+                    <FiChevronLeft className="w-4 h-4" />
+                    Previous
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, wsPagination.totalPages) }, (_, i) => {
+                      const pageNum = Math.max(1, Math.min(wsPagination.totalPages - 4, wsPagination.currentPage - 2)) + i
+                      if (pageNum > wsPagination.totalPages) return null
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={pageNum === wsPagination.currentPage ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNum)}
+                          disabled={wsLoading && !wsInitialLoad}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(wsPagination.currentPage + 1)}
+                    disabled={!wsPagination.hasNextPage || (wsLoading && !wsInitialLoad)}
+                    className="flex items-center gap-1"
+                  >
+                    Next
+                    <FiChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           )}
