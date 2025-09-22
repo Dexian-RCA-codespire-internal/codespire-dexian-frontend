@@ -39,7 +39,7 @@ const MainLayout = () => {
         />
         
         {/* Main Content */}
-        <main className="flex-1 ml-16 p-6">
+        <main className="flex-1 ml-24 p-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

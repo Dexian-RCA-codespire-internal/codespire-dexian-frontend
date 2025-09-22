@@ -37,6 +37,15 @@ const Analysis = () => {
   // RCA Workflow State
   const [rcaStep, setRcaStep] = useState(1)
   const [analysisResponse, setAnalysisResponse] = useState('')
+  
+  // Step data tracking
+  const [stepData, setStepData] = useState({
+    problem_step1: '',
+    timeline_step2: '',
+    impact_step3: '',
+    findings_step4: '',
+    root_cause_step5: ''
+  })
 
   // Fetch similar cases
   const fetchSimilarCases = async (ticketData) => {
@@ -117,13 +126,37 @@ const Analysis = () => {
         const ticket = response.data || response
         setTicketData(ticket)
         
-        // Fetch similar cases after ticket data is loaded
+        // Load existing step data from ticket
         if (ticket) {
-          const similarCasesData = await fetchSimilarCases(ticket)
-          // Fetch AI suggestions after similar cases are loaded
-          if (similarCasesData) {
-            await fetchAISuggestions(similarCasesData, ticket)
+          const existingStepData = {
+            problem_step1: ticket.problem_step1 || '',
+            timeline_step2: ticket.timeline_step2 || '',
+            impact_step3: ticket.impact_step3 || '',
+            findings_step4: ticket.findings_step4 || '',
+            root_cause_step5: ticket.root_cause_step5 || ''
           }
+          setStepData(existingStepData)
+          
+          // Find and navigate to first incomplete step
+          const firstIncompleteStep = findFirstIncompleteStepWithData(existingStepData)
+          setRcaStep(firstIncompleteStep)
+          
+          // Load the response for the current step
+          const stepKey = `${firstIncompleteStep === 1 ? 'problem' : 
+                           firstIncompleteStep === 2 ? 'timeline' : 
+                           firstIncompleteStep === 3 ? 'impact' : 
+                           firstIncompleteStep === 4 ? 'findings' : 'root_cause'}_step${firstIncompleteStep}`
+          setAnalysisResponse(existingStepData[stepKey] || '')
+        }
+        
+        // Start fetching similar cases and AI suggestions after ticket data is loaded
+        if (ticket) {
+          // Start both requests in parallel for better UX
+          fetchSimilarCases(ticket).then(similarCasesData => {
+            if (similarCasesData) {
+              fetchAISuggestions(similarCasesData, ticket)
+            }
+          })
         }
       } catch (err) {
         console.error('Error fetching ticket data:', err)
@@ -233,24 +266,147 @@ const Analysis = () => {
   ]
 
   // RCA Workflow Handlers
-  const handleRcaNext = () => {
-    if (rcaStep < 5) {
-      setRcaStep(rcaStep + 1)
-    } else {
-      // Complete RCA - keep user on analysis page
-      console.log('RCA completed for ticket:', ticketId)
-      // You can add success message or update UI state here
+  const handleRcaNext = async () => {
+    try {
+      if (!ticketData) {
+        console.error('No ticket data available')
+        return
+      }
+
+      // Update step data with current response
+      const updatedStepData = {
+        ...stepData,
+        [`${rcaStep === 1 ? 'problem' : 
+           rcaStep === 2 ? 'timeline' : 
+           rcaStep === 3 ? 'impact' : 
+           rcaStep === 4 ? 'findings' : 'root_cause'}_step${rcaStep}`]: analysisResponse,
+        status: rcaStep === 5 ? 'Resolved' : 'In Progress'
+      }
+
+      // Call API to update ticket with step data
+      await ticketService.updateTicketSteps({
+        ticketId: ticketData._id,
+        stepData: updatedStepData
+      })
+
+      // Update local step data state
+      setStepData(updatedStepData)
+
+      if (rcaStep < 5) {
+        // Move to next step
+        setRcaStep(rcaStep + 1)
+        // Clear response for next step
+        setAnalysisResponse('')
+      } else {
+        // Complete RCA - check if all previous steps are complete
+        if (!areAllPreviousStepsComplete()) {
+          // Show alert about incomplete steps
+          const incompleteSteps = []
+          if (!stepData.problem_step1 || stepData.problem_step1.trim().length === 0) {
+            incompleteSteps.push('Problem Definition (Step 1)')
+          }
+          if (!stepData.timeline_step2 || stepData.timeline_step2.trim().length === 0) {
+            incompleteSteps.push('Timeline & Context (Step 2)')
+          }
+          if (!stepData.impact_step3 || stepData.impact_step3.trim().length === 0) {
+            incompleteSteps.push('Impact Assessment (Step 3)')
+          }
+          if (!stepData.findings_step4 || stepData.findings_step4.trim().length === 0) {
+            incompleteSteps.push('Investigation Findings (Step 4)')
+          }
+          
+          alert(`Cannot complete RCA. The following steps are not completed:\n\n${incompleteSteps.join('\n')}\n\nPlease complete these steps first.`)
+          return
+        }
+        
+        // All steps complete - call the resolve API
+        const resolveResponse = await ticketService.resolveTicket({
+          rootCause: analysisResponse,
+          ticket: ticketData
+        })
+        
+        console.log('Ticket resolved successfully:', resolveResponse)
+        
+        // Show success message and navigate
+        alert('RCA completed successfully! Ticket has been resolved.')
+        navigate('/rca-dashboard')
+      }
+    } catch (error) {
+      console.error('Error saving step data:', error)
+      alert(`Error saving step data: ${error.message}`)
     }
   }
 
   const handleRcaPrevious = () => {
     if (rcaStep > 1) {
-      setRcaStep(rcaStep - 1)
+      const previousStep = rcaStep - 1
+      setRcaStep(previousStep)
+      
+      // Load previous step data if available
+      const stepKey = `${previousStep === 1 ? 'problem' : 
+                       previousStep === 2 ? 'timeline' : 
+                       previousStep === 3 ? 'impact' : 
+                       previousStep === 4 ? 'findings' : 'root_cause'}_step${previousStep}`
+      
+      if (stepData[stepKey]) {
+        setAnalysisResponse(stepData[stepKey])
+      } else {
+        setAnalysisResponse('')
+      }
     }
   }
 
   const getCurrentStepData = () => {
     return rcaSteps.find(step => step.step === rcaStep) || rcaSteps[0]
+  }
+
+  // Check if all previous steps have data
+  const areAllPreviousStepsComplete = () => {
+    if (rcaStep < 5) return true // Not on final step yet
+    
+    // Check if steps 1-4 have data
+    const requiredSteps = ['problem_step1', 'timeline_step2', 'impact_step3', 'findings_step4']
+    return requiredSteps.every(stepKey => stepData[stepKey] && stepData[stepKey].trim().length > 0)
+  }
+
+  // Find the first incomplete step
+  const findFirstIncompleteStep = () => {
+    const steps = [
+      { step: 1, key: 'problem_step1', name: 'Problem Definition' },
+      { step: 2, key: 'timeline_step2', name: 'Timeline & Context' },
+      { step: 3, key: 'impact_step3', name: 'Impact Assessment' },
+      { step: 4, key: 'findings_step4', name: 'Investigation Findings' },
+      { step: 5, key: 'root_cause_step5', name: 'Root Cause Analysis' }
+    ]
+    
+    for (const stepInfo of steps) {
+      if (!stepData[stepInfo.key] || stepData[stepInfo.key].trim().length === 0) {
+        return stepInfo.step
+      }
+    }
+    
+    // If all steps are complete, return step 5
+    return 5
+  }
+
+  // Find the first incomplete step with provided data
+  const findFirstIncompleteStepWithData = (stepDataToCheck) => {
+    const steps = [
+      { step: 1, key: 'problem_step1', name: 'Problem Definition' },
+      { step: 2, key: 'timeline_step2', name: 'Timeline & Context' },
+      { step: 3, key: 'impact_step3', name: 'Impact Assessment' },
+      { step: 4, key: 'findings_step4', name: 'Investigation Findings' },
+      { step: 5, key: 'root_cause_step5', name: 'Root Cause Analysis' }
+    ]
+    
+    for (const stepInfo of steps) {
+      if (!stepDataToCheck[stepInfo.key] || stepDataToCheck[stepInfo.key].trim().length === 0) {
+        return stepInfo.step
+      }
+    }
+    
+    // If all steps are complete, return step 5
+    return 5
   }
 
   const handleSaveProgress = () => {
@@ -263,6 +419,24 @@ const Analysis = () => {
     // Implement report generation
   }
 
+  // Handle step navigation
+  const handleStepClick = (stepNumber) => {
+    // Allow navigation to any step
+    setRcaStep(stepNumber)
+    
+    // Load existing step data if available
+    const stepKey = `${stepNumber === 1 ? 'problem' : 
+                     stepNumber === 2 ? 'timeline' : 
+                     stepNumber === 3 ? 'impact' : 
+                     stepNumber === 4 ? 'findings' : 'root_cause'}_step${stepNumber}`
+    
+    if (stepData[stepKey]) {
+      setAnalysisResponse(stepData[stepKey])
+    } else {
+      setAnalysisResponse('')
+    }
+  }
+
   // Show loading state with skeleton loaders instead of full page spinner
   if (loading) {
     return (
@@ -271,7 +445,7 @@ const Analysis = () => {
           
           
 
-          {/* RCA Workflow with skeleton loaders */}
+          {/* RCA Workflow with skeleton loaders - only show ticket data skeleton */}
           <RCAWorkflow
             currentStep={rcaStep}
             totalSteps={5}
@@ -283,14 +457,15 @@ const Analysis = () => {
             onPrevious={handleRcaPrevious}
             aiSuggestions={[]}
             similarCases={null}
-            aiSuggestionsLoading={true}
-            similarCasesLoading={true}
+            aiSuggestionsLoading={false}
+            similarCasesLoading={false}
             nextButtonText={rcaStep === 5 ? "Complete RCA →" : "Next Step →"}
             showPrevious={rcaStep > 1}
             canProceed={analysisResponse.trim().length > 0}
             onSaveProgress={handleSaveProgress}
             onGenerateReport={handleGenerateReport}
             ticketData={null}
+            onStepClick={handleStepClick}
           />
         </div>
       </div>
@@ -339,6 +514,7 @@ const Analysis = () => {
           onSaveProgress={handleSaveProgress}
           onGenerateReport={handleGenerateReport}
           ticketData={ticketData}
+          onStepClick={handleStepClick}
         />
       </div>
     </div>
