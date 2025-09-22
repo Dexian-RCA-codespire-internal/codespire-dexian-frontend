@@ -14,7 +14,7 @@ const RCAWorkflow = ({
   aiGuidance, 
   response, 
   onResponseChange, 
-  onNext, 
+  onNext,
   onPrevious, 
   aiSuggestions = [], 
   similarCases = [],
