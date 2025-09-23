@@ -226,6 +226,11 @@ const RCAWorkflow = ({
             </div>
           </CardContent>
         </Card>
+
+        {/* Playbook Recommender - Moved to bottom of main content */}
+        <div className="mt-8">
+          <PlaybookRecommender ticketData={ticketData} />
+        </div>
       </div>
 
       {/* Right Sidebar */}
@@ -335,8 +340,6 @@ const RCAWorkflow = ({
            </Card>
          )}
 
-        {/* Playbook Recommender */}
-        <PlaybookRecommender ticketData={ticketData} />
       </div>
       </div>
     </div>

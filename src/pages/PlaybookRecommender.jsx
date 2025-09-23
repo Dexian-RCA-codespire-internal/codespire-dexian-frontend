@@ -42,7 +42,6 @@ const PlaybookRecommender = () => {
   const [savedPlaybooks, setSavedPlaybooks] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [backendStatus, setBackendStatus] = useState('connecting')
   const [newPlaybook, setNewPlaybook] = useState({
     playbook_id: '',
     title: '',
@@ -279,11 +278,9 @@ const PlaybookRecommender = () => {
       
       console.log(`✅ Backend connected! Loaded ${updatedPlaybooks.length} playbooks`)
       setSavedPlaybooks(updatedPlaybooks)
-      setBackendStatus('connected')
     } catch (error) {
       console.error('❌ Backend connection failed:', error.message)
       setError('Failed to load playbooks from server')
-      setBackendStatus('disconnected')
       // Keep existing saved playbooks if API fails
     } finally {
       setIsLoading(false)
@@ -542,15 +539,6 @@ const PlaybookRecommender = () => {
              {isLoading && (
                <div className="text-sm text-blue-600">Loading...</div>
              )}
-             <div className={`text-xs px-2 py-1 rounded-full ${
-               backendStatus === 'connected' ? 'bg-green-100 text-green-800' :
-               backendStatus === 'disconnected' ? 'bg-red-100 text-red-800' :
-               'bg-yellow-100 text-yellow-800'
-             }`}>
-               {backendStatus === 'connected' ? '🟢 Backend Connected' :
-                backendStatus === 'disconnected' ? '🔴 Backend Disconnected' :
-                '🟡 Connecting...'}
-             </div>
              {error && (
                <div className="text-sm text-red-600">{error}</div>
              )}

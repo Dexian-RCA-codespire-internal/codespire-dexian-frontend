@@ -276,7 +276,7 @@ const PlaybookRecommender = ({ ticketData }) => {
       <CardHeader>
         <div className="flex items-center justify-between">
             <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
-              <FiBookOpen className="w-5 h-5 mr-2 text-purple-500" />
+              <FiBookOpen className="w-5 h-5 mr-2 text-green-500" />
               {playbooks.length > 1 ? 'Top Matching Playbooks' : 'Best Match Playbook'}
             </CardTitle>
           <Button
