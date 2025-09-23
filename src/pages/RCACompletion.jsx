@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Textarea } from '../components/ui/textarea'
+import { StreamingTextarea } from '../components/ui/StreamingTextarea'
 import { Badge } from '../components/ui/badge'
 import { Skeleton } from '../components/ui/skeleton'
 import { 
@@ -54,6 +55,10 @@ const RCACompletion = () => {
   const currentTechnicalRCA = useRef('')
   const currentCustomerSummary = useRef('')
   
+  // Track received chunks to prevent duplication
+  const receivedTechnicalChunks = useRef(new Set())
+  const receivedCustomerChunks = useRef(new Set())
+  
   // Ticket data
   const [ticketData, setTicketData] = useState(null)
   
@@ -100,6 +105,8 @@ const RCACompletion = () => {
       if (socket) {
         socket.off('rca_progress')
         socket.off('rca_generation')
+        socket.off('rca_chunk')
+        socket.off('rca_streaming')
         socket.off('rca_complete')
         socket.off('rca_error')
       }
@@ -181,6 +188,16 @@ const RCACompletion = () => {
           handleGeneration(data)
         })
         
+        socket.on('rca_chunk', (data) => {
+          console.log('🔍 Received rca_chunk:', data)
+          handleGeneration(data)
+        })
+        
+        socket.on('rca_streaming', (data) => {
+          console.log('🔍 Received rca_streaming:', data)
+          handleGeneration(data)
+        })
+        
         socket.on('rca_complete', (data) => {
           console.log('🔍 Received rca_complete:', data)
           handleComplete(data)
@@ -217,18 +234,50 @@ const RCACompletion = () => {
     if (data.type === 'technical') {
       if (data.chunk) {
         console.log('📝 Adding technical chunk:', data.chunk)
-        currentTechnicalRCA.current += data.chunk
-        setTechnicalReport(currentTechnicalRCA.current)
-        setGeneratingTechnical(false) // Remove loading as soon as first chunk arrives
-        console.log('📝 Updated technical report length:', currentTechnicalRCA.current.length)
+        // Create a unique hash for the chunk to prevent duplication
+        const chunkHash = `${data.chunk.slice(0, 50)}_${data.chunk.length}`
+        
+        if (!receivedTechnicalChunks.current.has(chunkHash)) {
+          receivedTechnicalChunks.current.add(chunkHash)
+          currentTechnicalRCA.current += data.chunk
+          setTechnicalReport(currentTechnicalRCA.current)
+          setGeneratingTechnical(false) // Remove loading as soon as first chunk arrives
+          console.log('📝 Updated technical report length:', currentTechnicalRCA.current.length)
+        } else {
+          console.log('📝 Skipping duplicate technical chunk:', chunkHash)
+        }
+      } else if (data.content) {
+        // Handle complete content updates - replace entire content
+        console.log('📝 Setting complete technical content')
+        currentTechnicalRCA.current = data.content
+        setTechnicalReport(data.content)
+        setGeneratingTechnical(false)
+        // Clear chunk tracking when setting complete content
+        receivedTechnicalChunks.current.clear()
       }
     } else if (data.type === 'customer') {
       if (data.chunk) {
         console.log('👥 Adding customer chunk:', data.chunk)
-        currentCustomerSummary.current += data.chunk
-        setCustomerSummary(currentCustomerSummary.current)
-        setGeneratingCustomer(false) // Remove loading as soon as first chunk arrives
-        console.log('👥 Updated customer summary length:', currentCustomerSummary.current.length)
+        // Create a unique hash for the chunk to prevent duplication
+        const chunkHash = `${data.chunk.slice(0, 50)}_${data.chunk.length}`
+        
+        if (!receivedCustomerChunks.current.has(chunkHash)) {
+          receivedCustomerChunks.current.add(chunkHash)
+          currentCustomerSummary.current += data.chunk
+          setCustomerSummary(currentCustomerSummary.current)
+          setGeneratingCustomer(false) // Remove loading as soon as first chunk arrives
+          console.log('👥 Updated customer summary length:', currentCustomerSummary.current.length)
+        } else {
+          console.log('👥 Skipping duplicate customer chunk:', chunkHash)
+        }
+      } else if (data.content) {
+        // Handle complete content updates - replace entire content
+        console.log('👥 Setting complete customer content')
+        currentCustomerSummary.current = data.content
+        setCustomerSummary(data.content)
+        setGeneratingCustomer(false)
+        // Clear chunk tracking when setting complete content
+        receivedCustomerChunks.current.clear()
       }
     }
     
@@ -244,6 +293,11 @@ const RCACompletion = () => {
     setProgress(100)
     setGeneratingTechnical(false)
     setGeneratingCustomer(false)
+    
+    // Clear chunk tracking on completion
+    receivedTechnicalChunks.current.clear()
+    receivedCustomerChunks.current.clear()
+    
     console.log('Complete RCA data:', data)
   }
 
@@ -425,6 +479,11 @@ const RCACompletion = () => {
     currentCustomerSummary.current = ''
     setTechnicalReport('')
     setCustomerSummary('')
+    
+    // Clear chunk tracking
+    receivedTechnicalChunks.current.clear()
+    receivedCustomerChunks.current.clear()
+    
     setStreaming(true)
     setProgress(0)
     setStreamingError(null)
@@ -622,6 +681,48 @@ const RCACompletion = () => {
           </div>
         )}
 
+        {/* Streaming Progress */}
+        {streaming && streamingProgress && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <FiLoader className="w-5 h-5 text-green-500 animate-spin mr-3" />
+                <p className="text-green-700 font-medium">{streamingProgress}</p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-32 bg-green-200 rounded-full h-2">
+                  <div 
+                    className="bg-green-600 h-2 rounded-full transition-all duration-300" 
+                    style={{ width: `${progress}%` }}
+                  ></div>
+                </div>
+                <span className="text-xs text-green-600">{Math.round(progress)}%</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* WebSocket Connection Status */}
+        <div className="mb-6 flex justify-end">
+          <div className={`flex items-center px-3 py-2 rounded-full text-sm ${
+            websocketConnected 
+              ? 'bg-green-100 text-green-800' 
+              : 'bg-red-100 text-red-800'
+          }`}>
+            {websocketConnected ? (
+              <>
+                <FiWifi className="w-4 h-4 mr-2" />
+                WebSocket Connected
+              </>
+            ) : (
+              <>
+                <FiWifiOff className="w-4 h-4 mr-2" />
+                WebSocket Disconnected
+              </>
+            )}
+          </div>
+        </div>
+
         {/* Regenerate Button */}
         {ticketData && (
           <div className="mb-6 flex justify-end">
@@ -668,26 +769,17 @@ const RCACompletion = () => {
                   Detailed technical analysis for internal use
                 </p>
               </div>
-                    {streaming && !technicalReport ? (
-                      <div className="flex  h-96 flex-col items-center justify-center py-12 text-center">
-                        <FiLoader className="w-8 h-8 text-blue-500 animate-spin mb-4" />
-                        <p className="text-sm text-gray-600">AI Agent is building Technical RCA Report</p>
-                      </div>
-                    ) : (
-                      <Textarea
-                        value={technicalReport}
-                        onChange={(e) => setTechnicalReport(e.target.value)}
-                        placeholder="Technical RCA report will be generated here..."
-                        rows={20}
-                        className="w-full resize-none font-mono text-sm"
-                      />
-                    )}
-              {technicalReport && (
-                <div className="flex items-center text-sm text-green-600">
-                  <FiCheckCircle className="w-4 h-4 mr-1" />
-                  Technical report ready
-                </div>
-              )}
+                    <StreamingTextarea
+                      value={technicalReport}
+                      onChange={(e) => setTechnicalReport(e.target.value)}
+                      placeholder="Technical RCA report will be generated here..."
+                      rows={20}
+                      className="font-mono"
+                      streaming={streaming}
+                      generating={generatingTechnical}
+                      streamingProgress={streamingProgress}
+                      type="technical"
+                    />
             </CardContent>
           </Card>
 
@@ -705,26 +797,16 @@ const RCACompletion = () => {
                   Simplified summary for customer communication
                 </p>
               </div>
-                    {streaming || !customerSummary ? (
-                      <div className="flex h-96 flex-col items-center justify-center py-12 text-center">
-                        <FiLoader className="w-8 h-8 text-green-500 animate-spin mb-4" />
-                        <p className="text-sm text-gray-600">AI Agent is building Customer-Friendly Summary</p>
-                      </div>
-                    ) : (
-                      <Textarea
-                        value={customerSummary}
-                        onChange={(e) => setCustomerSummary(e.target.value)}
-                        placeholder="Customer-friendly summary will be generated here..."
-                        rows={20}
-                        className="w-full resize-none text-sm"
-                      />
-                    )}
-              {customerSummary && (
-                <div className="flex items-center text-sm text-green-600">
-                  <FiCheckCircle className="w-4 h-4 mr-1" />
-                  Customer summary ready
-                </div>
-              )}
+                    <StreamingTextarea
+                      value={customerSummary}
+                      onChange={(e) => setCustomerSummary(e.target.value)}
+                      placeholder="Customer-friendly summary will be generated here..."
+                      rows={20}
+                      streaming={streaming}
+                      generating={generatingCustomer}
+                      streamingProgress={streamingProgress}
+                      type="customer"
+                    />
             </CardContent>
           </Card>
         </div>
