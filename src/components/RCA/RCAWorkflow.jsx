@@ -158,9 +158,9 @@ const RCAWorkflow = ({
       )}
       
       {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className={`grid grid-cols-1 gap-8 ${currentStep === 4 ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
       {/* Main Content Area */}
-      <div className="lg:col-span-2">
+      <div className={currentStep === 4 ? 'lg:col-span-2' : 'lg:col-span-1'}>
         <Card className="bg-white shadow-sm">
           <CardContent className="p-8">
             {/* Step Header */}
@@ -233,12 +233,13 @@ const RCAWorkflow = ({
         </Card>
       </div>
 
-      {/* Right Sidebar */}
-      <div className="lg:col-span-1 space-y-6">
+      {/* Right Sidebar - Only show for Root Cause step (step 4) */}
+      {currentStep === 4 && (
+        <div className="lg:col-span-1 space-y-6">
          
 
-        {/* Similar Cases */}
-        {(similarCases && similarCases.results && similarCases.results.length > 0) || similarCasesLoading ? (
+        {/* Similar Cases - Only show for Root Cause step (step 4) */}
+        {currentStep === 4 && ((similarCases && similarCases.results && similarCases.results.length > 0) || similarCasesLoading) ? (
           <Card className="bg-white shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
@@ -306,8 +307,8 @@ const RCAWorkflow = ({
           </Card>
         ) : null}
 
-        {/* AI Suggestions */}
-        {(aiSuggestions.length > 0 || aiSuggestionsLoading) && (
+        {/* AI Suggestions - Only show for Root Cause step (step 4) */}
+        {currentStep === 4 && (aiSuggestions.length > 0 || aiSuggestionsLoading) && (
            <Card className="bg-white shadow-sm">
              <CardHeader>
                <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
@@ -339,7 +340,8 @@ const RCAWorkflow = ({
              </CardContent>
            </Card>
          )}
-      </div>
+        </div>
+      )}
       </div>
     </div>
   )
