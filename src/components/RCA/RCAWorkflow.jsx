@@ -4,6 +4,7 @@ import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
 import { Input } from '../ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { SimpleDateTimePicker } from '../ui/simple-date-time-picker'
 import AutoSuggestionTextarea from '../ui/AutoSuggestionTextarea'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
@@ -41,6 +42,11 @@ const RCAWorkflow = ({
   const [aiQuestion, setAiQuestion] = useState('')
   const [isGeneratingProblemStatement, setIsGeneratingProblemStatement] = useState(false)
   const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false)
+  
+  // State for Timeline step (step 2)
+  const [logs, setLogs] = useState([])
+  const [newLog, setNewLog] = useState({ time: '', service: '', message: '' })
+  const [isAddingLog, setIsAddingLog] = useState(false)
 
   // Generate problem statement when component mounts and we're on step 1
   useEffect(() => {
@@ -114,9 +120,45 @@ const RCAWorkflow = ({
     generateProblemStatement()
   }, [currentStep, ticketData, isGeneratingProblemStatement, hasAttemptedGeneration])
 
+  // Load logs when on Timeline step (step 2)
+  useEffect(() => {
+    if (currentStep === 2 && ticketData && ticketData.logs) {
+      setLogs(ticketData.logs)
+    }
+  }, [currentStep, ticketData])
+
   // Handle clicking on problem definition
   const handleProblemDefinitionClick = (definition) => {
     setProblemSummary(definition)
+  }
+
+  // Handle adding new log
+  const handleAddLog = () => {
+    if (newLog.time && newLog.service && newLog.message) {
+      const logWithId = { ...newLog, id: Date.now(), isUserGenerated: true }
+      setLogs([...logs, logWithId])
+      setNewLog({ time: '', service: '', message: '' })
+      setIsAddingLog(false)
+    }
+  }
+
+  // Handle deleting user-generated log
+  const handleDeleteLog = (logId) => {
+    setLogs(logs.filter(log => log.id !== logId))
+  }
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return ''
+    const date = new Date(dateString)
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
   }
 
   return (
@@ -380,6 +422,129 @@ const RCAWorkflow = ({
                     />
                   </div>
                 </div>
+              ) : currentStep === 2 ? (
+                // Timeline step - show ticket creation time and logs
+                <div className="space-y-6">
+                  {/* Ticket Creation Time */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Ticket Creation Time
+                    </label>
+                    <Input
+                      value={ticketData?.opened_time ? formatDate(ticketData.opened_time) : ''}
+                      disabled
+                      className="w-full bg-gray-50"
+                    />
+                  </div>
+                  
+                  {/* Logs Section */}
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900">Logs</h3>
+                      <Button
+                        onClick={() => setIsAddingLog(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        size="sm"
+                      >
+                        + Add Log
+                      </Button>
+                    </div>
+                    
+                    {/* Existing Logs */}
+                    <div className="space-y-3">
+                      {logs.map((log, index) => (
+                        <div key={log.id || index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                          <div className="w-48 flex-shrink-0">
+                            <Input
+                              value={formatDate(log.time)}
+                              disabled
+                              className="w-full"
+                              placeholder="Time"
+                            />
+                          </div>
+                          <div className="w-32 flex-shrink-0">
+                            <Input
+                              value={log.service}
+                              disabled
+                              className="w-full"
+                              placeholder="Service"
+                            />
+                          </div>
+                          <div className="flex-grow">
+                            <Input
+                              value={log.message}
+                              disabled
+                              className="w-full"
+                              placeholder="Message"
+                            />
+                          </div>
+                          {log.isUserGenerated && (
+                            <Button
+                              onClick={() => handleDeleteLog(log.id)}
+                              variant="outline"
+                              size="sm"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
+                            >
+                              ✕
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Add New Log Form */}
+                    {isAddingLog && (
+                      <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="flex items-center gap-3">
+                          <div className="w-48 flex-shrink-0">
+                            <SimpleDateTimePicker
+                              value={newLog.time ? new Date(newLog.time) : null}
+                              onChange={(date) => setNewLog({...newLog, time: date ? date.toISOString() : ''})}
+                              placeholder="Select date and time"
+                              className="w-full"
+                            />
+                          </div>
+                          <div className="w-32 flex-shrink-0">
+                            <Input
+                              value={newLog.service}
+                              onChange={(e) => setNewLog({...newLog, service: e.target.value})}
+                              placeholder="Service"
+                              className="w-full"
+                            />
+                          </div>
+                          <div className="flex-grow">
+                            <Input
+                              value={newLog.message}
+                              onChange={(e) => setNewLog({...newLog, message: e.target.value})}
+                              placeholder="Message"
+                              className="w-full"
+                            />
+                          </div>
+                          <div className="flex gap-2 flex-shrink-0">
+                            <Button
+                              onClick={handleAddLog}
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              ✓
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                setIsAddingLog(false)
+                                setNewLog({ time: '', service: '', message: '' })
+                              }}
+                              variant="outline"
+                              size="sm"
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              ✕
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               ) : currentStep === 5 ? (
                 <AutoSuggestionTextarea
                   value={response}
@@ -428,7 +593,7 @@ const RCAWorkflow = ({
 
       {/* Right Sidebar - Show for Problem Definition (step 1) and Root Cause (step 4) */}
       {(currentStep === 1 || currentStep === 4) && (
-        <div className="lg:col-span-1 space-y-6">
+      <div className="lg:col-span-1 space-y-6">
          
         {/* Problem Definitions - Only show for Problem Definition step (step 1) */}
         {currentStep === 1 && (
@@ -583,7 +748,7 @@ const RCAWorkflow = ({
              </CardContent>
            </Card>
          )}
-        </div>
+      </div>
       )}
       </div>
     </div>
