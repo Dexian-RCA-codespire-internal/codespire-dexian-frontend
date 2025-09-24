@@ -38,6 +38,7 @@ const RCAWorkflow = ({
   const [businessImpactCategory, setBusinessImpactCategory] = useState('')
   const [problemSummary, setProblemSummary] = useState('')
   const [problemDefinitions, setProblemDefinitions] = useState([])
+  const [aiQuestion, setAiQuestion] = useState('')
   const [isGeneratingProblemStatement, setIsGeneratingProblemStatement] = useState(false)
   const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false)
 
@@ -52,7 +53,7 @@ const RCAWorkflow = ({
           const requestData = {
             shortDescription: ticketData.short_description || '',
             description: ticketData.description || ticketData.short_description || '',
-            serverLogs: [] // Add server logs if available in ticket data
+            serverLogs: ticketData?.logs || []
           }
           
           const response = await aiService.problemStatement.generate(requestData)
@@ -64,6 +65,11 @@ const RCAWorkflow = ({
             if (problemStatement.problemDefinitions && problemStatement.problemDefinitions.length > 0) {
               setProblemSummary(problemStatement.problemDefinitions[0])
               setProblemDefinitions(problemStatement.problemDefinitions)
+            }
+            
+            // Set the AI question
+            if (problemStatement.question) {
+              setAiQuestion(problemStatement.question)
             }
             
             // Map issue type
@@ -269,6 +275,19 @@ const RCAWorkflow = ({
                 <p className="text-sm text-green-700">{aiGuidance}</p>
               </div>
             </div>
+
+            {/* AI Question - Only show for Problem Definition step (step 1) */}
+            {/* {currentStep === 1 && aiQuestion && (
+              <div className="mb-6">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center mb-2">
+                    <BsStars className="w-5 h-5 text-blue-600 mr-2" />
+                    <span className="text-sm font-medium text-blue-800">AI Question</span>
+                  </div>
+                  <p className="text-sm text-blue-700">{aiQuestion}</p>
+                </div>
+              </div>
+            )} */}
 
             {/* Response Input */}
             <div className="mb-8">
