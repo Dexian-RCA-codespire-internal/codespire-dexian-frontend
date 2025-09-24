@@ -26,6 +26,7 @@ const Sidebar = ({ onSubSidebarToggle }) => {
     RiAiGenerate2,
     AiOutlineSearch,
     AiOutlineBook,
+    AiOutlineTrophy,
     FaRegFile,
     BellIcon,
     FiShield,
