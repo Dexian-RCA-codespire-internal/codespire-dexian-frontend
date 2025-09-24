@@ -8,6 +8,7 @@ import AutoSuggestionTextarea from '../ui/AutoSuggestionTextarea'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
 import { FiMessageCircle, FiZap, FiSearch, FiArrowRight, FiArrowLeft, FiCheck, FiSave, FiDownload, FiLoader } from 'react-icons/fi'
+import { BsStars } from 'react-icons/bs'
 import { aiService } from '../../api/services/aiService'
 
 const RCAWorkflow = ({ 
@@ -36,6 +37,7 @@ const RCAWorkflow = ({
   const [severity, setSeverity] = useState('')
   const [businessImpactCategory, setBusinessImpactCategory] = useState('')
   const [problemSummary, setProblemSummary] = useState('')
+  const [problemDefinitions, setProblemDefinitions] = useState([])
   const [isGeneratingProblemStatement, setIsGeneratingProblemStatement] = useState(false)
   const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false)
 
@@ -58,8 +60,11 @@ const RCAWorkflow = ({
           if (response.success && response.problemStatement) {
             const { problemStatement } = response
             
-            // Map the AI response to our form fields
-            setProblemSummary(problemStatement.problemDefinition || '')
+            // Set the first problem definition in the textarea and store all definitions
+            if (problemStatement.problemDefinitions && problemStatement.problemDefinitions.length > 0) {
+              setProblemSummary(problemStatement.problemDefinitions[0])
+              setProblemDefinitions(problemStatement.problemDefinitions)
+            }
             
             // Map issue type
             const issueTypeMap = {
@@ -102,6 +107,11 @@ const RCAWorkflow = ({
     
     generateProblemStatement()
   }, [currentStep, ticketData, isGeneratingProblemStatement, hasAttemptedGeneration])
+
+  // Handle clicking on problem definition
+  const handleProblemDefinitionClick = (definition) => {
+    setProblemSummary(definition)
+  }
 
   return (
     <div className="space-y-8">
@@ -233,9 +243,9 @@ const RCAWorkflow = ({
       )}
       
       {/* Main Content */}
-      <div className={`grid grid-cols-1 gap-8 ${currentStep === 4 ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
+      <div className={`grid grid-cols-1 gap-8 ${(currentStep === 1 || currentStep === 4) ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
       {/* Main Content Area */}
-      <div className={currentStep === 4 ? 'lg:col-span-2' : 'lg:col-span-1'}>
+      <div className={(currentStep === 1 || currentStep === 4) ? 'lg:col-span-2' : 'lg:col-span-1'}>
         <Card className="bg-white shadow-sm">
           <CardContent className="p-8">
             {/* Step Header */}
@@ -397,10 +407,60 @@ const RCAWorkflow = ({
         </Card>
       </div>
 
-      {/* Right Sidebar - Only show for Root Cause step (step 4) */}
-      {currentStep === 4 && (
+      {/* Right Sidebar - Show for Problem Definition (step 1) and Root Cause (step 4) */}
+      {(currentStep === 1 || currentStep === 4) && (
         <div className="lg:col-span-1 space-y-6">
          
+        {/* Problem Definitions - Only show for Problem Definition step (step 1) */}
+        {currentStep === 1 && (
+          <Card className="bg-white shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
+                <BsStars className="w-5 h-5 mr-2 text-blue-500" />
+                AI Problem Definitions
+                {!isGeneratingProblemStatement && problemDefinitions.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {problemDefinitions.length} options
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {isGeneratingProblemStatement ? (
+                // Skeleton loader for problem definitions
+                Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-start justify-between mb-2">
+                      <Skeleton className="h-5 w-16" />
+                    </div>
+                    <Skeleton className="h-4 w-full mb-1" />
+                    <Skeleton className="h-4 w-3/4 mb-1" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                ))
+              ) : problemDefinitions.length > 0 ? (
+                problemDefinitions.map((definition, index) => (
+                  <div 
+                    key={index} 
+                    className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
+                    onClick={() => handleProblemDefinitionClick(definition)}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                        Option {index + 1}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-700 line-clamp-3">{definition}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                  <p className="text-sm text-gray-500">No problem definitions available</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Similar Cases - Only show for Root Cause step (step 4) */}
         {currentStep === 4 && ((similarCases && similarCases.results && similarCases.results.length > 0) || similarCasesLoading) ? (
