@@ -15,6 +15,7 @@ import { aiService } from '../../api/services/aiService'
 const RCAWorkflow = ({ 
   currentStep, 
   totalSteps, 
+  setStepData,
   stepTitle, 
   aiGuidance, 
   response, 
@@ -68,11 +69,15 @@ const RCAWorkflow = ({
           if (response.success && response.problemStatement) {
             const { problemStatement } = response
             
-            // Set the first problem definition in the textarea and store all definitions
-            if (problemStatement.problemDefinitions && problemStatement.problemDefinitions.length > 0) {
-              setProblemSummary(problemStatement.problemDefinitions[0])
-              setProblemDefinitions(problemStatement.problemDefinitions)
-            }
+             // Set the first problem definition in the textarea and store all definitions
+             if (problemStatement.problemDefinitions && problemStatement.problemDefinitions.length > 0) {
+               setProblemSummary(problemStatement.problemDefinitions[0])
+               setStepData((prevData) => ({
+                 ...prevData,
+                 problem_step1: problemStatement.problemDefinitions[0]
+               }))
+               setProblemDefinitions(problemStatement.problemDefinitions)
+             }
             
             // Set the AI question
             if (problemStatement.question) {
@@ -131,6 +136,10 @@ const RCAWorkflow = ({
   // Handle clicking on problem definition
   const handleProblemDefinitionClick = (definition) => {
     setProblemSummary(definition)
+    setStepData((prevData) => ({
+      ...prevData,
+      problem_step1: definition
+    }))
   }
 
   // Handle adding new log
@@ -166,11 +175,15 @@ const RCAWorkflow = ({
       
       const response = await aiService.timelineContext.generate(requestData)
       
-      if (response.success && response.timelineDescription) {
-        const { description, context } = response.timelineDescription
-        const combinedDescription = `${description}\n\n${context}`
-        onResponseChange(combinedDescription)
-      }
+       if (response.success && response.timelineDescription) {
+         const { description, context } = response.timelineDescription
+         const combinedDescription = `${description}\n\n${context}`
+         onResponseChange(combinedDescription)
+         setStepData((prevData) => ({
+           ...prevData,
+           timeline_step2: combinedDescription
+         }))
+       }
     } catch (error) {
       console.error('Error generating timeline description:', error)
       alert('Failed to generate AI timeline description. Please try again.')
@@ -444,14 +457,20 @@ const RCAWorkflow = ({
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Problem Statement (AI-assisted)
                     </label>
-                    <Textarea
-                      value={problemSummary}
-                      onChange={(e) => setProblemSummary(e.target.value)}
-                      placeholder={isGeneratingProblemStatement ? "Generating AI problem summary..." : "AI-generated problem summary..."}
-                      rows={6}
-                      className="w-full resize-none"
-                      disabled={isGeneratingProblemStatement}
-                    />
+                     <Textarea
+                       value={problemSummary}
+                       onChange={(e) => {
+                         setProblemSummary(e.target.value)
+                         setStepData((prevData) => ({
+                           ...prevData,
+                           problem_step1: e.target.value
+                         }))
+                       }}
+                       placeholder={isGeneratingProblemStatement ? "Generating AI problem summary..." : "AI-generated problem summary..."}
+                       rows={6}
+                       className="w-full resize-none"
+                       disabled={isGeneratingProblemStatement}
+                     />
                   </div>
                 </div>
               ) : currentStep === 2 ? (
@@ -599,33 +618,65 @@ const RCAWorkflow = ({
                         {isGeneratingTimelineDescription ? 'Generating...' : 'Create Description'}
                       </Button>
                     </div>
-                    <Textarea
-                      value={response}
-                      onChange={(e) => onResponseChange(e.target.value)}
-                      placeholder="Describe the timeline and context of the incident..."
-                      rows={6}
-                      className="w-full resize-none"
-                    />
+                     <Textarea
+                       value={response}
+                       onChange={(e) => {
+                         onResponseChange(e.target.value)
+                         setStepData((prevData) => ({
+                           ...prevData,
+                           timeline_step2: e.target.value
+                         }))
+                       }}
+                       placeholder="Describe the timeline and context of the incident..."
+                       rows={6}
+                       className="w-full resize-none"
+                     />
                   </div>
                 </div>
-              ) : currentStep === 5 ? (
-                <AutoSuggestionTextarea
-                  value={response}
-                  onChange={(e) => onResponseChange(e)}
-                  placeholder="Enter your corrective actions here..."
-                  rows={8}
-                  className="w-full resize-none"
-                  reference={ticketData ? `${ticketData.short_description} ${ticketData.description || ''}`.trim() : ''}
-                />
-              ) : (
-                <Textarea
-                  value={response}
-                  onChange={(e) => onResponseChange(e.target.value)}
-                  placeholder="Enter your response here..."
-                  rows={8}
-                  className="w-full resize-none"
-                />
-              )}
+               ) : currentStep === 5 ? (
+                 <AutoSuggestionTextarea
+                   value={response}
+                   onChange={(e) => {
+                     onResponseChange(e)
+                     setStepData((prevData) => ({
+                       ...prevData,
+                       corrective_actions_step5: e
+                     }))
+                   }}
+                   placeholder="Enter your corrective actions here..."
+                   rows={8}
+                   className="w-full resize-none"
+                   reference={ticketData ? `${ticketData.short_description} ${ticketData.description || ''}`.trim() : ''}
+                 />
+               ) : currentStep === 3 ? (
+                 <Textarea
+                   value={response}
+                   onChange={(e) => {
+                     onResponseChange(e.target.value)
+                     setStepData((prevData) => ({
+                       ...prevData,
+                       impact_step3: e.target.value
+                     }))
+                   }}
+                   placeholder="Enter your response here..."
+                   rows={8}
+                   className="w-full resize-none"
+                 />
+               ) : (
+                 <Textarea
+                   value={response}
+                   onChange={(e) => {
+                     onResponseChange(e.target.value)
+                     setStepData((prevData) => ({
+                       ...prevData,
+                       root_cause_step4: e.target.value
+                     }))
+                   }}
+                   placeholder="Enter your response here..."
+                   rows={8}
+                   className="w-full resize-none"
+                 />
+               )}
             </div>
 
             {/* Navigation */}

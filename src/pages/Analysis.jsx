@@ -273,13 +273,12 @@ const Analysis = () => {
         return
       }
 
-      // Update step data with current response
+      // Use the current stepData (already updated by textarea onChange handlers)
+      console.log('stepData',stepData);
+      console.log('rcaStep',rcaStep);
+      console.log('analysisResponse',analysisResponse);
       const updatedStepData = {
         ...stepData,
-        [`${rcaStep === 1 ? 'problem' : 
-           rcaStep === 2 ? 'timeline' : 
-           rcaStep === 3 ? 'impact' : 
-           rcaStep === 4 ? 'root_cause' : 'corrective_actions'}_step${rcaStep}`]: analysisResponse,
         status: rcaStep === 5 ? 'Resolved' : 'In Progress'
       }
 
@@ -454,6 +453,7 @@ const Analysis = () => {
           <RCAWorkflow
             currentStep={rcaStep}
             totalSteps={5}
+            setStepData={setStepData}
             stepTitle={getCurrentStepData().title}
             aiGuidance={getCurrentStepData().aiGuidance}
             response={analysisResponse}
@@ -503,6 +503,7 @@ const Analysis = () => {
         <RCAWorkflow
           currentStep={rcaStep}
           totalSteps={5}
+          setStepData={setStepData}
           stepTitle={getCurrentStepData().title}
           aiGuidance={getCurrentStepData().aiGuidance}
           response={analysisResponse}
