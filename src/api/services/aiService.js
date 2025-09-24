@@ -190,5 +190,14 @@ export const aiService = {
       const response = await api.get(`/ai/analytics/performance-predictions?systemId=${systemId}&timeRange=${timeRange}`);
       return response.data;
     }
+  },
+
+  // Problem Statement Generation
+  problemStatement: {
+    // Generate AI-powered problem statement
+    generate: async (ticketData) => {
+      const response = await api.post('/v1/problem-statement/generate', ticketData);
+      return response.data;
+    }
   }
 };

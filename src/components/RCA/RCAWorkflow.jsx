@@ -1,11 +1,14 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
+import { Input } from '../ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import AutoSuggestionTextarea from '../ui/AutoSuggestionTextarea'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
-import { FiMessageCircle, FiZap, FiSearch, FiArrowRight, FiArrowLeft, FiCheck, FiSave, FiDownload } from 'react-icons/fi'
+import { FiMessageCircle, FiZap, FiSearch, FiArrowRight, FiArrowLeft, FiCheck, FiSave, FiDownload, FiLoader } from 'react-icons/fi'
+import { aiService } from '../../api/services/aiService'
 
 const RCAWorkflow = ({ 
   currentStep, 
@@ -28,6 +31,78 @@ const RCAWorkflow = ({
   ticketData = null,
   onStepClick = null
 }) => {
+  // State for Problem Definition step fields
+  const [issueType, setIssueType] = useState('')
+  const [severity, setSeverity] = useState('')
+  const [businessImpactCategory, setBusinessImpactCategory] = useState('')
+  const [problemSummary, setProblemSummary] = useState('')
+  const [isGeneratingProblemStatement, setIsGeneratingProblemStatement] = useState(false)
+  const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false)
+
+  // Generate problem statement when component mounts and we're on step 1
+  useEffect(() => {
+    const generateProblemStatement = async () => {
+      if (currentStep === 1 && ticketData && !isGeneratingProblemStatement && !hasAttemptedGeneration) {
+        try {
+          setIsGeneratingProblemStatement(true)
+          setHasAttemptedGeneration(true)
+          
+          const requestData = {
+            shortDescription: ticketData.short_description || '',
+            description: ticketData.description || ticketData.short_description || '',
+            serverLogs: [] // Add server logs if available in ticket data
+          }
+          
+          const response = await aiService.problemStatement.generate(requestData)
+          
+          if (response.success && response.problemStatement) {
+            const { problemStatement } = response
+            
+            // Map the AI response to our form fields
+            setProblemSummary(problemStatement.problemDefinition || '')
+            
+            // Map issue type
+            const issueTypeMap = {
+              'Software': 'software',
+              'Hardware': 'hardware', 
+              'Network': 'network',
+              'Configuration': 'configuration',
+              'User Error': 'user_error',
+              'Other': 'other'
+            }
+            setIssueType(issueTypeMap[problemStatement.issueType] || '')
+            
+            // Map severity
+            const severityMap = {
+              'Sev 1 – Critical': 'sev1',
+              'Sev 2 – Major': 'sev2',
+              'Sev 3 – Moderate': 'sev3',
+              'Sev 4 – Minor': 'sev4'
+            }
+            setSeverity(severityMap[problemStatement.severity] || '')
+            
+            // Map business impact
+            const impactMap = {
+              'Revenue Loss': 'revenue_loss',
+              'Compliance Issue': 'compliance_issue',
+              'Operational Downtime': 'operational_downtime',
+              'Customer Support': 'customer_support',
+              'Other': 'other'
+            }
+            setBusinessImpactCategory(impactMap[problemStatement.businessImpact] || '')
+          }
+        } catch (error) {
+          console.error('Error generating problem statement:', error)
+          alert('Failed to generate AI problem statement. Please fill in the fields manually.')
+        } finally {
+          setIsGeneratingProblemStatement(false)
+        }
+      }
+    }
+    
+    generateProblemStatement()
+  }, [currentStep, ticketData, isGeneratingProblemStatement, hasAttemptedGeneration])
+
   return (
     <div className="space-y-8">
       {/* Header Section */}
@@ -187,7 +262,96 @@ const RCAWorkflow = ({
 
             {/* Response Input */}
             <div className="mb-8">
-              {currentStep === 5 ? (
+              {currentStep === 1 ? (
+                // Problem Definition step - show ticket description and form fields
+                <div className="space-y-6">
+                  {/* Ticket Description */}
+                  {ticketData && ticketData.description && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Ticket Description
+                      </label>
+                      <Input
+                        value={ticketData.description}
+                        disabled
+                        className="w-full bg-gray-50"
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Dropdown Fields Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Issue Type
+                      </label>
+                      <Select value={issueType} onValueChange={setIssueType}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select issue type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="network">Network</SelectItem>
+                          <SelectItem value="hardware">Hardware</SelectItem>
+                          <SelectItem value="software">Software</SelectItem>
+                          <SelectItem value="configuration">Configuration</SelectItem>
+                          <SelectItem value="user_error">User Error</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Severity
+                      </label>
+                      <Select value={severity} onValueChange={setSeverity}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select severity" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sev1">Sev 1 – Critical</SelectItem>
+                          <SelectItem value="sev2">Sev 2 – Major</SelectItem>
+                          <SelectItem value="sev3">Sev 3 – Moderate</SelectItem>
+                          <SelectItem value="sev4">Sev 4 – Minor</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Business Impact Category
+                      </label>
+                      <Select value={businessImpactCategory} onValueChange={setBusinessImpactCategory}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select impact category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="revenue_loss">Revenue Loss</SelectItem>
+                          <SelectItem value="compliance_issue">Compliance Issue</SelectItem>
+                          <SelectItem value="operational_downtime">Operational Downtime</SelectItem>
+                          <SelectItem value="customer_support">Customer Support</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  {/* Problem Statement */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Problem Statement (AI-assisted)
+                    </label>
+                    <Textarea
+                      value={problemSummary}
+                      onChange={(e) => setProblemSummary(e.target.value)}
+                      placeholder={isGeneratingProblemStatement ? "Generating AI problem summary..." : "AI-generated problem summary..."}
+                      rows={6}
+                      className="w-full resize-none"
+                      disabled={isGeneratingProblemStatement}
+                    />
+                  </div>
+                </div>
+              ) : currentStep === 5 ? (
                 <AutoSuggestionTextarea
                   value={response}
                   onChange={(e) => onResponseChange(e)}
@@ -219,9 +383,9 @@ const RCAWorkflow = ({
               )}
               <Button 
                 onClick={onNext}
-                disabled={!canProceed}
+                disabled={currentStep === 1 ? (!issueType || !severity || !businessImpactCategory || !problemSummary.trim()) : !canProceed}
                 className={`ml-auto ${
-                  canProceed 
+                  (currentStep === 1 ? (issueType && severity && businessImpactCategory && problemSummary.trim()) : canProceed)
                     ? 'bg-green-600 hover:bg-green-700 text-white' 
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
