@@ -15,6 +15,7 @@ import { aiService } from '../../api/services/aiService'
 const RCAWorkflow = ({ 
   currentStep, 
   totalSteps, 
+  stepData = {},
   setStepData,
   stepTitle, 
   aiGuidance, 
@@ -49,6 +50,12 @@ const RCAWorkflow = ({
   const [newLog, setNewLog] = useState({ time: '', service: '', message: '' })
   const [isAddingLog, setIsAddingLog] = useState(false)
   const [isGeneratingTimelineDescription, setIsGeneratingTimelineDescription] = useState(false)
+
+  // State for Impact step (step 3)
+  const [impactLevel, setImpactLevel] = useState('')
+  const [departmentAffected, setDepartmentAffected] = useState('')
+  const [isGeneratingImpactAssessment, setIsGeneratingImpactAssessment] = useState(false)
+  const [hasAttemptedImpactGeneration, setHasAttemptedImpactGeneration] = useState(false)
 
   // Generate problem statement when component mounts and we're on step 1
   useEffect(() => {
@@ -132,6 +139,86 @@ const RCAWorkflow = ({
       setLogs(ticketData.logs)
     }
   }, [currentStep, ticketData])
+
+  // Generate impact assessment when on Impact step (step 3)
+  useEffect(() => {
+    const generateImpactAssessment = async () => {
+      if (currentStep === 3 && stepData && !isGeneratingImpactAssessment && !hasAttemptedImpactGeneration) {
+        try {
+          setIsGeneratingImpactAssessment(true)
+          setHasAttemptedImpactGeneration(true)
+          
+          // Check if we have the required data from previous steps
+          if (stepData.problem_step1 && stepData.timeline_step2) {
+            const requestData = {
+              problemStatement: stepData.problem_step1,
+              timelineContext: stepData.timeline_step2
+            }
+            
+            const response = await aiService.impactAssessment.analyze(requestData)
+            
+            if (response.success && response.data) {
+              const { impactAssessment, impactLevel: aiImpactLevel, department } = response.data
+              
+              // Map AI impact level to our dropdown values
+              const impactLevelMap = {
+                'Sev 1 - Critical Impact': 'sev1',
+                'Sev 2 - Major Impact': 'sev2', 
+                'Sev 3 - Normal Impact': 'sev3',
+                'Sev 4 - Minor Impact': 'sev4'
+              }
+              
+              // Map AI department to our dropdown values
+              const departmentMap = {
+                'Customer Support': 'customer_support',
+                'Sales': 'sales',
+                'IT Operations': 'it_operations',
+                'Finance': 'finance',
+                'Human Resources': 'hr',
+                'Other': 'other'
+              }
+              
+              // Set the impact level
+              const mappedImpactLevel = impactLevelMap[aiImpactLevel] || ''
+              if (mappedImpactLevel) {
+                setImpactLevel(mappedImpactLevel)
+                setStepData((prevData) => ({
+                  ...prevData,
+                  impact_level_step3: mappedImpactLevel
+                }))
+              }
+              
+              // Set the department affected
+              const mappedDepartment = departmentMap[department] || ''
+              if (mappedDepartment) {
+                setDepartmentAffected(mappedDepartment)
+                setStepData((prevData) => ({
+                  ...prevData,
+                  department_affected_step3: mappedDepartment
+                }))
+              }
+              
+              // Set the impact assessment description
+              if (impactAssessment) {
+                onResponseChange(impactAssessment)
+                setStepData((prevData) => ({
+                  ...prevData,
+                  impact_step3: impactAssessment
+                }))
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error generating impact assessment:', error)
+          alert('Failed to generate AI impact assessment. Please fill in the fields manually.')
+        } finally {
+          setIsGeneratingImpactAssessment(false)
+        }
+      }
+    }
+    
+    generateImpactAssessment()
+  }, [currentStep, stepData, isGeneratingImpactAssessment, hasAttemptedImpactGeneration, onResponseChange])
 
   // Handle clicking on problem definition
   const handleProblemDefinitionClick = (definition) => {
@@ -649,19 +736,166 @@ const RCAWorkflow = ({
                    reference={ticketData ? `${ticketData.short_description} ${ticketData.description || ''}`.trim() : ''}
                  />
                ) : currentStep === 3 ? (
-                 <Textarea
-                   value={response}
-                   onChange={(e) => {
-                     onResponseChange(e.target.value)
-                     setStepData((prevData) => ({
-                       ...prevData,
-                       impact_step3: e.target.value
-                     }))
-                   }}
-                   placeholder="Enter your response here..."
-                   rows={8}
-                   className="w-full resize-none"
-                 />
+                 // Impact Assessment step - show dropdowns and textarea
+                 <div className="space-y-6">
+                   {/* Dropdown Fields Row */}
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-2">
+                         Impact Level
+                       </label>
+                       <Select value={impactLevel} onValueChange={(value) => {
+                         setImpactLevel(value)
+                         setStepData((prevData) => ({
+                           ...prevData,
+                           impact_level_step3: value
+                         }))
+                       }}>
+                         <SelectTrigger>
+                           <SelectValue placeholder="Select impact level" />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="sev1">SEV 1 - Critical Impact</SelectItem>
+                           <SelectItem value="sev2">SEV 2 - Major Impact</SelectItem>
+                           <SelectItem value="sev3">SEV 3 - Normal Impact</SelectItem>
+                           <SelectItem value="sev4">SEV 4 - Minor Impact</SelectItem>
+                         </SelectContent>
+                       </Select>
+                     </div>
+                     
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-2">
+                         Department Affected
+                       </label>
+                       <Select value={departmentAffected} onValueChange={(value) => {
+                         setDepartmentAffected(value)
+                         setStepData((prevData) => ({
+                           ...prevData,
+                           department_affected_step3: value
+                         }))
+                       }}>
+                         <SelectTrigger>
+                           <SelectValue placeholder="Select department" />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="customer_support">Customer Support</SelectItem>
+                           <SelectItem value="sales">Sales</SelectItem>
+                           <SelectItem value="it_operations">IT Operations</SelectItem>
+                           <SelectItem value="finance">Finance</SelectItem>
+                           <SelectItem value="hr">Human Resources</SelectItem>
+                           <SelectItem value="other">Other</SelectItem>
+                         </SelectContent>
+                       </Select>
+                     </div>
+                   </div>
+                   
+                   {/* Impact Assessment Description */}
+                   <div>
+                     <div className="flex items-center justify-between mb-2">
+                       <label className="block text-sm font-medium text-gray-700">
+                         Impact Assessment Description
+                       </label>
+                       {/* <Button
+                         onClick={async () => {
+                           if (stepData.problem_step1 && stepData.timeline_step2) {
+                             try {
+                               setIsGeneratingImpactAssessment(true)
+                               
+                               const requestData = {
+                                 problemStatement: stepData.problem_step1,
+                                 timelineContext: stepData.timeline_step2
+                               }
+                               
+                               const response = await aiService.impactAssessment.analyze(requestData)
+                               
+                               if (response.success && response.data) {
+                                 const { impactAssessment, impactLevel: aiImpactLevel, department } = response.data
+                                 
+                                 // Map AI impact level to our dropdown values
+                                 const impactLevelMap = {
+                                   'Sev 1 - Critical Impact': 'sev1',
+                                   'Sev 2 - Major Impact': 'sev2', 
+                                   'Sev 3 - Normal Impact': 'sev3',
+                                   'Sev 4 - Minor Impact': 'sev4'
+                                 }
+                                 
+                                 // Map AI department to our dropdown values
+                                 const departmentMap = {
+                                   'Customer Support': 'customer_support',
+                                   'Sales': 'sales',
+                                   'IT Operations': 'it_operations',
+                                   'Finance': 'finance',
+                                   'Human Resources': 'hr',
+                                   'Other': 'other'
+                                 }
+                                 
+                                 // Set the impact level
+                                 const mappedImpactLevel = impactLevelMap[aiImpactLevel] || ''
+                                 if (mappedImpactLevel) {
+                                   setImpactLevel(mappedImpactLevel)
+                                   setStepData((prevData) => ({
+                                     ...prevData,
+                                     impact_level_step3: mappedImpactLevel
+                                   }))
+                                 }
+                                 
+                                 // Set the department affected
+                                 const mappedDepartment = departmentMap[department] || ''
+                                 if (mappedDepartment) {
+                                   setDepartmentAffected(mappedDepartment)
+                                   setStepData((prevData) => ({
+                                     ...prevData,
+                                     department_affected_step3: mappedDepartment
+                                   }))
+                                 }
+                                 
+                                 // Set the impact assessment description
+                                 if (impactAssessment) {
+                                   onResponseChange(impactAssessment)
+                                   setStepData((prevData) => ({
+                                     ...prevData,
+                                     impact_step3: impactAssessment
+                                   }))
+                                 }
+                               }
+                             } catch (error) {
+                               console.error('Error generating impact assessment:', error)
+                               alert('Failed to generate AI impact assessment. Please try again.')
+                             } finally {
+                               setIsGeneratingImpactAssessment(false)
+                             }
+                           } else {
+                             alert('Please complete Problem Definition and Timeline steps first.')
+                           }
+                         }}
+                         disabled={isGeneratingImpactAssessment}
+                         className="bg-green-600 hover:bg-green-700 text-white disabled:bg-gray-400"
+                         size="sm"
+                       >
+                         {isGeneratingImpactAssessment ? (
+                           <FiLoader className="w-4 h-4 mr-2 animate-spin" />
+                         ) : (
+                           <BsStars className="w-4 h-4 mr-2" />
+                         )}
+                         {isGeneratingImpactAssessment ? 'Generating...' : 'Generate Assessment'}
+                       </Button> */}
+                     </div>
+                     <Textarea
+                       value={response}
+                       onChange={(e) => {
+                         onResponseChange(e.target.value)
+                         setStepData((prevData) => ({
+                           ...prevData,
+                           impact_step3: e.target.value
+                         }))
+                       }}
+                       placeholder={isGeneratingImpactAssessment ? "Generating AI impact assessment..." : "Describe the business and technical impact of this issue..."}
+                       rows={6}
+                       className="w-full resize-none"
+                       disabled={isGeneratingImpactAssessment}
+                     />
+                   </div>
+                 </div>
                ) : (
                  <Textarea
                    value={response}
@@ -691,9 +925,15 @@ const RCAWorkflow = ({
               )}
               <Button 
                 onClick={onNext}
-                disabled={currentStep === 1 ? (!issueType || !severity || !businessImpactCategory || !problemSummary.trim()) : !canProceed}
+                disabled={
+                  currentStep === 1 ? (!issueType || !severity || !businessImpactCategory || !problemSummary.trim()) :
+                  currentStep === 3 ? (!impactLevel || !departmentAffected || !response.trim() || isGeneratingImpactAssessment) :
+                  !canProceed
+                }
                 className={`ml-auto ${
-                  (currentStep === 1 ? (issueType && severity && businessImpactCategory && problemSummary.trim()) : canProceed)
+                  (currentStep === 1 ? (issueType && severity && businessImpactCategory && problemSummary.trim()) :
+                   currentStep === 3 ? (impactLevel && departmentAffected && response.trim() && !isGeneratingImpactAssessment) :
+                   canProceed)
                     ? 'bg-green-600 hover:bg-green-700 text-white' 
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}

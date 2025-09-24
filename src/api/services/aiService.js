@@ -208,5 +208,14 @@ export const aiService = {
       const response = await api.post('/v1/timeline-context/generate', data);
       return response.data;
     }
+  },
+
+  // Impact Assessment
+  impactAssessment: {
+    // Analyze impact assessment based on problem statement and timeline context
+    analyze: async (data) => {
+      const response = await api.post('/v1/impact-assessment/analyze', data);
+      return response.data;
+    }
   }
 };

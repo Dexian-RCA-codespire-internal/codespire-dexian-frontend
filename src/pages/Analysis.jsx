@@ -43,6 +43,8 @@ const Analysis = () => {
     problem_step1: '',
     timeline_step2: '',
     impact_step3: '',
+    impact_level_step3: '',
+    department_affected_step3: '',
     root_cause_step4: '',
     corrective_actions_step5: ''
   })
@@ -132,6 +134,8 @@ const Analysis = () => {
             problem_step1: ticket.problem_step1 || '',
             timeline_step2: ticket.timeline_step2 || '',
             impact_step3: ticket.impact_step3 || '',
+            impact_level_step3: ticket.impact_level_step3 || '',
+            department_affected_step3: ticket.department_affected_step3 || '',
             root_cause_step4: ticket.root_cause_step4 || ticket.findings_step4 || '',
             corrective_actions_step5: ticket.corrective_actions_step5 || ticket.root_cause_step5 || ''
           }
@@ -307,7 +311,8 @@ const Analysis = () => {
           if (!stepData.timeline_step2 || stepData.timeline_step2.trim().length === 0) {
             incompleteSteps.push('Timeline & Context (Step 2)')
           }
-          if (!stepData.impact_step3 || stepData.impact_step3.trim().length === 0) {
+          if (!stepData.impact_step3 || stepData.impact_step3.trim().length === 0 || 
+              !stepData.impact_level_step3 || !stepData.department_affected_step3) {
             incompleteSteps.push('Impact Assessment (Step 3)')
           }
           if (!stepData.root_cause_step4 || stepData.root_cause_step4.trim().length === 0) {
@@ -369,8 +374,14 @@ const Analysis = () => {
     if (rcaStep < 5) return true // Not on final step yet
     
     // Check if steps 1-4 have data
-    const requiredSteps = ['problem_step1', 'timeline_step2', 'impact_step3', 'root_cause_step4']
-    return requiredSteps.every(stepKey => stepData[stepKey] && stepData[stepKey].trim().length > 0)
+    const requiredSteps = ['problem_step1', 'timeline_step2', 'root_cause_step4']
+    const hasRequiredSteps = requiredSteps.every(stepKey => stepData[stepKey] && stepData[stepKey].trim().length > 0)
+    
+    // Special check for step 3 (impact assessment) - needs all three fields
+    const hasImpactStep = stepData.impact_step3 && stepData.impact_step3.trim().length > 0 && 
+                         stepData.impact_level_step3 && stepData.department_affected_step3
+    
+    return hasRequiredSteps && hasImpactStep
   }
 
   // Find the first incomplete step
@@ -378,14 +389,22 @@ const Analysis = () => {
     const steps = [
       { step: 1, key: 'problem_step1', name: 'Problem Definition' },
       { step: 2, key: 'timeline_step2', name: 'Timeline & Context' },
-      { step: 3, key: 'impact_step3', name: 'Impact Assessment' },
+      { step: 3, keys: ['impact_step3', 'impact_level_step3', 'department_affected_step3'], name: 'Impact Assessment' },
       { step: 4, key: 'root_cause_step4', name: 'Root Cause Analysis' },
       { step: 5, key: 'corrective_actions_step5', name: 'Corrective Actions' }
     ]
     
     for (const stepInfo of steps) {
-      if (!stepData[stepInfo.key] || stepData[stepInfo.key].trim().length === 0) {
-        return stepInfo.step
+      if (stepInfo.step === 3) {
+        // Special handling for step 3 with multiple required fields
+        if (!stepData.impact_step3 || stepData.impact_step3.trim().length === 0 || 
+            !stepData.impact_level_step3 || !stepData.department_affected_step3) {
+          return stepInfo.step
+        }
+      } else {
+        if (!stepData[stepInfo.key] || stepData[stepInfo.key].trim().length === 0) {
+          return stepInfo.step
+        }
       }
     }
     
@@ -398,14 +417,22 @@ const Analysis = () => {
     const steps = [
       { step: 1, key: 'problem_step1', name: 'Problem Definition' },
       { step: 2, key: 'timeline_step2', name: 'Timeline & Context' },
-      { step: 3, key: 'impact_step3', name: 'Impact Assessment' },
+      { step: 3, keys: ['impact_step3', 'impact_level_step3', 'department_affected_step3'], name: 'Impact Assessment' },
       { step: 4, key: 'root_cause_step4', name: 'Root Cause Analysis' },
       { step: 5, key: 'corrective_actions_step5', name: 'Corrective Actions' }
     ]
     
     for (const stepInfo of steps) {
-      if (!stepDataToCheck[stepInfo.key] || stepDataToCheck[stepInfo.key].trim().length === 0) {
-        return stepInfo.step
+      if (stepInfo.step === 3) {
+        // Special handling for step 3 with multiple required fields
+        if (!stepDataToCheck.impact_step3 || stepDataToCheck.impact_step3.trim().length === 0 || 
+            !stepDataToCheck.impact_level_step3 || !stepDataToCheck.department_affected_step3) {
+          return stepInfo.step
+        }
+      } else {
+        if (!stepDataToCheck[stepInfo.key] || stepDataToCheck[stepInfo.key].trim().length === 0) {
+          return stepInfo.step
+        }
       }
     }
     
@@ -453,6 +480,7 @@ const Analysis = () => {
           <RCAWorkflow
             currentStep={rcaStep}
             totalSteps={5}
+            stepData={stepData}
             setStepData={setStepData}
             stepTitle={getCurrentStepData().title}
             aiGuidance={getCurrentStepData().aiGuidance}
@@ -503,6 +531,7 @@ const Analysis = () => {
         <RCAWorkflow
           currentStep={rcaStep}
           totalSteps={5}
+          stepData={stepData}
           setStepData={setStepData}
           stepTitle={getCurrentStepData().title}
           aiGuidance={getCurrentStepData().aiGuidance}
