@@ -4,6 +4,7 @@ import { SessionAuth } from 'supertokens-auth-react/recipe/session'
 import MainLayout from '../components/layout/MainLayout'
 import Dashboard from '../pages/Dashboard'
 import RCADashboard from '../pages/RCADashboard'
+import SLAWrapper from '../pages/SLAWrapper'
 import Complaint from '../pages/Complaint'
 import Investigation from '../pages/Investigation'
 import Analysis from '../pages/Analysis'
@@ -52,6 +53,7 @@ export default function RoutesIndex() {
       }>
         <Route index element={<Dashboard />} />
         <Route path="rca-dashboard" element={<RCADashboard />} />
+        <Route path="sla" element={<SLAWrapper />} />
         <Route path="complaint/:ticketId" element={<Complaint />} />
         <Route path="investigation/:ticketId" element={<Investigation />} />
         <Route path="analysis/:id/:ticketId" element={<Analysis />} />

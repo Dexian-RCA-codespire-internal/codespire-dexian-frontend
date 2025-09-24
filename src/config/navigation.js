@@ -5,11 +5,12 @@ export const navigationConfig = {
   // Core features (always enabled)
   dashboard: true,
   aiRca: true,
+  sla: true,                    // SLA Monitoring
 
   
   // Optional features (can be enabled/disabled)
   patternDetector: false,        // Pattern & Duplicate Detector
-  playbookRecommender: true,    // Playbook Recommender
+  playbookRecommender:true,    // Playbook Recommender
   customerRcaSummary: false,     // Customer RCA Summary
   alertCorrelation: false,       // Alert Correlation
   complianceAudit: false,        // Compliance & Audit
@@ -41,6 +42,12 @@ export const navigationItems = {
     label: "AI RCA",
     icon: "RiAiGenerate2",
     hasSubItems: true
+  },
+  sla: {
+    path: "/sla",
+    label: "SLA",
+    icon: "AiOutlineTrophy",
+    hasSubItems: false
   },
   patternDetector: {
     path: "/pattern-detector",

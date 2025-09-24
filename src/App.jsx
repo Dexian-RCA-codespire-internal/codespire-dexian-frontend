@@ -3,15 +3,12 @@ import { Helmet } from 'react-helmet-async'
 import { SuperTokensWrapper } from 'supertokens-auth-react'
 import RoutesIndex from './routes'
 import useWebSocketOnly from './hooks/useWebSocketOnly'
-import NotificationContainer from './components/ui/NotificationContainer'
-import './utils/websocketChecks' // Import to activate API call monitoring (DEVELOPMENT ONLY - REMOVE IN PRODUCTION)
+import ToastContainer from './components/ui/ToastContainer'
+// import './utils/websocketChecks' // Disabled - notification system correctly uses REST API + WebSocket
 
 function AppContent() {
-  const {
-    notifications,
-    removeNotification,
-    clearNotifications
-  } = useWebSocketOnly(import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081');
+  // Initialize WebSocket connection
+  useWebSocketOnly(import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081');
 
   return (
     <>
@@ -25,12 +22,8 @@ function AppContent() {
 
 
 
-      {/* Notifications */}
-      <NotificationContainer
-        notifications={notifications}
-        onRemoveNotification={removeNotification}
-        onClearNotifications={clearNotifications}
-      />
+      {/* Toast Notifications */}
+      <ToastContainer />
     </>
   )
 }
