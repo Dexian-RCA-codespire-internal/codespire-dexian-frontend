@@ -10,6 +10,7 @@ import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
 import { FiMessageCircle, FiZap, FiSearch, FiArrowRight, FiArrowLeft, FiCheck, FiSave, FiDownload, FiLoader } from 'react-icons/fi'
 import { BsStars } from 'react-icons/bs'
+import { IoIosColorWand } from "react-icons/io"
 import { aiService } from '../../api/services/aiService'
 
 const RCAWorkflow = ({ 
@@ -56,6 +57,11 @@ const RCAWorkflow = ({
   const [departmentAffected, setDepartmentAffected] = useState('')
   const [isGeneratingImpactAssessment, setIsGeneratingImpactAssessment] = useState(false)
   const [hasAttemptedImpactGeneration, setHasAttemptedImpactGeneration] = useState(false)
+
+  // State for text enhancement loading
+  const [isEnhancingTimeline, setIsEnhancingTimeline] = useState(false)
+  const [isEnhancingRootCause, setIsEnhancingRootCause] = useState(false)
+  const [isEnhancingCorrectiveActions, setIsEnhancingCorrectiveActions] = useState(false)
 
   // Generate problem statement when component mounts and we're on step 1
   useEffect(() => {
@@ -276,6 +282,84 @@ const RCAWorkflow = ({
       alert('Failed to generate AI timeline description. Please try again.')
     } finally {
       setIsGeneratingTimelineDescription(false)
+    }
+  }
+
+  // Handle enhancing problem statement
+  const handleEnhanceProblemStatement = async () => {
+    if (!problemSummary.trim()) {
+      alert('Please enter some text in the problem statement to enhance.')
+      return
+    }
+
+    try {
+      setIsGeneratingProblemStatement(true)
+      
+      const requestData = {
+        text: problemSummary,
+        reference: `${ticketData?.short_description || ''} ${ticketData?.description || ''}`.trim()
+      }
+      
+      const response = await aiService.textEnhancement.enhance(requestData)
+      
+      if (response.success && response.data && response.data.enhancedText) {
+        const enhancedText = response.data.enhancedText
+        
+        // Update the problem statement with enhanced text
+        setProblemSummary(enhancedText)
+        setStepData((prevData) => ({
+          ...prevData,
+          problem_step1: enhancedText
+        }))
+        
+        console.log('Text enhanced successfully:', response.data)
+      } else {
+        alert('Failed to enhance text. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error enhancing problem statement:', error)
+      alert('Failed to enhance problem statement. Please try again.')
+    } finally {
+      setIsGeneratingProblemStatement(false)
+    }
+  }
+
+  // Generic text enhancement function
+  const handleEnhanceText = async (currentText, stepKey, setLoadingState, setLoadingFunction) => {
+    if (!currentText.trim()) {
+      alert('Please enter some text to enhance.')
+      return
+    }
+
+    try {
+      setLoadingFunction(true)
+      
+      const requestData = {
+        text: currentText,
+        reference: `${ticketData?.short_description || ''} ${ticketData?.description || ''}`.trim()
+      }
+      
+      const response = await aiService.textEnhancement.enhance(requestData)
+      
+      if (response.success && response.data && response.data.enhancedText) {
+        const enhancedText = response.data.enhancedText
+        
+        // Update the response with enhanced text
+        onResponseChange(enhancedText)
+        setStepData((prevData) => ({
+          ...prevData,
+          [stepKey]: enhancedText
+        }))
+        
+        console.log('Text enhanced successfully:', response.data)
+      } else {
+        alert('Failed to enhance text. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error enhancing text:', error)
+      alert('Failed to enhance text. Please try again.')
+    } finally {
+      setLoadingFunction(false)
     }
   }
 
@@ -544,6 +628,7 @@ const RCAWorkflow = ({
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Problem Statement (AI-assisted)
                     </label>
+                    <div className="relative">
                      <Textarea
                        value={problemSummary}
                        onChange={(e) => {
@@ -555,9 +640,19 @@ const RCAWorkflow = ({
                        }}
                        placeholder={isGeneratingProblemStatement ? "Generating AI problem summary..." : "AI-generated problem summary..."}
                        rows={6}
-                       className="w-full resize-none"
+                       className="w-full resize-none pr-20"
                        disabled={isGeneratingProblemStatement}
                      />
+                     <Button
+                       onClick={handleEnhanceProblemStatement}
+                       disabled={isGeneratingProblemStatement}
+                       className="absolute bottom-0 right-0 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded-md shadow-sm flex items-center gap-1"
+                       size="sm"
+                     >
+                       <IoIosColorWand className="w-4 h-4" />
+                       <span className="text-sm">Enhance</span>
+                     </Button>
+                    </div>
                   </div>
                 </div>
               ) : currentStep === 2 ? (
@@ -705,6 +800,7 @@ const RCAWorkflow = ({
                         {isGeneratingTimelineDescription ? 'Generating...' : 'Create Description'}
                       </Button>
                     </div>
+                    <div className="relative">
                      <Textarea
                        value={response}
                        onChange={(e) => {
@@ -716,8 +812,19 @@ const RCAWorkflow = ({
                        }}
                        placeholder="Describe the timeline and context of the incident..."
                        rows={6}
-                       className="w-full resize-none"
+                       className="w-full resize-none pr-20"
+                       disabled={isEnhancingTimeline}
                      />
+                     <Button
+                       onClick={() => handleEnhanceText(response, 'timeline_step2', isEnhancingTimeline, setIsEnhancingTimeline)}
+                       disabled={isEnhancingTimeline}
+                       className="absolute bottom-0 right-0 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded-md shadow-sm flex items-center gap-1"
+                       size="sm"
+                     >
+                       <IoIosColorWand className="w-4 h-4" />
+                       <span className="text-sm">Enhance</span>
+                     </Button>
+                    </div>
                   </div>
                 </div>
                ) : currentStep === 5 ? (
@@ -734,6 +841,8 @@ const RCAWorkflow = ({
                    rows={8}
                    className="w-full resize-none"
                    reference={ticketData ? `${ticketData.short_description} ${ticketData.description || ''}`.trim() : ''}
+                   onEnhance={() => handleEnhanceText(response, 'corrective_actions_step5', isEnhancingCorrectiveActions, setIsEnhancingCorrectiveActions)}
+                   isEnhancing={isEnhancingCorrectiveActions}
                  />
                ) : currentStep === 3 ? (
                  // Impact Assessment step - show dropdowns and textarea
@@ -795,121 +904,60 @@ const RCAWorkflow = ({
                        <label className="block text-sm font-medium text-gray-700">
                          Impact Assessment Description
                        </label>
-                       {/* <Button
-                         onClick={async () => {
-                           if (stepData.problem_step1 && stepData.timeline_step2) {
-                             try {
-                               setIsGeneratingImpactAssessment(true)
-                               
-                               const requestData = {
-                                 problemStatement: stepData.problem_step1,
-                                 timelineContext: stepData.timeline_step2
-                               }
-                               
-                               const response = await aiService.impactAssessment.analyze(requestData)
-                               
-                               if (response.success && response.data) {
-                                 const { impactAssessment, impactLevel: aiImpactLevel, department } = response.data
-                                 
-                                 // Map AI impact level to our dropdown values
-                                 const impactLevelMap = {
-                                   'Sev 1 - Critical Impact': 'sev1',
-                                   'Sev 2 - Major Impact': 'sev2', 
-                                   'Sev 3 - Normal Impact': 'sev3',
-                                   'Sev 4 - Minor Impact': 'sev4'
-                                 }
-                                 
-                                 // Map AI department to our dropdown values
-                                 const departmentMap = {
-                                   'Customer Support': 'customer_support',
-                                   'Sales': 'sales',
-                                   'IT Operations': 'it_operations',
-                                   'Finance': 'finance',
-                                   'Human Resources': 'hr',
-                                   'Other': 'other'
-                                 }
-                                 
-                                 // Set the impact level
-                                 const mappedImpactLevel = impactLevelMap[aiImpactLevel] || ''
-                                 if (mappedImpactLevel) {
-                                   setImpactLevel(mappedImpactLevel)
-                                   setStepData((prevData) => ({
-                                     ...prevData,
-                                     impact_level_step3: mappedImpactLevel
-                                   }))
-                                 }
-                                 
-                                 // Set the department affected
-                                 const mappedDepartment = departmentMap[department] || ''
-                                 if (mappedDepartment) {
-                                   setDepartmentAffected(mappedDepartment)
-                                   setStepData((prevData) => ({
-                                     ...prevData,
-                                     department_affected_step3: mappedDepartment
-                                   }))
-                                 }
-                                 
-                                 // Set the impact assessment description
-                                 if (impactAssessment) {
-                                   onResponseChange(impactAssessment)
-                                   setStepData((prevData) => ({
-                                     ...prevData,
-                                     impact_step3: impactAssessment
-                                   }))
-                                 }
-                               }
-                             } catch (error) {
-                               console.error('Error generating impact assessment:', error)
-                               alert('Failed to generate AI impact assessment. Please try again.')
-                             } finally {
-                               setIsGeneratingImpactAssessment(false)
-                             }
-                           } else {
-                             alert('Please complete Problem Definition and Timeline steps first.')
-                           }
+                     </div>
+                     <div className="relative">
+                       <Textarea
+                         value={response}
+                         onChange={(e) => {
+                           onResponseChange(e.target.value)
+                           setStepData((prevData) => ({
+                             ...prevData,
+                             impact_step3: e.target.value
+                           }))
                          }}
+                         placeholder={isGeneratingImpactAssessment ? "Generating AI impact assessment..." : "Describe the business and technical impact of this issue..."}
+                         rows={6}
+                         className="w-full resize-none pr-20"
                          disabled={isGeneratingImpactAssessment}
-                         className="bg-green-600 hover:bg-green-700 text-white disabled:bg-gray-400"
+                       />
+                       <Button
+                         onClick={() => handleEnhanceText(response, 'impact_step3', false, () => {})}
+                         disabled={isGeneratingImpactAssessment}
+                         className="absolute bottom-0 right-0 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded-md shadow-sm flex items-center gap-1"
                          size="sm"
                        >
-                         {isGeneratingImpactAssessment ? (
-                           <FiLoader className="w-4 h-4 mr-2 animate-spin" />
-                         ) : (
-                           <BsStars className="w-4 h-4 mr-2" />
-                         )}
-                         {isGeneratingImpactAssessment ? 'Generating...' : 'Generate Assessment'}
-                       </Button> */}
+                         <IoIosColorWand className="w-4 h-4" />
+                         <span className="text-sm">Enhance</span>
+                       </Button>
                      </div>
-                     <Textarea
-                       value={response}
-                       onChange={(e) => {
-                         onResponseChange(e.target.value)
-                         setStepData((prevData) => ({
-                           ...prevData,
-                           impact_step3: e.target.value
-                         }))
-                       }}
-                       placeholder={isGeneratingImpactAssessment ? "Generating AI impact assessment..." : "Describe the business and technical impact of this issue..."}
-                       rows={6}
-                       className="w-full resize-none"
-                       disabled={isGeneratingImpactAssessment}
-                     />
                    </div>
                  </div>
                ) : (
-                 <Textarea
-                   value={response}
-                   onChange={(e) => {
-                     onResponseChange(e.target.value)
-                     setStepData((prevData) => ({
-                       ...prevData,
-                       root_cause_step4: e.target.value
-                     }))
-                   }}
-                   placeholder="Enter your response here..."
-                   rows={8}
-                   className="w-full resize-none"
-                 />
+                 <div className="relative">
+                   <Textarea
+                     value={response}
+                     onChange={(e) => {
+                       onResponseChange(e.target.value)
+                       setStepData((prevData) => ({
+                         ...prevData,
+                         root_cause_step4: e.target.value
+                       }))
+                     }}
+                     placeholder="Enter your response here..."
+                     rows={8}
+                     className="w-full resize-none pr-20"
+                     disabled={isEnhancingRootCause}
+                   />
+                   <Button
+                     onClick={() => handleEnhanceText(response, 'root_cause_step4', isEnhancingRootCause, setIsEnhancingRootCause)}
+                     disabled={isEnhancingRootCause}
+                     className="absolute bottom-0 right-0 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded-md shadow-sm flex items-center gap-1"
+                     size="sm"
+                   >
+                     <IoIosColorWand className="w-4 h-4" />
+                     <span className="text-sm">Enhance</span>
+                   </Button>
+                 </div>
                )}
             </div>
 

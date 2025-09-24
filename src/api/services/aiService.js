@@ -217,5 +217,14 @@ export const aiService = {
       const response = await api.post('/v1/impact-assessment/analyze', data);
       return response.data;
     }
+  },
+
+  // Text Enhancement
+  textEnhancement: {
+    // Enhance text using AI
+    enhance: async (data) => {
+      const response = await api.post('/v1/text-enhancement/enhance', data);
+      return response.data;
+    }
   }
 };

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Textarea } from './textarea'
+import { Button } from './button'
 import { autoSuggestionService } from '../../api'
+import { IoIosColorWand } from "react-icons/io"
 
 const AutoSuggestionTextarea = ({ 
   value, 
@@ -9,6 +11,8 @@ const AutoSuggestionTextarea = ({
   rows = 8, 
   className = "w-full resize-none",
   reference = "",
+  onEnhance = null,
+  isEnhancing = false,
   ...props 
 }) => {
   const [suggestion, setSuggestion] = useState('')
@@ -122,9 +126,23 @@ const AutoSuggestionTextarea = ({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         rows={rows}
-        className={className}
+        className={`${className} ${onEnhance ? 'pr-20' : ''}`}
+        disabled={isEnhancing}
         {...props}
       />
+      
+      {/* Enhance Button */}
+      {onEnhance && (
+        <Button
+          onClick={onEnhance}
+          disabled={isEnhancing}
+          className="absolute bottom-0 right-0 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded-md shadow-sm flex items-center gap-1"
+          size="sm"
+        >
+          <IoIosColorWand className="w-4 h-4" />
+          <span className="text-sm">Enhance</span>
+        </Button>
+      )}
       
       {/* Suggestion overlay */}
       {showSuggestion && suggestion && (
