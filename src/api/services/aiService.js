@@ -199,5 +199,14 @@ export const aiService = {
       const response = await api.post('/v1/problem-statement/generate', ticketData);
       return response.data;
     }
+  },
+
+  // Timeline Context Generation
+  timelineContext: {
+    // Generate AI-powered timeline and context description
+    generate: async (data) => {
+      const response = await api.post('/v1/timeline-context/generate', data);
+      return response.data;
+    }
   }
 };

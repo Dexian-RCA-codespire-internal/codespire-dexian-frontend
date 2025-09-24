@@ -47,6 +47,7 @@ const RCAWorkflow = ({
   const [logs, setLogs] = useState([])
   const [newLog, setNewLog] = useState({ time: '', service: '', message: '' })
   const [isAddingLog, setIsAddingLog] = useState(false)
+  const [isGeneratingTimelineDescription, setIsGeneratingTimelineDescription] = useState(false)
 
   // Generate problem statement when component mounts and we're on step 1
   useEffect(() => {
@@ -145,6 +146,37 @@ const RCAWorkflow = ({
   // Handle deleting user-generated log
   const handleDeleteLog = (logId) => {
     setLogs(logs.filter(log => log.id !== logId))
+  }
+
+  // Handle generating timeline description
+  const handleGenerateTimelineDescription = async () => {
+    try {
+      setIsGeneratingTimelineDescription(true)
+      
+      const requestData = {
+        problemStatement: problemSummary || '',
+        ticketCreationTime: ticketData?.opened_time || '',
+        logs: logs.map(log => ({
+          time: log.time,
+          service: log.service,
+          level: log.level || 'INFO',
+          message: log.message
+        }))
+      }
+      
+      const response = await aiService.timelineContext.generate(requestData)
+      
+      if (response.success && response.timelineDescription) {
+        const { description, context } = response.timelineDescription
+        const combinedDescription = `${description}\n\n${context}`
+        onResponseChange(combinedDescription)
+      }
+    } catch (error) {
+      console.error('Error generating timeline description:', error)
+      alert('Failed to generate AI timeline description. Please try again.')
+    } finally {
+      setIsGeneratingTimelineDescription(false)
+    }
   }
 
   // Format date for display
@@ -439,11 +471,11 @@ const RCAWorkflow = ({
                   
                   {/* Logs Section */}
                   <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900">Logs</h3>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm  text-gray-900">Logs</h3>
                       <Button
                         onClick={() => setIsAddingLog(true)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        className="bg-green-600 hover:bg-green-700 text-white"
                         size="sm"
                       >
                         + Add Log
@@ -451,8 +483,10 @@ const RCAWorkflow = ({
                     </div>
                     
                     {/* Existing Logs */}
-                    <div className="space-y-3">
-                      {logs.map((log, index) => (
+                    <div className="space-y-3 max-h-72 overflow-y-auto">
+                      {logs
+                        .sort((a, b) => new Date(a.time) - new Date(b.time))
+                        .map((log, index) => (
                         <div key={log.id || index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
                           <div className="w-48 flex-shrink-0">
                             <Input
@@ -543,6 +577,35 @@ const RCAWorkflow = ({
                         </div>
                       </div>
                     )}
+                  </div>
+                  
+                  {/* Timeline and Context Description */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Timeline and Context Description
+                      </label>
+                      <Button
+                        onClick={handleGenerateTimelineDescription}
+                        disabled={isGeneratingTimelineDescription}
+                        className="bg-green-600 hover:bg-green-700 text-white disabled:bg-gray-400"
+                        size="sm"
+                      >
+                        {isGeneratingTimelineDescription ? (
+                          <FiLoader className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <BsStars className="w-4 h-4 mr-2" />
+                        )}
+                        {isGeneratingTimelineDescription ? 'Generating...' : 'Create Description'}
+                      </Button>
+                    </div>
+                    <Textarea
+                      value={response}
+                      onChange={(e) => onResponseChange(e.target.value)}
+                      placeholder="Describe the timeline and context of the incident..."
+                      rows={6}
+                      className="w-full resize-none"
+                    />
                   </div>
                 </div>
               ) : currentStep === 5 ? (
