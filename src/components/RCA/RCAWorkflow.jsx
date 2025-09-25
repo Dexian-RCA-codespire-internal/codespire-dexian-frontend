@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
-import { Textarea } from '../ui/textarea'
-import { Input } from '../ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import { SimpleDateTimePicker } from '../ui/simple-date-time-picker'
-import AutoSuggestionTextarea from '../ui/AutoSuggestionTextarea'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
 import { FiMessageCircle, FiZap, FiSearch, FiArrowRight, FiArrowLeft, FiCheck, FiSave, FiDownload, FiLoader } from 'react-icons/fi'
-import { BsStars } from 'react-icons/bs'
-import { IoIosColorWand } from "react-icons/io"
-import { aiService } from '../../api/services/aiService'
+import { 
+  ProblemDefinitionStep, 
+  ImpactAssessmentStep, 
+  RootCauseAnalysisStep, 
+  CorrectiveActionsStep 
+} from './steps';
+import { BsStars } from "react-icons/bs";
 
 const RCAWorkflow = ({ 
   currentStep, 
@@ -37,29 +36,15 @@ const RCAWorkflow = ({
   onStepClick = null
 }) => {
   // State for Problem Definition step fields
-  const [issueType, setIssueType] = useState('')
-  const [severity, setSeverity] = useState('')
-  const [businessImpactCategory, setBusinessImpactCategory] = useState('')
-  const [problemSummary, setProblemSummary] = useState('')
-  const [problemDefinitions, setProblemDefinitions] = useState([])
-  const [aiQuestion, setAiQuestion] = useState('')
+  // State for Problem Definition step (step 1)
   const [isGeneratingProblemStatement, setIsGeneratingProblemStatement] = useState(false)
   const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false)
   
-  // State for Timeline step (step 2)
-  const [logs, setLogs] = useState([])
-  const [newLog, setNewLog] = useState({ time: '', service: '', message: '' })
-  const [isAddingLog, setIsAddingLog] = useState(false)
-  const [isGeneratingTimelineDescription, setIsGeneratingTimelineDescription] = useState(false)
-
-  // State for Impact step (step 3)
-  const [impactLevel, setImpactLevel] = useState('')
-  const [departmentAffected, setDepartmentAffected] = useState('')
+  // State for Impact step (step 2)
   const [isGeneratingImpactAssessment, setIsGeneratingImpactAssessment] = useState(false)
   const [hasAttemptedImpactGeneration, setHasAttemptedImpactGeneration] = useState(false)
 
   // State for text enhancement loading
-  const [isEnhancingTimeline, setIsEnhancingTimeline] = useState(false)
   const [isEnhancingRootCause, setIsEnhancingRootCause] = useState(false)
   const [isEnhancingCorrectiveActions, setIsEnhancingCorrectiveActions] = useState(false)
 
@@ -83,49 +68,12 @@ const RCAWorkflow = ({
             const { problemStatement } = response
             
              // Set the first problem definition in the textarea and store all definitions
-             if (problemStatement.problemDefinitions && problemStatement.problemDefinitions.length > 0) {
-               setProblemSummary(problemStatement.problemDefinitions[0])
-               setStepData((prevData) => ({
-                 ...prevData,
-                 problem_step1: problemStatement.problemDefinitions[0]
-               }))
-               setProblemDefinitions(problemStatement.problemDefinitions)
-             }
+             // Note: Problem definitions handling is now done within the ProblemDefinitionStep component
             
-            // Set the AI question
-            if (problemStatement.question) {
-              setAiQuestion(problemStatement.question)
-            }
+            // Note: AI question handling is now done within the ProblemDefinitionStep component
             
-            // Map issue type
-            const issueTypeMap = {
-              'Software': 'software',
-              'Hardware': 'hardware', 
-              'Network': 'network',
-              'Configuration': 'configuration',
-              'User Error': 'user_error',
-              'Other': 'other'
-            }
-            setIssueType(issueTypeMap[problemStatement.issueType] || '')
-            
-            // Map severity
-            const severityMap = {
-              'Sev 1 – Critical': 'sev1',
-              'Sev 2 – Major': 'sev2',
-              'Sev 3 – Moderate': 'sev3',
-              'Sev 4 – Minor': 'sev4'
-            }
-            setSeverity(severityMap[problemStatement.severity] || '')
-            
-            // Map business impact
-            const impactMap = {
-              'Revenue Loss': 'revenue_loss',
-              'Compliance Issue': 'compliance_issue',
-              'Operational Downtime': 'operational_downtime',
-              'Customer Support': 'customer_support',
-              'Other': 'other'
-            }
-            setBusinessImpactCategory(impactMap[problemStatement.businessImpact] || '')
+            // Note: Issue type, severity, and business impact mapping 
+            // is now handled within the ProblemDefinitionStep component
           }
         } catch (error) {
           console.error('Error generating problem statement:', error)
@@ -139,26 +87,20 @@ const RCAWorkflow = ({
     generateProblemStatement()
   }, [currentStep, ticketData, isGeneratingProblemStatement, hasAttemptedGeneration])
 
-  // Load logs when on Timeline step (step 2)
-  useEffect(() => {
-    if (currentStep === 2 && ticketData && ticketData.logs) {
-      setLogs(ticketData.logs)
-    }
-  }, [currentStep, ticketData])
 
-  // Generate impact assessment when on Impact step (step 3)
+  // Generate impact assessment when on Impact step (step 2)
   useEffect(() => {
     const generateImpactAssessment = async () => {
-      if (currentStep === 3 && stepData && !isGeneratingImpactAssessment && !hasAttemptedImpactGeneration) {
+      if (currentStep === 2 && stepData && !isGeneratingImpactAssessment && !hasAttemptedImpactGeneration) {
         try {
           setIsGeneratingImpactAssessment(true)
           setHasAttemptedImpactGeneration(true)
           
           // Check if we have the required data from previous steps
-          if (stepData.problem_step1 && stepData.timeline_step2) {
+          if (stepData.rca_workflow_steps[0]) {
             const requestData = {
-              problemStatement: stepData.problem_step1,
-              timelineContext: stepData.timeline_step2
+              problemStatement: stepData.rca_workflow_steps[0],
+              timelineContext: stepData.rca_workflow_steps[0] // Use problem statement as context since timeline is removed
             }
             
             const response = await aiService.impactAssessment.analyze(requestData)
@@ -190,7 +132,7 @@ const RCAWorkflow = ({
                 setImpactLevel(mappedImpactLevel)
                 setStepData((prevData) => ({
                   ...prevData,
-                  impact_level_step3: mappedImpactLevel
+                  impact_level_step2: mappedImpactLevel
                 }))
               }
               
@@ -198,19 +140,16 @@ const RCAWorkflow = ({
               const mappedDepartment = departmentMap[department] || ''
               if (mappedDepartment) {
                 setDepartmentAffected(mappedDepartment)
-                setStepData((prevData) => ({
-                  ...prevData,
-                  department_affected_step3: mappedDepartment
+    setStepData((prevData) => ({
+      ...prevData,
+                  department_affected_step2: mappedDepartment
                 }))
               }
               
               // Set the impact assessment description
               if (impactAssessment) {
                 onResponseChange(impactAssessment)
-                setStepData((prevData) => ({
-                  ...prevData,
-                  impact_step3: impactAssessment
-                }))
+                // Don't update stepData here - let handleRcaNext handle it
               }
             }
           }
@@ -227,105 +166,13 @@ const RCAWorkflow = ({
   }, [currentStep, stepData, isGeneratingImpactAssessment, hasAttemptedImpactGeneration, onResponseChange])
 
   // Handle clicking on problem definition
-  const handleProblemDefinitionClick = (definition) => {
-    setProblemSummary(definition)
-    setStepData((prevData) => ({
-      ...prevData,
-      problem_step1: definition
-    }))
-  }
+  // Note: Problem definition click handling is now done within the ProblemDefinitionStep component
 
-  // Handle adding new log
-  const handleAddLog = () => {
-    if (newLog.time && newLog.service && newLog.message) {
-      const logWithId = { ...newLog, id: Date.now(), isUserGenerated: true }
-      setLogs([...logs, logWithId])
-      setNewLog({ time: '', service: '', message: '' })
-      setIsAddingLog(false)
-    }
-  }
 
-  // Handle deleting user-generated log
-  const handleDeleteLog = (logId) => {
-    setLogs(logs.filter(log => log.id !== logId))
-  }
-
-  // Handle generating timeline description
-  const handleGenerateTimelineDescription = async () => {
-    try {
-      setIsGeneratingTimelineDescription(true)
-      
-      const requestData = {
-        problemStatement: problemSummary || '',
-        ticketCreationTime: ticketData?.opened_time || '',
-        logs: logs.map(log => ({
-          time: log.time,
-          service: log.service,
-          level: log.level || 'INFO',
-          message: log.message
-        }))
-      }
-      
-      const response = await aiService.timelineContext.generate(requestData)
-      
-       if (response.success && response.timelineDescription) {
-         const { description, context } = response.timelineDescription
-         const combinedDescription = `${description}\n\n${context}`
-         onResponseChange(combinedDescription)
-         setStepData((prevData) => ({
-           ...prevData,
-           timeline_step2: combinedDescription
-         }))
-       }
-    } catch (error) {
-      console.error('Error generating timeline description:', error)
-      alert('Failed to generate AI timeline description. Please try again.')
-    } finally {
-      setIsGeneratingTimelineDescription(false)
-    }
-  }
-
-  // Handle enhancing problem statement
-  const handleEnhanceProblemStatement = async () => {
-    if (!problemSummary.trim()) {
-      alert('Please enter some text in the problem statement to enhance.')
-      return
-    }
-
-    try {
-      setIsGeneratingProblemStatement(true)
-      
-      const requestData = {
-        text: problemSummary,
-        reference: `${ticketData?.short_description || ''} ${ticketData?.description || ''}`.trim()
-      }
-      
-      const response = await aiService.textEnhancement.enhance(requestData)
-      
-      if (response.success && response.data && response.data.enhancedText) {
-        const enhancedText = response.data.enhancedText
-        
-        // Update the problem statement with enhanced text
-        setProblemSummary(enhancedText)
-        setStepData((prevData) => ({
-          ...prevData,
-          problem_step1: enhancedText
-        }))
-        
-        console.log('Text enhanced successfully:', response.data)
-      } else {
-        alert('Failed to enhance text. Please try again.')
-      }
-    } catch (error) {
-      console.error('Error enhancing problem statement:', error)
-      alert('Failed to enhance problem statement. Please try again.')
-    } finally {
-      setIsGeneratingProblemStatement(false)
-    }
-  }
+  // Note: Problem statement enhancement is now handled within the ProblemDefinitionStep component
 
   // Generic text enhancement function
-  const handleEnhanceText = async (currentText, stepKey, setLoadingState, setLoadingFunction) => {
+  const handleEnhanceText = async (currentText, stepIndex, setLoadingState, setLoadingFunction) => {
     if (!currentText.trim()) {
       alert('Please enter some text to enhance.')
       return
@@ -346,15 +193,12 @@ const RCAWorkflow = ({
         
         // Update the response with enhanced text
         onResponseChange(enhancedText)
-        setStepData((prevData) => ({
-          ...prevData,
-          [stepKey]: enhancedText
-        }))
+        // Don't update stepData here - let handleRcaNext handle it
         
         console.log('Text enhanced successfully:', response.data)
       } else {
         alert('Failed to enhance text. Please try again.')
-      }
+       }
     } catch (error) {
       console.error('Error enhancing text:', error)
       alert('Failed to enhance text. Please try again.')
@@ -465,9 +309,8 @@ const RCAWorkflow = ({
                       isClickable ? 'text-gray-700 hover:text-gray-900' : 'text-gray-500'
                     }`}>
                       {stepNumber === 1 ? 'Problem' :
-                       stepNumber === 2 ? 'Timeline' :
-                       stepNumber === 3 ? 'Impact' :
-                       stepNumber === 4 ? 'Root Cause' : 'Corrective actions'}
+                       stepNumber === 2 ? 'Impact' :
+                       stepNumber === 3 ? 'Root Cause' : 'Corrective actions'}
                     </span>
                   </div>
                 )
@@ -534,430 +377,56 @@ const RCAWorkflow = ({
               </div>
             </div>
 
-            {/* AI Question - Only show for Problem Definition step (step 1) */}
-            {/* {currentStep === 1 && aiQuestion && (
-              <div className="mb-6">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center mb-2">
-                    <BsStars className="w-5 h-5 text-blue-600 mr-2" />
-                    <span className="text-sm font-medium text-blue-800">AI Question</span>
-                  </div>
-                  <p className="text-sm text-blue-700">{aiQuestion}</p>
-                </div>
-              </div>
-            )} */}
+            {/* Note: AI Question is now handled within the ProblemDefinitionStep component */}
 
-            {/* Response Input */}
+            {/* Step Content */}
             <div className="mb-8">
-              {currentStep === 1 ? (
-                // Problem Definition step - show ticket description and form fields
-                <div className="space-y-6">
-                  {/* Ticket Description */}
-                  {ticketData && ticketData.description && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Ticket Description
-                      </label>
-                      <Input
-                        value={ticketData.description}
-                        disabled
-                        className="w-full bg-gray-50"
-                      />
-                    </div>
-                  )}
-                  
-                  {/* Dropdown Fields Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Issue Type
-                      </label>
-                      <Select value={issueType} onValueChange={setIssueType}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select issue type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="network">Network</SelectItem>
-                          <SelectItem value="hardware">Hardware</SelectItem>
-                          <SelectItem value="software">Software</SelectItem>
-                          <SelectItem value="configuration">Configuration</SelectItem>
-                          <SelectItem value="user_error">User Error</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Severity
-                      </label>
-                      <Select value={severity} onValueChange={setSeverity}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select severity" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="sev1">Sev 1 – Critical</SelectItem>
-                          <SelectItem value="sev2">Sev 2 – Major</SelectItem>
-                          <SelectItem value="sev3">Sev 3 – Moderate</SelectItem>
-                          <SelectItem value="sev4">Sev 4 – Minor</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Business Impact Category
-                      </label>
-                      <Select value={businessImpactCategory} onValueChange={setBusinessImpactCategory}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select impact category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="revenue_loss">Revenue Loss</SelectItem>
-                          <SelectItem value="compliance_issue">Compliance Issue</SelectItem>
-                          <SelectItem value="operational_downtime">Operational Downtime</SelectItem>
-                          <SelectItem value="customer_support">Customer Support</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  
-                  {/* Problem Statement */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Problem Statement (AI-assisted)
-                    </label>
-                    <div className="relative">
-                     <Textarea
-                       value={problemSummary}
-                       onChange={(e) => {
-                         setProblemSummary(e.target.value)
-                         setStepData((prevData) => ({
-                           ...prevData,
-                           problem_step1: e.target.value
-                         }))
-                       }}
-                       placeholder={isGeneratingProblemStatement ? "Generating AI problem summary..." : "AI-generated problem summary..."}
-                       rows={6}
-                       className="w-full resize-none pr-20"
-                       disabled={isGeneratingProblemStatement}
-                     />
-                     <Button
-                       onClick={handleEnhanceProblemStatement}
-                       disabled={isGeneratingProblemStatement}
-                       className="absolute bottom-0 right-0 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded-md shadow-sm flex items-center gap-1"
-                       size="sm"
-                     >
-                       <IoIosColorWand className="w-4 h-4" />
-                       <span className="text-sm">Enhance</span>
-                     </Button>
-                    </div>
-                  </div>
-                </div>
-              ) : currentStep === 2 ? (
-                // Timeline step - show ticket creation time and logs
-                <div className="space-y-6">
-                  {/* Ticket Creation Time */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Ticket Creation Time
-                    </label>
-                    <Input
-                      value={ticketData?.opened_time ? formatDate(ticketData.opened_time) : ''}
-                      disabled
-                      className="w-full bg-gray-50"
-                    />
-                  </div>
-                  
-                  {/* Logs Section */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm  text-gray-900">Logs</h3>
-                      <Button
-                        onClick={() => setIsAddingLog(true)}
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                        size="sm"
-                      >
-                        + Add Log
-                      </Button>
-                    </div>
-                    
-                    {/* Existing Logs */}
-                    <div className="space-y-3 max-h-72 overflow-y-auto">
-                      {logs
-                        .sort((a, b) => new Date(a.time) - new Date(b.time))
-                        .map((log, index) => (
-                        <div key={log.id || index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
-                          <div className="w-48 flex-shrink-0">
-                            <Input
-                              value={formatDate(log.time)}
-                              disabled
-                              className="w-full"
-                              placeholder="Time"
-                            />
-                          </div>
-                          <div className="w-32 flex-shrink-0">
-                            <Input
-                              value={log.service}
-                              disabled
-                              className="w-full"
-                              placeholder="Service"
-                            />
-                          </div>
-                          <div className="flex-grow">
-                            <Input
-                              value={log.message}
-                              disabled
-                              className="w-full"
-                              placeholder="Message"
-                            />
-                          </div>
-                          {log.isUserGenerated && (
-                            <Button
-                              onClick={() => handleDeleteLog(log.id)}
-                              variant="outline"
-                              size="sm"
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
-                            >
-                              ✕
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    
-                    {/* Add New Log Form */}
-                    {isAddingLog && (
-                      <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <div className="flex items-center gap-3">
-                          <div className="w-48 flex-shrink-0">
-                            <SimpleDateTimePicker
-                              value={newLog.time ? new Date(newLog.time) : null}
-                              onChange={(date) => setNewLog({...newLog, time: date ? date.toISOString() : ''})}
-                              placeholder="Select date and time"
-                              className="w-full"
-                            />
-                          </div>
-                          <div className="w-32 flex-shrink-0">
-                            <Input
-                              value={newLog.service}
-                              onChange={(e) => setNewLog({...newLog, service: e.target.value})}
-                              placeholder="Service"
-                              className="w-full"
-                            />
-                          </div>
-                          <div className="flex-grow">
-                            <Input
-                              value={newLog.message}
-                              onChange={(e) => setNewLog({...newLog, message: e.target.value})}
-                              placeholder="Message"
-                              className="w-full"
-                            />
-                          </div>
-                          <div className="flex gap-2 flex-shrink-0">
-                            <Button
-                              onClick={handleAddLog}
-                              size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                            >
-                              ✓
-                            </Button>
-                            <Button
-                              onClick={() => {
-                                setIsAddingLog(false)
-                                setNewLog({ time: '', service: '', message: '' })
-                              }}
-                              variant="outline"
-                              size="sm"
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              ✕
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Timeline and Context Description */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="block text-sm font-medium text-gray-700">
-                        Timeline and Context Description
-                      </label>
-                      <Button
-                        onClick={handleGenerateTimelineDescription}
-                        disabled={isGeneratingTimelineDescription}
-                        className="bg-green-600 hover:bg-green-700 text-white disabled:bg-gray-400"
-                        size="sm"
-                      >
-                        {isGeneratingTimelineDescription ? (
-                          <FiLoader className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <BsStars className="w-4 h-4 mr-2" />
-                        )}
-                        {isGeneratingTimelineDescription ? 'Generating...' : 'Create Description'}
-                      </Button>
-                    </div>
-                    <div className="relative">
-                     <Textarea
-                       value={response}
-                       onChange={(e) => {
-                         onResponseChange(e.target.value)
-                         setStepData((prevData) => ({
-                           ...prevData,
-                           timeline_step2: e.target.value
-                         }))
-                       }}
-                       placeholder="Describe the timeline and context of the incident..."
-                       rows={6}
-                       className="w-full resize-none pr-20"
-                       disabled={isEnhancingTimeline}
-                     />
-                     <Button
-                       onClick={() => handleEnhanceText(response, 'timeline_step2', isEnhancingTimeline, setIsEnhancingTimeline)}
-                       disabled={isEnhancingTimeline}
-                       className="absolute bottom-0 right-0 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded-md shadow-sm flex items-center gap-1"
-                       size="sm"
-                     >
-                       <IoIosColorWand className="w-4 h-4" />
-                       <span className="text-sm">Enhance</span>
-                     </Button>
-                    </div>
-                  </div>
-                </div>
-               ) : currentStep === 5 ? (
-                 <AutoSuggestionTextarea
-                   value={response}
-                   onChange={(e) => {
-                     onResponseChange(e)
-                     setStepData((prevData) => ({
-                       ...prevData,
-                       corrective_actions_step5: e
-                     }))
-                   }}
-                   placeholder="Enter your corrective actions here..."
-                   rows={8}
-                   className="w-full resize-none"
-                   reference={ticketData ? `${ticketData.short_description} ${ticketData.description || ''}`.trim() : ''}
-                   onEnhance={() => handleEnhanceText(response, 'corrective_actions_step5', isEnhancingCorrectiveActions, setIsEnhancingCorrectiveActions)}
-                   isEnhancing={isEnhancingCorrectiveActions}
+              {currentStep === 1 && (
+                <ProblemDefinitionStep
+                  stepData={stepData}
+                  setStepData={setStepData}
+                  ticketData={ticketData}
+                  response={response}
+                  onResponseChange={onResponseChange}
+                  isGeneratingProblemStatement={isGeneratingProblemStatement}
+                  setIsGeneratingProblemStatement={setIsGeneratingProblemStatement}
+                  hasAttemptedGeneration={hasAttemptedGeneration}
+                  setHasAttemptedGeneration={setHasAttemptedGeneration}
+                />
+              )}
+              
+              {currentStep === 2 && (
+                <ImpactAssessmentStep
+                  stepData={stepData}
+                  setStepData={setStepData}
+                  ticketData={ticketData}
+                  response={response}
+                  onResponseChange={onResponseChange}
+                  isGeneratingImpactAssessment={isGeneratingImpactAssessment}
+                  setIsGeneratingImpactAssessment={setIsGeneratingImpactAssessment}
+                  hasAttemptedImpactGeneration={hasAttemptedImpactGeneration}
+                  setHasAttemptedImpactGeneration={setHasAttemptedImpactGeneration}
+                />
+              )}
+              
+              {currentStep === 3 && (
+                <RootCauseAnalysisStep
+                  ticketData={ticketData}
+                  response={response}
+                  onResponseChange={onResponseChange}
+                  isEnhancingRootCause={isEnhancingRootCause}
+                  setIsEnhancingRootCause={setIsEnhancingRootCause}
+                />
+              )}
+              
+              {currentStep === 4 && (
+                <CorrectiveActionsStep
+                  ticketData={ticketData}
+                  response={response}
+                  onResponseChange={onResponseChange}
+                  isEnhancingCorrectiveActions={isEnhancingCorrectiveActions}
+                  setIsEnhancingCorrectiveActions={setIsEnhancingCorrectiveActions}
                  />
-               ) : currentStep === 3 ? (
-                 // Impact Assessment step - show dropdowns and textarea
-                 <div className="space-y-6">
-                   {/* Dropdown Fields Row */}
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <div>
-                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                         Impact Level
-                       </label>
-                       <Select value={impactLevel} onValueChange={(value) => {
-                         setImpactLevel(value)
-                         setStepData((prevData) => ({
-                           ...prevData,
-                           impact_level_step3: value
-                         }))
-                       }}>
-                         <SelectTrigger>
-                           <SelectValue placeholder="Select impact level" />
-                         </SelectTrigger>
-                         <SelectContent>
-                           <SelectItem value="sev1">SEV 1 - Critical Impact</SelectItem>
-                           <SelectItem value="sev2">SEV 2 - Major Impact</SelectItem>
-                           <SelectItem value="sev3">SEV 3 - Normal Impact</SelectItem>
-                           <SelectItem value="sev4">SEV 4 - Minor Impact</SelectItem>
-                         </SelectContent>
-                       </Select>
-                     </div>
-                     
-                     <div>
-                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                         Department Affected
-                       </label>
-                       <Select value={departmentAffected} onValueChange={(value) => {
-                         setDepartmentAffected(value)
-                         setStepData((prevData) => ({
-                           ...prevData,
-                           department_affected_step3: value
-                         }))
-                       }}>
-                         <SelectTrigger>
-                           <SelectValue placeholder="Select department" />
-                         </SelectTrigger>
-                         <SelectContent>
-                           <SelectItem value="customer_support">Customer Support</SelectItem>
-                           <SelectItem value="sales">Sales</SelectItem>
-                           <SelectItem value="it_operations">IT Operations</SelectItem>
-                           <SelectItem value="finance">Finance</SelectItem>
-                           <SelectItem value="hr">Human Resources</SelectItem>
-                           <SelectItem value="other">Other</SelectItem>
-                         </SelectContent>
-                       </Select>
-                     </div>
-                   </div>
-                   
-                   {/* Impact Assessment Description */}
-                   <div>
-                     <div className="flex items-center justify-between mb-2">
-                       <label className="block text-sm font-medium text-gray-700">
-                         Impact Assessment Description
-                       </label>
-                     </div>
-                     <div className="relative">
-                       <Textarea
-                         value={response}
-                         onChange={(e) => {
-                           onResponseChange(e.target.value)
-                           setStepData((prevData) => ({
-                             ...prevData,
-                             impact_step3: e.target.value
-                           }))
-                         }}
-                         placeholder={isGeneratingImpactAssessment ? "Generating AI impact assessment..." : "Describe the business and technical impact of this issue..."}
-                         rows={6}
-                         className="w-full resize-none pr-20"
-                         disabled={isGeneratingImpactAssessment}
-                       />
-                       <Button
-                         onClick={() => handleEnhanceText(response, 'impact_step3', false, () => {})}
-                         disabled={isGeneratingImpactAssessment}
-                         className="absolute bottom-0 right-0 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded-md shadow-sm flex items-center gap-1"
-                         size="sm"
-                       >
-                         <IoIosColorWand className="w-4 h-4" />
-                         <span className="text-sm">Enhance</span>
-                       </Button>
-                     </div>
-                   </div>
-                 </div>
-               ) : (
-                 <div className="relative">
-                   <Textarea
-                     value={response}
-                     onChange={(e) => {
-                       onResponseChange(e.target.value)
-                       setStepData((prevData) => ({
-                         ...prevData,
-                         root_cause_step4: e.target.value
-                       }))
-                     }}
-                     placeholder="Enter your response here..."
-                     rows={8}
-                     className="w-full resize-none pr-20"
-                     disabled={isEnhancingRootCause}
-                   />
-                   <Button
-                     onClick={() => handleEnhanceText(response, 'root_cause_step4', isEnhancingRootCause, setIsEnhancingRootCause)}
-                     disabled={isEnhancingRootCause}
-                     className="absolute bottom-0 right-0 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded-md shadow-sm flex items-center gap-1"
-                     size="sm"
-                   >
-                     <IoIosColorWand className="w-4 h-4" />
-                     <span className="text-sm">Enhance</span>
-                   </Button>
-                 </div>
                )}
             </div>
 
@@ -974,13 +443,17 @@ const RCAWorkflow = ({
               <Button 
                 onClick={onNext}
                 disabled={
-                  currentStep === 1 ? (!issueType || !severity || !businessImpactCategory || !problemSummary.trim()) :
-                  currentStep === 3 ? (!impactLevel || !departmentAffected || !response.trim() || isGeneratingImpactAssessment) :
+                  currentStep === 1 ? (!response.trim() || isGeneratingProblemStatement) :
+                  currentStep === 2 ? (!response.trim() || isGeneratingImpactAssessment) :
+                  currentStep === 3 ? (!response.trim() || isEnhancingRootCause) :
+                  currentStep === 4 ? (!response.trim() || isEnhancingCorrectiveActions) :
                   !canProceed
                 }
                 className={`ml-auto ${
-                  (currentStep === 1 ? (issueType && severity && businessImpactCategory && problemSummary.trim()) :
-                   currentStep === 3 ? (impactLevel && departmentAffected && response.trim() && !isGeneratingImpactAssessment) :
+                  (currentStep === 1 ? (response.trim() && !isGeneratingProblemStatement) :
+                   currentStep === 2 ? (response.trim() && !isGeneratingImpactAssessment) :
+                   currentStep === 3 ? (response.trim() && !isEnhancingRootCause) :
+                   currentStep === 4 ? (response.trim() && !isEnhancingCorrectiveActions) :
                    canProceed)
                     ? 'bg-green-600 hover:bg-green-700 text-white' 
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -997,56 +470,7 @@ const RCAWorkflow = ({
       {(currentStep === 1 || currentStep === 4) && (
       <div className="lg:col-span-1 space-y-6">
          
-        {/* Problem Definitions - Only show for Problem Definition step (step 1) */}
-        {currentStep === 1 && (
-          <Card className="bg-white shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
-                <BsStars className="w-5 h-5 mr-2 text-blue-500" />
-                AI Problem Definitions
-                {!isGeneratingProblemStatement && problemDefinitions.length > 0 && (
-                  <Badge variant="secondary" className="ml-2">
-                    {problemDefinitions.length} options
-                  </Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {isGeneratingProblemStatement ? (
-                // Skeleton loader for problem definitions
-                Array.from({ length: 3 }).map((_, index) => (
-                  <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="flex items-start justify-between mb-2">
-                      <Skeleton className="h-5 w-16" />
-                    </div>
-                    <Skeleton className="h-4 w-full mb-1" />
-                    <Skeleton className="h-4 w-3/4 mb-1" />
-                    <Skeleton className="h-4 w-1/2" />
-                  </div>
-                ))
-              ) : problemDefinitions.length > 0 ? (
-                problemDefinitions.map((definition, index) => (
-                  <div 
-                    key={index} 
-                    className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
-                    onClick={() => handleProblemDefinitionClick(definition)}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded">
-                        Option {index + 1}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-700 line-clamp-3">{definition}</p>
-                  </div>
-                ))
-              ) : (
-                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-center">
-                  <p className="text-sm text-gray-500">No problem definitions available</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        {/* Note: Problem Definitions are now handled within the ProblemDefinitionStep component */}
 
         {/* Similar Cases - Only show for Root Cause step (step 4) */}
         {currentStep === 4 && ((similarCases && similarCases.results && similarCases.results.length > 0) || similarCasesLoading) ? (
@@ -1158,3 +582,4 @@ const RCAWorkflow = ({
 }
 
 export default RCAWorkflow
+
