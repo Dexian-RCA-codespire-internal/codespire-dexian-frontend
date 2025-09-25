@@ -26,7 +26,8 @@ const RCAWorkflow = ({
   onSaveProgress,
   onGenerateReport,
   ticketData = null,
-  onStepClick = null
+  onStepClick = null,
+  onGuidanceResult = null
 }) => {
   // Debug ticket data
   console.log('🎫 RCAWorkflow received ticket data:', ticketData)
@@ -229,7 +230,11 @@ const RCAWorkflow = ({
 
         {/* Playbook Recommender - Moved to bottom of main content */}
         <div className="mt-8">
-          <PlaybookRecommender ticketData={ticketData} />
+          <PlaybookRecommender 
+          ticketData={ticketData} 
+          aiGuidanceQuestion={aiGuidance} 
+          onGuidanceResult={onGuidanceResult}
+        />
         </div>
       </div>
 

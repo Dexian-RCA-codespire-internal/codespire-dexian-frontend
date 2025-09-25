@@ -5,12 +5,15 @@ import { Button } from './ui/button'
 import { Skeleton } from './ui/skeleton'
 import { FiBookOpen, FiExternalLink, FiRefreshCw, FiAlertCircle, FiCheckCircle, FiClock } from 'react-icons/fi'
 import { playbookService } from '../api/services/playbookService'
+import { aiService } from '../api/services/aiService'
 
-const PlaybookRecommender = ({ ticketData }) => {
+const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult }) => {
   const [playbooks, setPlaybooks] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [lastSearched, setLastSearched] = useState(null)
+  const [aiGuidanceResults, setAiGuidanceResults] = useState([])
+  const [guidanceLoading, setGuidanceLoading] = useState(false)
 
   // Generate search query from ticket data using short description and description
   const generateSearchQuery = (ticket) => {
@@ -38,9 +41,35 @@ const PlaybookRecommender = ({ ticketData }) => {
     }
     
     // Create the final query
-    const query = queryParts.join(' ')
+    let query = queryParts.join(' ')
     
-    console.log('🔍 Generated hybrid search query from short description + description:')
+    // Simplify the query for AI guidance search - extract key terms
+    if (query.length > 100) {
+      // Extract key terms from the query
+      const keyTerms = []
+      
+      // Look for common technical terms
+      const technicalTerms = [
+        'email', 'smtp', 'quota', 'server', 'connection', 
+        'network', 'dns', 'database', 'login', 'password', 'authentication',
+        'ssl', 'tls', 'certificate', 'firewall', 'port', 'timeout'
+      ]
+      
+      technicalTerms.forEach(term => {
+        if (query.toLowerCase().includes(term)) {
+          keyTerms.push(term)
+        }
+      })
+      
+      // If we found key terms, use them; otherwise use first 100 chars
+      if (keyTerms.length > 0) {
+        query = keyTerms.join(' ')
+      } else {
+        query = query.substring(0, 100)
+      }
+    }
+    
+    console.log('🔍 Generated AI guidance search query:')
     console.log('📋 Ticket ID:', ticket.ticket_id)
     console.log('📋 Short description:', ticket.short_description)
     console.log('📋 Description:', ticket.description?.substring(0, 200) + '...')
@@ -229,15 +258,278 @@ const PlaybookRecommender = ({ ticketData }) => {
     }
   }
 
-  // Handle "Use" button click
+  // Update confidence score based on usage for a specific playbook
+  const updateConfidenceScore = async (playbookId) => {
+    try {
+      // Get current playbook data
+      const playbook = playbooks.find(p => p.playbook_id === playbookId)
+      if (!playbook) {
+        console.warn(`⚠️ Playbook not found: ${playbookId}`)
+        return
+      }
+      
+      // Calculate new confidence based on usage
+      const currentUsage = parseInt(playbook.usage?.replace(/\D/g, '') || '0')
+      const newUsage = currentUsage + 1
+      
+      // Confidence calculation: 50% base + usage bonus (max 95%)
+      const baseConfidence = 50
+      const usageBonus = Math.min(newUsage * 2, 45) // 2% per usage, max 45%
+      const newConfidence = Math.min(baseConfidence + usageBonus, 95)
+      
+      console.log(`📊 Updating confidence for specific playbook:`)
+      console.log(`   Playbook ID: ${playbookId}`)
+      console.log(`   Playbook Title: ${playbook.title}`)
+      console.log(`   Current usage: ${currentUsage}`)
+      console.log(`   New usage: ${newUsage}`)
+      console.log(`   New confidence: ${newConfidence}%`)
+      
+      // Update ONLY the specific playbook in the local state
+      setPlaybooks(prev => prev.map(p => 
+        p.playbook_id === playbookId 
+          ? { 
+              ...p, 
+              usage: `${newUsage} tickets resolved`,
+              confidence: `${newConfidence}%`
+            }
+          : p  // Keep other playbooks unchanged
+      ))
+      
+    } catch (err) {
+      console.warn('⚠️ Failed to update confidence score:', err)
+    }
+  }
+
+  // Handle "Use" button click (kept for backward compatibility)
   const handleUsePlaybook = async (playbookId) => {
     try {
       await playbookService.incrementUsage(playbookId)
       console.log('✅ Playbook usage incremented via Use button:', playbookId)
+      await updateConfidenceScore(playbookId)
       alert('Playbook usage incremented successfully!')
     } catch (err) {
       console.warn('⚠️ Failed to increment playbook usage:', err)
       alert('Failed to increment playbook usage. Please try again.')
+    }
+  }
+
+  // Browser console test function - you can call this directly in browser console
+  window.testAIGuidanceAPI = async () => {
+    try {
+      const playbookIds = ['PB-000076-2025-09-24T09-06-07-613Z'];
+      const guidanceQuestion = "Check SMTP server status";
+      
+      console.log('🔍 Testing AI Guidance API directly...');
+      console.log('📋 Playbook IDs:', playbookIds);
+      console.log('❓ Question:', guidanceQuestion);
+      
+      const response = await fetch('http://localhost:8081/api/v1/ai/playbook-recommender/search-guidance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playbookIds: playbookIds,
+          guidanceQuestion: guidanceQuestion
+        })
+      });
+      
+      const data = await response.json();
+      console.log('📊 Direct API Response:', data);
+      
+    } catch (error) {
+      console.error('❌ Direct API Error:', error);
+    }
+  };
+
+  // Test query generation function
+  window.testQueryGeneration = (ticketData) => {
+    console.log('🔍 Testing Query Generation...');
+    console.log('📋 Input ticket:', ticketData);
+    const query = generateSearchQuery(ticketData);
+    console.log('📋 Generated query:', query);
+    console.log('📋 Query length:', query.length);
+    return query;
+  };
+
+  // Preprocess AI guidance questions to extract key terms for better matching
+  const preprocessAIGuidanceQuestion = (question) => {
+    console.log('🔧 Preprocessing AI guidance question:', question);
+    
+    // Define mapping of complex questions to simpler search terms
+    const questionMappings = {
+      // Step 5: Root Cause Analysis
+      'Based on your investigation, what is the underlying root cause?': 'root cause investigation',
+      'What is the underlying root cause?': 'root cause',
+      'What caused this issue?': 'root cause',
+      
+      // Step 6: Corrective Actions  
+      'Check SMTP server status?': 'email server',
+      'Check server status?': 'server status',
+      'Verify server configuration?': 'server configuration',
+      
+      // Step 1: Problem Definition
+      'What specific problem or incident occurred?': 'problem incident',
+      'Describe the symptoms observed': 'symptoms problem',
+      
+      // Step 2: Timeline
+      'When did this issue first occur?': 'timeline issue',
+      'What events preceded it?': 'timeline events',
+      
+      // Step 3: Impact
+      'What was the business and technical impact?': 'impact business technical',
+      'What was the impact of this issue?': 'impact issue',
+      
+      // Step 4: Investigation
+      'What data have you gathered?': 'investigation data',
+      'What patterns or clues were discovered?': 'investigation patterns clues'
+    };
+    
+    // Check for exact matches first
+    if (questionMappings[question]) {
+      const mapped = questionMappings[question];
+      console.log('🎯 Found exact mapping:', question, '→', mapped);
+      return mapped;
+    }
+    
+    // Extract key technical terms from the question
+    const technicalTerms = [
+      'email', 'smtp', 'server', 'status', 'configuration', 'delivery',
+      'root', 'cause', 'investigation', 'problem', 'issue', 'impact',
+      'timeline', 'data', 'patterns', 'symptoms', 'business', 'technical'
+    ];
+    
+    const foundTerms = technicalTerms.filter(term => 
+      question.toLowerCase().includes(term)
+    );
+    
+    if (foundTerms.length > 0) {
+      const processed = foundTerms.join(' ');
+      console.log('🎯 Extracted technical terms:', foundTerms, '→', processed);
+      return processed;
+    }
+    
+    // Fallback: use first few words of the question
+    const words = question.split(' ').slice(0, 3).join(' ');
+    console.log('🎯 Fallback to first words:', words);
+    return words;
+  };
+
+  // Handle "Get" button click - Search AI guidance in playbook triggers
+  const handleGetGuidance = async () => {
+    if (!playbooks.length || !ticketData) {
+      alert('No playbooks available or ticket data missing')
+      return
+    }
+
+    try {
+      setGuidanceLoading(true)
+      setError(null)
+      
+      console.log('🔍 Starting AI guidance search in playbook triggers...')
+      console.log('📋 Available playbooks:', playbooks.length)
+      console.log('🎫 Ticket data:', ticketData)
+      
+      // Extract playbook IDs from current recommendations
+      const playbookIds = playbooks.map(p => p.playbook_id || p._id)
+      
+      // Use AI guidance question from RCA workflow if available, otherwise generate from ticket data
+      let guidanceQuestion
+      
+      if (aiGuidanceQuestion && aiGuidanceQuestion.trim()) {
+        // Use the AI guidance question from the current RCA step
+        let rawQuestion = aiGuidanceQuestion.trim()
+        console.log('🎯 Raw AI guidance question:', rawQuestion)
+        
+        // Preprocess the question to extract key terms for better matching
+        guidanceQuestion = preprocessAIGuidanceQuestion(rawQuestion)
+        console.log('🎯 Processed AI guidance question:', guidanceQuestion)
+      } else {
+        // Fallback: generate from ticket data
+        guidanceQuestion = generateSearchQuery(ticketData)
+        console.log('🔄 Fallback: Generated from ticket data:', guidanceQuestion)
+        
+        // Further simplify for better matching - remove specific terms
+        if (guidanceQuestion.includes('quota exceeded')) {
+          guidanceQuestion = 'email quota'
+          console.log('🔄 Simplified query for better matching:', guidanceQuestion)
+        }
+      }
+      
+      // Debug: Log detailed information
+      console.log('🔍 AI Guidance Debug Info:');
+      console.log('📋 Playbook IDs:', playbookIds);
+      console.log('❓ Guidance Question:', guidanceQuestion);
+      console.log('🌐 API Endpoint:', '/v1/ai/playbook-recommender/search-guidance');
+      
+      // Debug: Log request payload
+      const requestPayload = {
+        playbookIds: playbookIds,
+        guidanceQuestion: guidanceQuestion
+      };
+      console.log('📤 Request Payload:', JSON.stringify(requestPayload, null, 2));
+      
+      console.log('🎯 Searching guidance in playbooks:', playbookIds)
+      console.log('❓ Guidance question:', guidanceQuestion)
+      
+      // Call AI service to search guidance in triggers
+      const response = await aiService.playbookRecommender.searchGuidanceInTriggers({
+        playbookIds,
+        guidanceQuestion
+      })
+      
+      // Debug: Log detailed response
+      console.log('✅ AI guidance search response:', response)
+      console.log('📊 AI Guidance Response:', response.data);
+      console.log('✅ Success:', response.data?.success);
+      console.log('📋 Total Results:', response.data?.total);
+      console.log('🎯 Data:', response.data?.data);
+      
+      if (response.success && response.data) {
+        setAiGuidanceResults(response.data)
+        console.log('🎯 AI guidance results:', response.data)
+        
+        // Send the result to the parent component and increment usage for the specific playbook
+        if (response.data.length > 0) {
+          const bestResult = response.data[0] // Get only the first/best result
+          console.log('🎯 Sending AI guidance result to parent:', bestResult)
+          
+          // Increment usage ONLY for the specific playbook that provided the guidance
+          if (bestResult.playbook_id) {
+            try {
+              await playbookService.incrementUsage(bestResult.playbook_id)
+              console.log('✅ Playbook usage incremented for:', bestResult.playbook_id)
+              console.log('📊 Playbook title:', bestResult.playbook_title)
+              
+              // Update confidence score for this specific playbook only
+              await updateConfidenceScore(bestResult.playbook_id)
+            } catch (err) {
+              console.warn('⚠️ Failed to increment playbook usage:', err)
+            }
+          }
+          
+          // Call the callback function to pass the result to parent
+          if (onGuidanceResult) {
+            onGuidanceResult(bestResult)
+          }
+        } else {
+          console.log('❌ No AI guidance results found')
+          // Still call the callback with null to indicate no results
+          if (onGuidanceResult) {
+            onGuidanceResult(null)
+          }
+        }
+      } else {
+        console.log('❌ No AI guidance results found')
+        alert('No AI guidance actions found for this ticket.')
+      }
+      
+    } catch (err) {
+      console.error('❌ Error searching AI guidance:', err)
+      console.error('❌ Error Response:', err.response?.data);
+      console.error('❌ Error Status:', err.response?.status);
+      setError(err.message || 'Failed to search AI guidance')
+      alert(`Error searching AI guidance: ${err.message || 'Unknown error'}`)
+    } finally {
+      setGuidanceLoading(false)
     }
   }
 
@@ -279,15 +571,25 @@ const PlaybookRecommender = ({ ticketData }) => {
               <FiBookOpen className="w-5 h-5 mr-2 text-green-500" />
               {playbooks.length > 1 ? 'Top Matching Playbooks' : 'Best Match Playbook'}
             </CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={loading || !ticketData}
-            className="h-8 w-8 p-0"
-          >
-            <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1"
+              onClick={handleGetGuidance}
+              disabled={guidanceLoading || !playbooks.length || !ticketData}
+            >
+              {guidanceLoading ? 'Searching...' : 'Use Playbook'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={loading || !ticketData}
+              className="h-8 w-8 p-0"
+            >
+              <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </div>
         {playbooks.length > 0 && (
           <p className="text-xs text-gray-500 flex items-center">
@@ -429,22 +731,43 @@ const PlaybookRecommender = ({ ticketData }) => {
                   </div>
                 )}
                 
-                {/* Use Button */}
-                <div className="mt-3 flex justify-end">
-                  <Button
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleUsePlaybook(playbook.playbook_id)
-                    }}
-                  >
-                    Use This Playbook
-                  </Button>
-                </div>
               </div>
             )
           })
+        )}
+        
+        {/* AI Guidance Results */}
+        {aiGuidanceResults.length > 0 && (
+          <div className="pt-4 border-t border-gray-200">
+            <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+              <FiCheckCircle className="w-4 h-4 mr-2 text-green-600" />
+              AI Guidance Actions
+            </h4>
+            <div className="space-y-2">
+              {aiGuidanceResults.map((result, index) => (
+                <div key={index} className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h5 className="text-sm font-medium text-green-900 mb-1">
+                        {result.trigger_title || `Action ${index + 1}`}
+                      </h5>
+                      <p className="text-sm text-green-800">
+                        {result.action}
+                      </p>
+                      {result.expected_outcome && (
+                        <p className="text-xs text-green-700 mt-1">
+                          Expected: {result.expected_outcome}
+                        </p>
+                      )}
+                    </div>
+                    <Badge className="bg-green-100 text-green-800 text-xs">
+                      {result.playbook_title || 'Playbook'}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
         
         {/* Search info */}

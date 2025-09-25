@@ -39,6 +39,17 @@ const Analysis = () => {
   const [rcaStep, setRcaStep] = useState(1)
   const [analysisResponse, setAnalysisResponse] = useState('')
   
+  // Handle AI guidance result from PlaybookRecommender
+  const handleGuidanceResult = (guidanceResult) => {
+    if (guidanceResult) {
+      console.log('🎯 Received AI guidance result:', guidanceResult)
+      // Populate the response form with only the AI guidance action
+      setAnalysisResponse(guidanceResult.action)
+    } else {
+      console.log('❌ No AI guidance result received')
+    }
+  }
+  
   // Step data tracking
   const [stepData, setStepData] = useState({
     problem_step1: '',
@@ -254,7 +265,7 @@ const Analysis = () => {
     {
       step: 5,
       title: 'Root Cause Analysis',
-      aiGuidance: 'Based on your investigation, what is the underlying root cause?',
+      aiGuidance: 'verify physical connection?',
       aiSuggestions: [
         'Inefficient database query causing resource contention',
         'Missing connection pool configuration limits',
@@ -284,7 +295,8 @@ const Analysis = () => {
         [`${rcaStep === 1 ? 'problem' : 
            rcaStep === 2 ? 'timeline' : 
            rcaStep === 3 ? 'impact' : 
-           rcaStep === 4 ? 'findings' : 'root_cause'}_step${rcaStep}`]: analysisResponse,
+           rcaStep === 4 ? 'findings' : 
+           rcaStep === 5 ? 'root_cause' : 'corrective_actions'}_step${rcaStep}`]: analysisResponse,
         status: rcaStep === 5 ? 'Resolved' : 'In Progress'
       }
 
@@ -319,6 +331,9 @@ const Analysis = () => {
           if (!stepData.findings_step4 || stepData.findings_step4.trim().length === 0) {
             incompleteSteps.push('Investigation Findings (Step 4)')
           }
+          if (!stepData.root_cause_step5 || stepData.root_cause_step5.trim().length === 0) {
+            incompleteSteps.push('Root Cause Analysis (Step 5)')
+          }
           
           alert(`Cannot complete RCA. The following steps are not completed:\n\n${incompleteSteps.join('\n')}\n\nPlease complete these steps first.`)
           return
@@ -326,7 +341,8 @@ const Analysis = () => {
         
         // All steps complete - call the resolve API
         const resolveResponse = await ticketService.resolveTicket({
-          rootCause: analysisResponse,
+          rootCause: stepData.root_cause_step5,
+          correctiveActions: analysisResponse,
           ticket: ticketData
         })
         
@@ -471,6 +487,7 @@ const Analysis = () => {
             onGenerateReport={handleGenerateReport}
             ticketData={null}
             onStepClick={handleStepClick}
+            onGuidanceResult={handleGuidanceResult}
           />
         </div>
       </div>
@@ -520,6 +537,7 @@ const Analysis = () => {
           onGenerateReport={handleGenerateReport}
           ticketData={ticketData}
           onStepClick={handleStepClick}
+          onGuidanceResult={handleGuidanceResult}
         />
       </div>
     </div>

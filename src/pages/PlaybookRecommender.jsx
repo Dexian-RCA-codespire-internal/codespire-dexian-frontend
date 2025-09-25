@@ -56,7 +56,6 @@ const PlaybookRecommender = () => {
         resources: ['']
       }
     ],
-    outcome: ''
   })
   const menuRef = useRef(null)
 
@@ -195,8 +194,14 @@ const PlaybookRecommender = () => {
         title: playbook.title,
         description: playbook.description || '',
         priority: playbook.priority || 'Medium',
-        steps: Array.isArray(playbook.steps) && playbook.steps.length > 0 
-          ? playbook.steps 
+        steps: Array.isArray(playbook.triggers) && playbook.triggers.length > 0 
+          ? playbook.triggers.map(trigger => ({
+              step_id: trigger.trigger_id,
+              title: trigger.title,
+              action: trigger.action,
+              expected_outcome: trigger.expected_outcome,
+              resources: trigger.resources || ['']
+            }))
           : [
               {
                 step_id: 1,
@@ -206,7 +211,6 @@ const PlaybookRecommender = () => {
                 resources: ['']
               }
             ],
-        outcome: playbook.outcome || ''
       })
       setShowEditModal(true)
     } catch (error) {
@@ -220,8 +224,14 @@ const PlaybookRecommender = () => {
           title: playbook.title,
           description: playbook.description || '',
           priority: playbook.priority || 'Medium',
-          steps: Array.isArray(playbook.steps) && playbook.steps.length > 0 
-            ? playbook.steps 
+          steps: Array.isArray(playbook.triggers) && playbook.triggers.length > 0 
+            ? playbook.triggers.map(trigger => ({
+                step_id: trigger.trigger_id,
+                title: trigger.title,
+                action: trigger.action,
+                expected_outcome: trigger.expected_outcome,
+                resources: trigger.resources || ['']
+              }))
             : [
                 {
                   step_id: 1,
@@ -231,7 +241,6 @@ const PlaybookRecommender = () => {
                   resources: ['']
                 }
               ],
-          outcome: playbook.outcome || ''
         })
         setShowEditModal(true)
       }
@@ -320,7 +329,6 @@ const PlaybookRecommender = () => {
           resources: ['']
         }
       ],
-      outcome: ''
     })
   }
 
@@ -413,23 +421,23 @@ const PlaybookRecommender = () => {
       return
     }
 
-    // Validate steps
-    const hasEmptySteps = newPlaybook.steps.some(step => 
+    // Validate triggers
+    const hasEmptyTriggers = newPlaybook.steps.some(step => 
       !step.title || !step.action || !step.expected_outcome
     )
     
-    if (hasEmptySteps) {
-      alert('Please fill in all step details (Title, Action, Expected Outcome)')
+    if (hasEmptyTriggers) {
+      alert('Please fill in all trigger details (Title, Action, Expected Outcome)')
       return
     }
     
-    // Ensure steps array is properly formatted
-    const formattedSteps = newPlaybook.steps.map((step, index) => ({
-      step_id: step.step_id || (index + 1),
-      title: step.title || '',
-      action: step.action || '',
-      expected_outcome: step.expected_outcome || '',
-      resources: Array.isArray(step.resources) ? step.resources : ['']
+    // Ensure triggers array is properly formatted
+    const formattedTriggers = newPlaybook.steps.map((trigger, index) => ({
+      trigger_id: trigger.step_id || (index + 1),
+      title: trigger.title || '',
+      action: trigger.action || '',
+      expected_outcome: trigger.expected_outcome || '',
+      resources: Array.isArray(trigger.resources) ? trigger.resources : ['']
     }))
     
 
@@ -438,17 +446,22 @@ const PlaybookRecommender = () => {
     const confidence = calculateConfidence(usageString)
     
     const playbookToSave = {
-      title: newPlaybook.title,
-      tags: ["Custom"], // Default tag for user-created playbooks
+      title: newPlaybook.title.trim(),
+      description: newPlaybook.description.trim(),
+      playbook_id: newPlaybook.playbook_id.trim(),
+      priority: newPlaybook.priority,
+      triggers: formattedTriggers, // Only send triggers (new format)
+      tags: ["Custom"],
       usage: usageString,
       confidence: `${confidence}%`,
-      playbook_id: newPlaybook.playbook_id,
-      description: newPlaybook.description,
-      priority: newPlaybook.priority,
-      steps: formattedSteps,
-      outcome: newPlaybook.outcome
+      created_by: "current_user",
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     }
     
+    // Debug: Log the data being sent
+    console.log('📤 Sending playbook data:', JSON.stringify(playbookToSave, null, 2))
 
     try {
       setIsLoading(true)
@@ -496,12 +509,17 @@ const PlaybookRecommender = () => {
             resources: ['']
           }
         ],
-        outcome: ''
       })
     } catch (error) {
       console.error('Error saving playbook:', error)
+      console.error('Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      })
       setError('Failed to save playbook. Please try again.')
-      alert('Failed to save playbook. Please try again.')
+      alert(`Failed to save playbook: ${error.response?.data?.message || error.message}`)
     } finally {
       setIsLoading(false)
     }
@@ -524,7 +542,6 @@ const PlaybookRecommender = () => {
           resources: ['']
         }
       ],
-      outcome: ''
     })
   }
 
@@ -1114,10 +1131,10 @@ const PlaybookRecommender = () => {
                 />
               </div>
 
-              {/* Steps Section */}
+              {/* Triggers Section */}
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">Steps</h3>
+                  <h3 className="text-lg font-medium text-gray-900">Triggers</h3>
                   <Button
                     type="button"
                     variant="outline"
@@ -1126,7 +1143,7 @@ const PlaybookRecommender = () => {
                     className="flex items-center gap-2"
                   >
                     <FiPlus className="h-4 w-4" />
-                    Add Step
+                    Add Trigger
                   </Button>
                 </div>
 
@@ -1134,7 +1151,7 @@ const PlaybookRecommender = () => {
                   {newPlaybook.steps.map((step, stepIndex) => (
                     <Card key={stepIndex} className="p-4">
                       <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-medium text-gray-900">Step {stepIndex + 1}</h4>
+                        <h4 className="font-medium text-gray-900">Trigger {stepIndex + 1}</h4>
                         {newPlaybook.steps.length > 1 && (
                           <Button
                             type="button"
@@ -1151,7 +1168,7 @@ const PlaybookRecommender = () => {
                       <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Step Title *
+                            Trigger Title *
                           </label>
                           <Input
                             value={step.title}
@@ -1233,19 +1250,6 @@ const PlaybookRecommender = () => {
                 </div>
               </div>
 
-              {/* Outcome */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Final Outcome
-                </label>
-                <Textarea
-                  value={newPlaybook.outcome}
-                  onChange={(e) => handleInputChange('outcome', e.target.value)}
-                  placeholder="Describe the expected final outcome..."
-                  rows={2}
-                  className="w-full"
-                />
-              </div>
             </div>
 
             {/* Modal Footer */}
@@ -1345,28 +1349,28 @@ const PlaybookRecommender = () => {
                       />
                     </div>
 
-                    {/* Steps Section */}
+                    {/* Triggers Section */}
                     <div>
                       <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-md font-medium text-black">Resolution Steps</h4>
+                        <h4 className="text-md font-medium text-black">Resolution Triggers</h4>
                       </div>
                       <div className="space-y-4">
-                        {selectedPlaybook.steps && selectedPlaybook.steps.length > 0 ? (
-                          selectedPlaybook.steps.map((step, stepIndex) => (
-                            <Card key={stepIndex} className="p-4 bg-white border-gray-200">
+                        {selectedPlaybook.triggers && selectedPlaybook.triggers.length > 0 ? (
+                          selectedPlaybook.triggers.map((trigger, triggerIndex) => (
+                            <Card key={triggerIndex} className="p-4 bg-white border-gray-200">
                               <div className="flex items-center justify-between mb-3">
                                 <h5 className="font-medium text-black">
-                                  Step {stepIndex + 1}: {step.title}
+                                  Trigger {triggerIndex + 1}: {trigger.title}
                                 </h5>
                               </div>
                               
                               <div className="space-y-3">
                                 <div>
                                   <label className="block text-sm font-medium text-black mb-2">
-                                    Step Title
+                                    Trigger Title
                                   </label>
                                   <Input
-                                    value={step.title}
+                                    value={trigger.title}
                                     readOnly
                                     className="bg-gray-50 text-black"
                                   />
@@ -1377,7 +1381,7 @@ const PlaybookRecommender = () => {
                                     Action
                                   </label>
                                   <Textarea
-                                    value={step.action}
+                                    value={trigger.action}
                                     readOnly
                                     rows={2}
                                     className="bg-gray-50 text-black"
@@ -1389,7 +1393,7 @@ const PlaybookRecommender = () => {
                                     Expected Outcome
                                   </label>
                                   <Textarea
-                                    value={step.expected_outcome}
+                                    value={trigger.expected_outcome}
                                     readOnly
                                     rows={2}
                                     className="bg-gray-50 text-black"
@@ -1401,8 +1405,8 @@ const PlaybookRecommender = () => {
                                     Resources
                                   </label>
                                   <div className="space-y-2">
-                                    {step.resources && step.resources.length > 0 ? (
-                                      step.resources.map((resource, resourceIndex) => (
+                                    {trigger.resources && trigger.resources.length > 0 ? (
+                                      trigger.resources.map((resource, resourceIndex) => (
                                         <div key={resourceIndex} className="flex items-center gap-2">
                                           <Input
                                             value={resource}
@@ -1435,18 +1439,6 @@ const PlaybookRecommender = () => {
                       </div>
                     </div>
 
-                    {/* Outcome */}
-                    <div>
-                      <label className="block text-sm font-medium text-black mb-2">
-                        Expected Final Outcome
-                      </label>
-                      <Textarea
-                        value={selectedPlaybook.outcome || ''}
-                        readOnly
-                        rows={3}
-                        className="bg-white text-black"
-                      />
-                    </div>
                   </div>
                 </div>
               </div>
@@ -1546,10 +1538,10 @@ const PlaybookRecommender = () => {
                 />
               </div>
 
-              {/* Steps Section */}
+              {/* Triggers Section */}
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">Steps</h3>
+                  <h3 className="text-lg font-medium text-gray-900">Triggers</h3>
                   <Button
                     type="button"
                     variant="outline"
@@ -1558,7 +1550,7 @@ const PlaybookRecommender = () => {
                     className="flex items-center gap-2"
                   >
                     <FiPlus className="h-4 w-4" />
-                    Add Step
+                    Add Trigger
                   </Button>
                 </div>
 
@@ -1566,7 +1558,7 @@ const PlaybookRecommender = () => {
                   {newPlaybook.steps.map((step, stepIndex) => (
                     <Card key={stepIndex} className="p-4">
                       <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-medium text-gray-900">Step {stepIndex + 1}</h4>
+                        <h4 className="font-medium text-gray-900">Trigger {stepIndex + 1}</h4>
                         {newPlaybook.steps.length > 1 && (
                           <Button
                             type="button"
@@ -1583,7 +1575,7 @@ const PlaybookRecommender = () => {
                       <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Step Title *
+                            Trigger Title *
                           </label>
                           <Input
                             value={step.title}
@@ -1665,19 +1657,6 @@ const PlaybookRecommender = () => {
                 </div>
               </div>
 
-              {/* Outcome */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Final Outcome
-                </label>
-                <Textarea
-                  value={newPlaybook.outcome}
-                  onChange={(e) => handleInputChange('outcome', e.target.value)}
-                  placeholder="Describe the expected final outcome..."
-                  rows={2}
-                  className="w-full"
-                />
-              </div>
             </div>
 
             {/* Modal Footer */}
