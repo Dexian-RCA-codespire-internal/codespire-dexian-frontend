@@ -37,6 +37,7 @@ const RCAWorkflow = ({
   onStepClick = null,
   problemStatementData = null,
   isGeneratingProblemStatement = false,
+  setIsGeneratingProblemStatement,
   hasAttemptedGeneration = false
 }) => {
   // Note: Problem statement state is now managed in the parent component (Analysis.jsx)
@@ -283,7 +284,7 @@ const RCAWorkflow = ({
       </Card>
 
 {/* Ticket Information Header */}
-{ticketData ? (
+{/* {ticketData ? (
         <div className="p-4 bg-white rounded-lg shadow-sm border">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
             {ticketData.short_description || 'No Title'}
@@ -309,13 +310,44 @@ const RCAWorkflow = ({
             <Skeleton className="h-4 w-36" />
           </div>
         </div>
-      )}
+      )} */}
       
       {/* Main Content */}
-      <div className={`grid grid-cols-1 gap-8 ${(currentStep === 4) ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
+      <div className={`grid grid-cols-1 ${(currentStep === 4) ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
+        {/* Ticket Information Header */}
+{ticketData ? (
+        <div className="p-4 bg-white rounded-lg shadow-sm border rounded-b-none">
+          <h1 className="text-xl text-gray-900">
+            <span className='font-bold'>Problem:</span> {ticketData.short_description || 'No Title'}
+          </h1>
+          <div className="text-sm text-gray-600">
+            <span className='font-bold'>Description:</span> {ticketData.description}
+            </div>
+          <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-600">
+            <span><strong>Ticket ID:</strong> {ticketData.ticket_id}</span>
+            <span><strong>Source:</strong> {ticketData.source}</span>
+            <span><strong>Status:</strong> <Badge className="bg-green-100" variant="secondary">{ticketData.status}</Badge></span>
+            <span><strong>Priority:</strong> <Badge className="bg-yellow-100" variant="secondary">{ticketData.priority}</Badge></span>
+            <span><strong>Category:</strong> <Badge className="bg-blue-100" variant="secondary">{ticketData.category}</Badge></span>
+          </div>
+        </div>
+      ) : (
+        <div className="p-4 bg-white rounded-lg shadow-sm border">
+          <div className="flex items-center gap-3 mb-2">
+            <Skeleton className="h-8 w-48" />
+          </div>
+          <div className="flex flex-wrap gap-4">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-36" />
+          </div>
+        </div>
+      )}
       {/* Main Content Area */}
       <div className={(currentStep === 1 || currentStep === 4) ? 'lg:col-span-2' : 'lg:col-span-1'}>
-        <Card className="bg-white shadow-sm">
+        <Card className="bg-white shadow-sm border-t-0 rounded-t-none">
           <CardContent className="p-8">
             {/* Step Header */}
             <div className="flex items-center mb-6">
@@ -351,8 +383,12 @@ const RCAWorkflow = ({
                    response={response}
                    onResponseChange={onResponseChange}
                    isGeneratingProblemStatement={isGeneratingProblemStatement}
+                   setIsGeneratingProblemStatement={setIsGeneratingProblemStatement}
                    hasAttemptedGeneration={hasAttemptedGeneration}
                    problemStatementData={problemStatementData}
+                   onNext={onNext}
+                   showPrevious={showPrevious}
+                   onPrevious={onPrevious}
                  />
                )}
               
@@ -391,7 +427,8 @@ const RCAWorkflow = ({
                )}
             </div>
 
-            {/* Navigation */}
+            {/* Navigation - Only show for steps 2-4, step 1 has its own navigation */}
+            {currentStep !== 1 && (
             <div className="flex items-center justify-between">
               {showPrevious && (
                 <Button 
@@ -403,19 +440,17 @@ const RCAWorkflow = ({
               )}
               <Button 
                 onClick={onNext}
-                disabled={
-                  currentStep === 1 ? (!response.trim() || isGeneratingProblemStatement) :
-                  currentStep === 2 ? (!response.trim() || isGeneratingImpactAssessment) :
-                  currentStep === 3 ? (!response.trim() || isEnhancingRootCause) :
-                  currentStep === 4 ? (!response.trim() || isEnhancingCorrectiveActions) :
-                  !canProceed
-                }
+                  disabled={
+                    currentStep === 2 ? (!response.trim() || isGeneratingImpactAssessment) :
+                    currentStep === 3 ? (!response.trim() || isEnhancingRootCause) :
+                    currentStep === 4 ? (!response.trim() || isEnhancingCorrectiveActions) :
+                    !canProceed
+                  }
                 className={`ml-auto ${
-                  (currentStep === 1 ? (response.trim() && !isGeneratingProblemStatement) :
-                   currentStep === 2 ? (response.trim() && !isGeneratingImpactAssessment) :
-                   currentStep === 3 ? (response.trim() && !isEnhancingRootCause) :
-                   currentStep === 4 ? (response.trim() && !isEnhancingCorrectiveActions) :
-                   canProceed)
+                    (currentStep === 2 ? (response.trim() && !isGeneratingImpactAssessment) :
+                     currentStep === 3 ? (response.trim() && !isEnhancingRootCause) :
+                     currentStep === 4 ? (response.trim() && !isEnhancingCorrectiveActions) :
+                     canProceed)
                     ? 'bg-green-600 hover:bg-green-700 text-white' 
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
@@ -423,6 +458,7 @@ const RCAWorkflow = ({
                 {nextButtonText}
               </Button>
             </div>
+            )}
           </CardContent>
         </Card>
       </div>

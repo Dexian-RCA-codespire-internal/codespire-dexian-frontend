@@ -688,6 +688,10 @@ const Analysis = () => {
             onGenerateReport={handleGenerateReport}
             ticketData={null}
             onStepClick={handleStepClick}
+            problemStatementData={problemStatementData}
+            isGeneratingProblemStatement={isGeneratingProblemStatement}
+            setIsGeneratingProblemStatement={setIsGeneratingProblemStatement}
+            hasAttemptedGeneration={hasAttemptedGeneration}
           />
         </div>
       </div>
@@ -741,6 +745,7 @@ const Analysis = () => {
           onStepClick={handleStepClick}
           problemStatementData={problemStatementData}
           isGeneratingProblemStatement={isGeneratingProblemStatement}
+          setIsGeneratingProblemStatement={setIsGeneratingProblemStatement}
           hasAttemptedGeneration={hasAttemptedGeneration}
         />
       </div>
