@@ -81,6 +81,52 @@ export const playbookService = {
       console.error('Error searching playbooks by priority:', error)
       throw error
     }
+  },
+
+  // Search playbooks using vector similarity
+  async searchPlaybooksByVector(query, options = {}) {
+    try {
+      const params = { query }
+      if (options.topK) params.topK = options.topK
+      if (options.minScore) params.minScore = options.minScore
+      if (options.filters?.priority) params.priority = options.filters.priority
+      if (options.filters?.tags) params.tags = options.filters.tags.join(',')
+
+      const response = await api.get('/v1/playbooks/search/vector', { params })
+      return response.data
+    } catch (error) {
+      console.error('Error searching playbooks by vector:', error)
+      throw error
+    }
+  },
+
+  // Hybrid search combining text and vector similarity
+  async hybridSearchPlaybooks(query, options = {}) {
+    try {
+      const params = { query }
+      if (options.vectorWeight) params.vectorWeight = options.vectorWeight
+      if (options.textWeight) params.textWeight = options.textWeight
+      if (options.maxResults) params.maxResults = options.maxResults
+      if (options.filters?.priority) params.priority = options.filters.priority
+      if (options.filters?.tags) params.tags = options.filters.tags.join(',')
+
+      const response = await api.get('/v1/playbooks/search/hybrid', { params })
+      return response.data
+    } catch (error) {
+      console.error('Error performing hybrid playbook search:', error)
+      throw error
+    }
+  },
+
+  // Increment usage count for a playbook
+  async incrementUsage(playbookId) {
+    try {
+      const response = await api.post(`/v1/playbooks/${playbookId}/increment-usage`)
+      return response.data
+    } catch (error) {
+      console.error('Error incrementing playbook usage:', error)
+      throw error
+    }
   }
 }
 

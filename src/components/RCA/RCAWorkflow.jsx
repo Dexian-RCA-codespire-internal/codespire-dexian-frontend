@@ -4,6 +4,7 @@ import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
+import PlaybookRecommender from '../PlaybookRecommender'
 import { FiMessageCircle, FiZap, FiSearch, FiArrowRight, FiArrowLeft, FiCheck, FiSave, FiDownload } from 'react-icons/fi'
 
 const RCAWorkflow = ({ 
@@ -13,7 +14,7 @@ const RCAWorkflow = ({
   aiGuidance, 
   response, 
   onResponseChange, 
-  onNext, 
+  onNext,
   onPrevious, 
   aiSuggestions = [], 
   similarCases = [],
@@ -25,8 +26,14 @@ const RCAWorkflow = ({
   onSaveProgress,
   onGenerateReport,
   ticketData = null,
-  onStepClick = null
+  onStepClick = null,
+  onGuidanceResult = null
 }) => {
+  // Debug ticket data
+  console.log('🎫 RCAWorkflow received ticket data:', ticketData)
+  console.log('🎫 RCAWorkflow - Ticket ID:', ticketData?.ticket_id)
+  console.log('🎫 RCAWorkflow - Short description:', ticketData?.short_description)
+  console.log('🎫 RCAWorkflow - Description:', ticketData?.description)
   return (
     <div className="space-y-8">
       {/* Header Section */}
@@ -220,6 +227,15 @@ const RCAWorkflow = ({
             </div>
           </CardContent>
         </Card>
+
+        {/* Playbook Recommender - Moved to bottom of main content */}
+        <div className="mt-8">
+          <PlaybookRecommender 
+          ticketData={ticketData} 
+          aiGuidanceQuestion={aiGuidance} 
+          onGuidanceResult={onGuidanceResult}
+        />
+        </div>
       </div>
 
       {/* Right Sidebar */}
@@ -328,6 +344,7 @@ const RCAWorkflow = ({
              </CardContent>
            </Card>
          )}
+
       </div>
       </div>
     </div>

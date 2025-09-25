@@ -8,6 +8,7 @@ import { Textarea } from '../components/ui/textarea'
 import { Badge } from '../components/ui/badge'
 import { Skeleton } from '../components/ui/skeleton'
 import { RCAWorkflow } from '../components/RCA'
+import PlaybookRecommender from '../components/PlaybookRecommender'
 import { FiUpload, FiImage, FiUser, FiPlus, FiClock, FiMoreHorizontal, FiSearch, FiZap, FiTrendingUp, FiAlertTriangle, FiCheckCircle } from 'react-icons/fi'
 
 const Analysis = () => {
@@ -37,6 +38,17 @@ const Analysis = () => {
   // RCA Workflow State
   const [rcaStep, setRcaStep] = useState(1)
   const [analysisResponse, setAnalysisResponse] = useState('')
+  
+  // Handle AI guidance result from PlaybookRecommender
+  const handleGuidanceResult = (guidanceResult) => {
+    if (guidanceResult) {
+      console.log('🎯 Received AI guidance result:', guidanceResult)
+      // Populate the response form with only the AI guidance action
+      setAnalysisResponse(guidanceResult.action)
+    } else {
+      console.log('❌ No AI guidance result received')
+    }
+  }
   
   // Step data tracking
   const [stepData, setStepData] = useState({
@@ -121,9 +133,13 @@ const Analysis = () => {
         console.log('Fetching ticket data for ID:', id)
         
         const response = await ticketService.getTicketById(id)
-        console.log('Ticket data received:', response)
+        console.log('🎫 Analysis page - Ticket data received:', response)
         
         const ticket = response.data || response
+        console.log('🎫 Analysis page - Processed ticket data:', ticket)
+        console.log('🎫 Analysis page - Ticket ID:', ticket?.ticket_id)
+        console.log('🎫 Analysis page - Short description:', ticket?.short_description)
+        console.log('🎫 Analysis page - Description:', ticket?.description)
         setTicketData(ticket)
         
         // Load existing step data from ticket
@@ -249,7 +265,7 @@ const Analysis = () => {
     {
       step: 5,
       title: 'Root Cause Analysis',
-      aiGuidance: 'Based on your investigation, what is the underlying root cause?',
+      aiGuidance: 'verify physical connection?',
       aiSuggestions: [
         'Inefficient database query causing resource contention',
         'Missing connection pool configuration limits',
@@ -279,7 +295,8 @@ const Analysis = () => {
         [`${rcaStep === 1 ? 'problem' : 
            rcaStep === 2 ? 'timeline' : 
            rcaStep === 3 ? 'impact' : 
-           rcaStep === 4 ? 'findings' : 'root_cause'}_step${rcaStep}`]: analysisResponse,
+           rcaStep === 4 ? 'findings' : 
+           rcaStep === 5 ? 'root_cause' : 'corrective_actions'}_step${rcaStep}`]: analysisResponse,
         status: rcaStep === 5 ? 'Resolved' : 'In Progress'
       }
 
@@ -314,6 +331,9 @@ const Analysis = () => {
           if (!stepData.findings_step4 || stepData.findings_step4.trim().length === 0) {
             incompleteSteps.push('Investigation Findings (Step 4)')
           }
+          if (!stepData.root_cause_step5 || stepData.root_cause_step5.trim().length === 0) {
+            incompleteSteps.push('Root Cause Analysis (Step 5)')
+          }
           
           alert(`Cannot complete RCA. The following steps are not completed:\n\n${incompleteSteps.join('\n')}\n\nPlease complete these steps first.`)
           return
@@ -321,7 +341,8 @@ const Analysis = () => {
         
         // All steps complete - call the resolve API
         const resolveResponse = await ticketService.resolveTicket({
-          rootCause: analysisResponse,
+          rootCause: stepData.root_cause_step5,
+          correctiveActions: analysisResponse,
           ticket: ticketData
         })
         
@@ -466,6 +487,7 @@ const Analysis = () => {
             onGenerateReport={handleGenerateReport}
             ticketData={null}
             onStepClick={handleStepClick}
+            onGuidanceResult={handleGuidanceResult}
           />
         </div>
       </div>
@@ -515,6 +537,7 @@ const Analysis = () => {
           onGenerateReport={handleGenerateReport}
           ticketData={ticketData}
           onStepClick={handleStepClick}
+          onGuidanceResult={handleGuidanceResult}
         />
       </div>
     </div>

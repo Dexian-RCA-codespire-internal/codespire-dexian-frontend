@@ -117,6 +117,16 @@ export const transformTicketToRCACase = (ticket) => {
     company: ticket.company,
     requester: ticket.requester,
     location: ticket.location,
-    raw: ticket.raw
+    raw: ticket.raw,
+    // RCA Step Data (NEW)
+    problem_step1: ticket.problem_step1,
+    timeline_step2: ticket.timeline_step2,
+    impact_step3: ticket.impact_step3,
+    findings_step4: ticket.findings_step4,
+    root_cause_step5: ticket.root_cause_step5,
+    // Alternative step data structures
+    stepData: ticket.stepData,
+    steps: ticket.steps,
+    rcaSteps: ticket.rcaSteps
   }
 }
