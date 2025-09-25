@@ -3,8 +3,9 @@ import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { FiAlertTriangle, FiInfo, FiWifi, FiWifiOff, FiAlertTriangle as FiAlertTriangleIcon, FiRefreshCw, FiChevronDown } from "react-icons/fi";
 import { RiTeamFill } from "react-icons/ri";
-import { AiOutlineLineChart } from "react-icons/ai";
+import { AiOutlineLineChart, AiFillDashboard } from "react-icons/ai";
 import { IoSpeedometerOutline } from "react-icons/io5";
+import { FaServer } from "react-icons/fa";
 import { Button } from '../components/ui/Button'
 import useWebSocketOnly from '../hooks/useWebSocketOnly'
 import { slaService } from '../api/services/slaService'
@@ -75,6 +76,9 @@ const Dashboard = () => {
   // Ping status data
   const [pingStatusData, setPingStatusData] = useState(null)
   
+  // Time update state for dynamic time display
+  const [currentTime, setCurrentTime] = useState(new Date())
+  
   // Fetch chart data from SLA endpoints
   useEffect(() => {
     const fetchChartData = async () => {
@@ -85,24 +89,43 @@ const Dashboard = () => {
         // Get SLA data (same as used for stats)
         const slaResponse = await slaService.getSLAs({ limit: 1000 })
         
-        // Fetch system health data from integration status
+        // Measure actual ping latency to server
         try {
-          // Try to get health status from integrations
-          const integrations = await integrationService.getIntegrations()
-          if (integrations && integrations.length > 0) {
-            // Calculate overall system health based on integration status
-            const activeIntegrations = integrations.filter(integration => integration.status === 'active')
-            const totalIntegrations = integrations.length
-            const healthPercentage = totalIntegrations > 0 ? Math.round((activeIntegrations.length / totalIntegrations) * 100) : 100
-            
+          const startTime = performance.now()
+          
+          // Ping the server by making a simple request
+          const pingResponse = await fetch('http://localhost:8081/api/v1/health', {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          })
+          
+          const endTime = performance.now()
+          const pingMs = Math.round(endTime - startTime)
+          
+          if (pingResponse.ok) {
             setPingStatusData({
-              uptime: healthPercentage,
-              trend: Math.floor(Math.random() * 10) - 5, // Mock trend for now
-              dailyData: null // Will use fallback data
+              uptime: pingMs, // Real measured ping in ms
+              trend: 0,
+              dailyData: null
+            })
+          } else {
+            // If server responds but with error, still measure ping
+            setPingStatusData({
+              uptime: pingMs,
+              trend: 0,
+              dailyData: null
             })
           }
-        } catch (healthError) {
-          console.log('Health status endpoint not available, using mock data')
+        } catch (pingError) {
+          console.log('Ping measurement failed, using fallback')
+          // Fallback to WebSocket status
+          setPingStatusData({
+            uptime: wsConnected ? 50 : 0, // Show 50ms if connected, 0 if not
+            trend: 0,
+            dailyData: null
+          })
         }
         
         if (slaResponse.success && slaResponse.slas) {
@@ -170,17 +193,15 @@ const Dashboard = () => {
               })
             },
             systemHealth: { 
-              value: pingStatusData?.uptime || Math.floor(Math.random() * 20) + 80, // Real ping data or fallback
-              trend: pingStatusData?.trend || Math.floor(Math.random() * 10) - 5, // Real trend or fallback
+              value: pingStatusData?.uptime || 0, // Use ping status uptime percentage
+              trend: pingStatusData?.trend || 0, // Use ping status trend
               dailyData: pingStatusData?.dailyData || Array.from({ length: 7 }, (_, i) => {
-                // System health: generally high with occasional dips
-                let baseValue = 85
-                if (i === 2 || i === 4) baseValue = 90 // Wed, Fri higher health
-                if (i === 0 || i === 6) baseValue = 80  // Mon, Sun slightly lower
+                // System health: consistent based on ping status
+                const healthValue = pingStatusData?.uptime || 0
                 
                 return {
                   day: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i],
-                  value: Math.min(100, Math.max(70, baseValue + Math.floor(Math.random() * 10) - 5))
+                  value: healthValue // Same value for all days
                 }
               })
             },
@@ -212,6 +233,50 @@ const Dashboard = () => {
     fetchChartData()
   }, [])
   
+  // Update time every minute for dynamic time display
+  useEffect(() => {
+    const timeInterval = setInterval(() => {
+      setCurrentTime(new Date())
+    }, 60000) // Update every minute
+    
+    return () => clearInterval(timeInterval)
+  }, [])
+  
+  // Periodic ping measurement to update ping status dynamically
+  useEffect(() => {
+    const pingInterval = setInterval(async () => {
+      try {
+        const startTime = performance.now()
+        
+        // Measure actual ping to server
+        const pingResponse = await fetch('http://localhost:8081/api/v1/health', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        const endTime = performance.now()
+        const pingMs = Math.round(endTime - startTime)
+        
+        setPingStatusData({
+          uptime: pingMs, // Real measured ping in ms
+          trend: 0,
+          dailyData: null
+        })
+      } catch (error) {
+        console.log('Ping measurement failed, using fallback')
+        setPingStatusData({
+          uptime: wsConnected ? 50 : 0, // Show 50ms if connected, 0 if not
+          trend: 0,
+          dailyData: null
+        })
+      }
+    }, 10000) // Ping every 10 seconds for more frequent updates
+    
+    return () => clearInterval(pingInterval)
+  }, [wsConnected])
+  
 
   // Dynamic stats based on SLA data with trends
   const stats = [
@@ -220,8 +285,8 @@ const Dashboard = () => {
       value: slaLoading ? '...' : slaError ? 'Error' : statsWithTrends.totalRcas.value.toString(), 
       trend: statsWithTrends.totalRcas.trend,
       dailyData: statsWithTrends.totalRcas.dailyData,
-      icon: IoSpeedometerOutline, 
-      color: 'text-blue-500',
+      icon: AiFillDashboard, 
+      color: 'text-black',
       showBars: true,
       barType: 'vertical'
     },
@@ -237,10 +302,10 @@ const Dashboard = () => {
     },
     { 
       title: 'SYSTEM HEALTH', 
-      value: slaLoading ? '...' : slaError ? 'Error' : statsWithTrends.systemHealth.value.toString(), 
+      value: slaLoading ? '...' : slaError ? 'Error' : statsWithTrends.systemHealth.value.toString() + 'ms', 
       trend: statsWithTrends.systemHealth.trend,
       dailyData: statsWithTrends.systemHealth.dailyData,
-      icon: RiTeamFill, 
+      icon: FaServer, 
       color: 'text-black',
       showBars: true,
       barType: 'horizontal'
@@ -560,28 +625,38 @@ const Dashboard = () => {
                    
                    <div className="mb-4">
                      <p className={`text-3xl font-bold ${
-                       slaError ? 'text-red-400' : 'text-gray-900'
+                       slaError ? 'text-red-400' : 
+                       stat.title === 'SYSTEM HEALTH' ? (
+                         // Dynamic color based on ping value (extract number from "45ms" format)
+                         (() => {
+                           const pingValue = parseInt(stat.value.toString().replace('ms', ''));
+                           return pingValue <= 30 ? 'text-green-500' :      // Excellent: ≤30ms
+                                  pingValue <= 60 ? 'text-lime-500' :       // Good: 31-60ms
+                                  pingValue <= 100 ? 'text-yellow-500' :    // Fair: 61-100ms
+                                  pingValue <= 150 ? 'text-orange-500' :    // Poor: 101-150ms
+                                  'text-red-500';                           // Bad: >150ms
+                         })()
+                       ) : 'text-gray-900'
                      }`}>
                        {stat.value}
                      </p>
                      
-                     <div className="flex items-center space-x-2 mt-2">
-                       <span className={`text-sm font-medium ${
-                         stat.trend >= 0 ? 'text-green-400' : 'text-red-400'
-                       }`}>
-                         {stat.trend >= 0 ? '+' : ''}{stat.trend}%
-                       </span>
-                       <span className="text-sm text-gray-600">
-                         from last week
-                       </span>
-                     </div>
+                     {stat.title !== 'SYSTEM HEALTH' && (
+                       <div className="flex items-center space-x-2 mt-2">
+                         <span className={`text-sm font-medium ${
+                           stat.trend >= 0 ? 'text-green-400' : 'text-red-400'
+                         }`}>
+                           {stat.trend >= 0 ? '+' : ''}{stat.trend}%
+                         </span>
+                         <span className="text-sm text-gray-600">
+                           from last week
+                         </span>
+                       </div>
+                     )}
                    </div>
                    
                    {stat.showBars && (
                      <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                         <span className="text-xs text-gray-400">Weekly Activity</span>
-                       </div>
                        
                        {/* Line Chart for TOTAL RCAs */}
                        <div className="relative h-16">
@@ -664,25 +739,22 @@ const Dashboard = () => {
                        {stat.value}
                      </p>
                      
-                     <div className="flex items-center space-x-2 mt-2">
-                       <span className={`text-sm font-medium ${
-                         stat.trend >= 0 ? 'text-green-400' : 'text-red-400'
-                       }`}>
-                         {stat.trend >= 0 ? '+' : ''}{stat.trend}%
-                       </span>
-                       <span className="text-sm text-gray-600">
-                         {stat.trend >= 0 ? 'from last week' : 'from last week'}
-                       </span>
-                </div>
+                     {stat.title !== 'SYSTEM HEALTH' && (
+                       <div className="flex items-center space-x-2 mt-2">
+                         <span className={`text-sm font-medium ${
+                           stat.trend >= 0 ? 'text-green-400' : 'text-red-400'
+                         }`}>
+                           {stat.trend >= 0 ? '+' : ''}{stat.trend}%
+                         </span>
+                         <span className="text-sm text-gray-600">
+                           from last week
+                         </span>
+                       </div>
+                     )}
               </div>
                    
                    {stat.showBars && (
                      <div className="space-y-2">
-                       {stat.title !== 'SYSTEM HEALTH' && (
-              <div className="flex items-center justify-between">
-                           <span className="text-xs text-gray-600">Weekly Activity</span>
-                         </div>
-                       )}
                        
                        {stat.barType === 'vertical' ? (
                          // Minimal Line Chart for Active Investigations (same as TOTAL RCAs)
@@ -739,27 +811,37 @@ const Dashboard = () => {
                            // System Health Progress Bar (aligned with Critical Issues)
                            <div className="w-full">
                              <div className="flex items-center justify-between mb-2">
-                               <span className="text-xs text-gray-700">System Status</span>
-                               <span className="text-xs text-gray-700">{stat.value}%</span>
+                               <span className="text-xs text-gray-700">Ping Status</span>
+                               <span className="text-xs text-gray-700">{stat.value}</span>
                              </div>
                              <div className="w-full bg-gray-700 rounded-full h-3">
                                <div 
                                  className={`h-3 rounded-full shadow-lg ${
-                                   stat.value >= 90 ? 'bg-gradient-to-r from-green-500 to-green-400' :
-                                   stat.value >= 70 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :
-                                   'bg-gradient-to-r from-red-500 to-red-400'
+                                   (() => {
+                                     const pingValue = parseInt(stat.value.toString().replace('ms', ''));
+                                     return pingValue <= 30 ? 'bg-gradient-to-r from-green-500 to-green-400' :  // Excellent: ≤30ms
+                                            pingValue <= 60 ? 'bg-gradient-to-r from-lime-500 to-lime-400' :  // Good: 31-60ms
+                                            pingValue <= 100 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :  // Fair: 61-100ms
+                                            pingValue <= 150 ? 'bg-gradient-to-r from-orange-500 to-orange-400' :  // Poor: 101-150ms
+                                            'bg-gradient-to-r from-red-500 to-red-400';  // Bad: >150ms
+                                   })()
                                  }`}
                                  style={{ 
-                                   width: `${stat.value}%`,
-                                   boxShadow: stat.value >= 90 ? '0 0 8px rgba(34, 197, 94, 0.6)' :
-                                   stat.value >= 70 ? '0 0 8px rgba(234, 179, 8, 0.6)' :
-                                   '0 0 8px rgba(239, 68, 68, 0.6)'
+                                   width: `${Math.min(100, Math.max(0, 100 - (parseInt(stat.value.toString().replace('ms', '')) / 2.5)))}%`,
+                                   boxShadow: (() => {
+                                     const pingValue = parseInt(stat.value.toString().replace('ms', ''));
+                                     return pingValue <= 30 ? '0 0 8px rgba(34, 197, 94, 0.6)' :
+                                            pingValue <= 60 ? '0 0 8px rgba(132, 204, 22, 0.6)' :
+                                            pingValue <= 100 ? '0 0 8px rgba(234, 179, 8, 0.6)' :
+                                            pingValue <= 150 ? '0 0 8px rgba(249, 115, 22, 0.6)' :
+                                            '0 0 8px rgba(239, 68, 68, 0.6)';
+                                   })()
                                  }}
                                ></div>
                              </div>
                              <div className="flex justify-between text-xs text-gray-600 mt-1">
-                               <span>0%</span>
-                               <span>100%</span>
+                               <span>0ms</span>
+                               <span>200ms</span>
                              </div>
                            </div>
                          ) : (
@@ -787,7 +869,7 @@ const Dashboard = () => {
                              <div className="flex justify-between text-xs text-gray-600 mt-1">
                                <span>0</span>
                                <span>10</span>
-                             </div>
+                </div>
               </div>
                          )}
                      </div>
@@ -882,32 +964,13 @@ const Dashboard = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.6 }}
       >
-        {/* Tab Navigation */}
+        {/* Resolutions Data Heading */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
-            {[
-              { id: 'recent-activity', label: 'Analysis' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                  activeTab === tab.id
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          
+          <h3 className="text-lg font-semibold text-gray-900">Resolutions Data</h3>
         </div>
         
-        {/* Tab Content */}
-
-        {activeTab === 'recent-activity' && (
-          <div className="space-y-6">
+        {/* Content */}
+        <div className="space-y-6">
             {chartLoading ? (
               <div className="flex items-center justify-center h-64">
                 <div className="text-center">
@@ -1052,11 +1115,11 @@ const Dashboard = () => {
                       </text>
                     ))}
                     
-                    {/* Total tickets line (blue) */}
+                    {/* Total tickets line (green) */}
                     <polyline
                       points={`60,${40 + ((chartData.totalTickets / 10) * 1.2)} 180,${40 + ((chartData.totalTickets / 8) * 1.2)} 300,${40 + ((chartData.totalTickets / 6) * 1.2)} 420,${40 + ((chartData.totalTickets / 4) * 1.2)} 540,${40 + ((chartData.totalTickets / 3) * 1.2)} 660,${40 + ((chartData.totalTickets / 2) * 1.2)}`}
                       fill="none"
-                      stroke="#3b82f6"
+                      stroke="#10b981"
                       strokeWidth="3"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1079,7 +1142,7 @@ const Dashboard = () => {
                         cx={60 + (index * 120)}
                         cy={40 + ((chartData.totalTickets / (10 - index * 2)) * 1.2)}
                         r="4"
-                        fill="#3b82f6"
+                        fill="#10b981"
                       />
                     ))}
                     
@@ -1099,7 +1162,6 @@ const Dashboard = () => {
               </>
             )}
           </div>
-        )}
 
       </motion.div>
 
@@ -1134,7 +1196,7 @@ const Dashboard = () => {
               >
                 Retry
               </Button>
-            </div>
+          </div>
           ) : notifications.slice(0, 3).length === 0 ? (
             <div className="text-center py-8">
               <div className="text-gray-500 text-sm">No recent activity</div>
@@ -1151,20 +1213,42 @@ const Dashboard = () => {
                  <div className="flex-1">
                    <span className="text-sm text-gray-700">
                      {(() => {
+                       // Extract SLA type from notification data
                        const slaTypes = ['breached', 'warning', 'critical', 'expired', 'pending'];
-                       const randomSlaType = slaTypes[Math.floor(Math.random() * slaTypes.length)];
-                       const hours = Math.floor(Math.random() * 12) + 1;
-                       const minutes = Math.floor(Math.random() * 60);
-                       return `SLA ${randomSlaType} - ${hours}h ${minutes}m remaining`;
+                       const notificationText = notification.title || notification.subject || notification.message || '';
+                       
+                       // Try to extract SLA type from notification content
+                       let slaType = 'pending'; // default
+                       for (const type of slaTypes) {
+                         if (notificationText.toLowerCase().includes(type)) {
+                           slaType = type;
+                           break;
+                         }
+                       }
+                       
+                       // Calculate dynamic time based on notification timestamp
+                       const notificationTime = new Date(notification.createdAt || new Date())
+                       const now = new Date()
+                       const diffInHours = Math.floor((now - notificationTime) / (1000 * 60 * 60))
+                       const diffInMinutes = Math.floor(((now - notificationTime) / (1000 * 60)) % 60)
+                       
+                       // Generate realistic time remaining based on SLA type
+                       let hoursRemaining, minutesRemaining
+                       if (slaType === 'breached') {
+                         hoursRemaining = Math.max(0, 24 - diffInHours)
+                         minutesRemaining = Math.max(0, 60 - diffInMinutes)
+                       } else if (slaType === 'critical') {
+                         hoursRemaining = Math.max(0, 4 - diffInHours)
+                         minutesRemaining = Math.max(0, 60 - diffInMinutes)
+                       } else {
+                         hoursRemaining = Math.max(0, 8 - diffInHours)
+                         minutesRemaining = Math.max(0, 60 - diffInMinutes)
+                       }
+                       
+                       return `SLA ${slaType} - ${hoursRemaining}h ${minutesRemaining}m remaining`
                      })()}
                    </span>
           </div>
-                <span className="text-xs text-gray-500">
-                  {notification.createdAt 
-                    ? new Date(notification.createdAt).toLocaleTimeString()
-                    : 'Just now'
-                  }
-                </span>
           </div>
             ))
           )}
