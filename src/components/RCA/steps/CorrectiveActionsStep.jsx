@@ -47,7 +47,7 @@ const CorrectiveActionsStep = ({
 
   return (
     <div className="space-y-6">
-      {/* AI Guidance */}
+      {/* AI Guidance
       <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
         <div className="flex items-center gap-2 mb-2">
           <BsStars className="w-4 h-4 text-blue-600" />
@@ -57,7 +57,7 @@ const CorrectiveActionsStep = ({
           What specific actions will you take to prevent this issue from recurring? 
           Focus on immediate fixes, preventive measures, and long-term improvements.
         </p>
-      </div>
+      </div> */}
 
       {/* Corrective Actions Textarea */}
       <div>
