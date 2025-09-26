@@ -4,6 +4,8 @@ import { motion } from 'framer-motion'
 import Header from './Header'
 import Sidebar from './Sidebar'
 import SubSidebar from './SubSidebar'
+import ChatBot from '../ChatBot/ChatBot'
+import { isFeatureEnabled } from '../../config/navigation'
 
 const MainLayout = () => {
   const [isSubSidebarOpen, setIsSubSidebarOpen] = useState(false)
@@ -50,6 +52,9 @@ const MainLayout = () => {
           </motion.div>
         </main>
       </div>
+      
+      {/* Global ChatBot - Available on all pages (if enabled) */}
+      {isFeatureEnabled('chatBot') && <ChatBot />}
     </div>
   )
 }

@@ -15,6 +15,7 @@ export const navigationConfig = {
   alertCorrelation: false,       // Alert Correlation
   complianceAudit: false,        // Compliance & Audit
   userManagement: false,          // User Management
+  chatBot: true,                // ChatBot Assistant
 }
 
 // Helper function to get enabled navigation items
