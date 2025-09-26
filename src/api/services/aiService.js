@@ -226,5 +226,14 @@ export const aiService = {
       const response = await api.post('/v1/text-enhancement/enhance', data);
       return response.data;
     }
+  },
+
+  // Root Cause Analysis
+  rootCauseAnalysis: {
+    // Analyze root causes for a ticket
+    analyze: async (data) => {
+      const response = await api.post('/v1/rca-root-cause/analyze', data);
+      return response.data;
+    }
   }
 };
