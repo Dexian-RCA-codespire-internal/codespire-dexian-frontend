@@ -10,8 +10,8 @@ import { Button } from '../components/ui/Button'
 import useWebSocketOnly from '../hooks/useWebSocketOnly'
 import { slaService } from '../api/services/slaService'
 import { integrationService } from '../api/services/integrationService'
-import useNotifications from '../hooks/useNotifications'
-
+import useNotifications from '../hooks/useNotifications';
+import { BiServer } from 'react-icons/bi';
 const Dashboard = () => {
   const navigate = useNavigate()
   
@@ -285,7 +285,7 @@ const Dashboard = () => {
       value: slaLoading ? '...' : slaError ? 'Error' : statsWithTrends.totalRcas.value.toString(), 
       trend: statsWithTrends.totalRcas.trend,
       dailyData: statsWithTrends.totalRcas.dailyData,
-      icon: AiFillDashboard, 
+      icon: IoSpeedometerOutline, 
       color: 'text-black',
       showBars: true,
       barType: 'vertical'
@@ -305,7 +305,7 @@ const Dashboard = () => {
       value: slaLoading ? '...' : slaError ? 'Error' : statsWithTrends.systemHealth.value.toString() + 'ms', 
       trend: statsWithTrends.systemHealth.trend,
       dailyData: statsWithTrends.systemHealth.dailyData,
-      icon: FaServer, 
+      icon: BiServer, 
       color: 'text-black',
       showBars: true,
       barType: 'horizontal'
@@ -602,7 +602,7 @@ const Dashboard = () => {
             <motion.div
               key={stat.title}
                className={`rounded-lg shadow-sm border p-6 ${
-                 'bg-gray-10 border-gray-700'
+                 'bg-gray-10 border-gray-700 flex flex-col justify-between'
                }`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
