@@ -14,6 +14,7 @@ import { IoIosColorWand } from "react-icons/io";
 import { FiLoader } from "react-icons/fi";
 import { BsStars } from "react-icons/bs";
 import { RiRobot2Line } from "react-icons/ri";
+import { Skeleton } from "../../ui/skeleton";
 import EnhancementModal from "../../ui/EnhancementModal";
 import { useTextEnhancement } from "../../../hooks/useTextEnhancement";
 const ProblemDefinitionStep = ({
@@ -289,13 +290,26 @@ const ProblemDefinitionStep = ({
       </div>
 
       {/* Right Column - Suggested Problem Definitions */}
-      {problemDefinitions.length > 0 && (
-        <div className="lg:col-span-1">
-          <Card className="sticky top-4">
-            <CardHeader>
-              <CardTitle className="flex items-end justify-center gap-2 font-normal"><RiRobot2Line className=" w-6 h-6 text-green-500" />Enhance Problem Statement</CardTitle>
-            </CardHeader>
-            <CardContent>
+      <div className="lg:col-span-1">
+        <Card className="sticky top-4">
+          <CardHeader>
+            <CardTitle className="flex items-end justify-center gap-2 font-normal">
+              <RiRobot2Line className="w-6 h-6 text-green-500" />
+              Enhance Problem Statement
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isGeneratingProblemStatement ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((index) => (
+                  <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <Skeleton className="h-4 w-full mb-2" />
+                    <Skeleton className="h-4 w-3/4 mb-2" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : problemDefinitions.length > 0 ? (
               <div className="space-y-2">
                 {problemDefinitions.map((definition, index) => (
                   <div
@@ -310,10 +324,15 @@ const ProblemDefinitionStep = ({
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+            ) : (
+              <div className="text-center text-gray-500 py-4">
+                <RiRobot2Line className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                <p className="text-sm">AI suggestions will appear here</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Enhancement Modal */}
       <EnhancementModal

@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { IoIosColorWand } from "react-icons/io"
 import { FiLoader } from "react-icons/fi"
 import { BsStars } from "react-icons/bs"
+import { Skeleton } from '../../ui/skeleton'
 import { aiService } from '../../../api/services/aiService'
 import EnhancementModal from '../../ui/EnhancementModal'
 import { useTextEnhancement } from '../../../hooks/useTextEnhancement'
@@ -192,6 +193,30 @@ const ImpactAssessmentStep = ({
         </p>
       </div>
 
+      {/* Skeleton Loader for Generating State */}
+      {isGeneratingImpactAssessment ? (
+        <div className="space-y-6">
+          {/* Dropdown Fields Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Skeleton className="h-4 w-24 mb-2" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <div>
+              <Skeleton className="h-4 w-32 mb-2" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          </div>
+          
+          {/* Textarea Skeleton */}
+          <div>
+            <Skeleton className="h-4 w-48 mb-2" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        </div>
+      ) : (
+        <>
+
       {/* Dropdown Fields Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -275,6 +300,9 @@ const ImpactAssessmentStep = ({
           </Button>
         </div>
       </div>
+
+        </>
+      )}
 
       {/* Enhancement Modal */}
       <EnhancementModal
