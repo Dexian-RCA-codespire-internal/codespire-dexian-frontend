@@ -212,7 +212,7 @@ const RCAWorkflow = ({
 
       
       {/* Main Content */}
-      <div className={`grid grid-cols-1 ${(currentStep === 4) ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
+      <div className={`grid grid-cols-1 lg:grid-cols-1`}>
         {/* Ticket Information Header */}
 {ticketData ? (
         <div className="p-4 bg-white rounded-lg shadow-sm border rounded-b-none">
@@ -370,114 +370,6 @@ const RCAWorkflow = ({
         </Card>
       </div>
 
-      {/* Right Sidebar - Show for Problem Definition (step 1) and Root Cause (step 4) */}
-      {(currentStep === 4) && (
-      <div className="lg:col-span-1space-y-6">
-         
-        {/* Note: Problem Definitions are now handled within the ProblemDefinitionStep component */}
-
-
-        {/* {currentStep === 4 && ((similarCases && similarCases.results && similarCases.results.length > 0) || similarCasesLoading) ? (
-          <Card className="bg-white shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
-                <FiSearch className="w-5 h-5 mr-2 text-blue-500" />
-                Similar Cases
-                {similarCases && similarCases.total_results && (
-                  <Badge variant="secondary" className="ml-2">
-                    {similarCases.total_results} found
-                  </Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {similarCasesLoading ? (
-             
-                Array.from({ length: 3 }).map((_, index) => (
-                  <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex-1">
-                        <Skeleton className="h-4 w-24 mb-2" />
-                        <Skeleton className="h-4 w-full mb-1" />
-                        <Skeleton className="h-3 w-3/4" />
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <Skeleton className="h-6 w-16" />
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Skeleton className="h-3 w-20" />
-                    </div>
-                  </div>
-                ))
-              ) : (
-                similarCases.results.map((caseItem, index) => (
-                  <div key={caseItem.ticket_id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{caseItem.ticket_id}</p>
-                        <p className="text-sm text-gray-600 mt-1">{caseItem.short_description}</p>
-                        {caseItem.description && (
-                          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{caseItem.description}</p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <Badge className={`${
-                          caseItem.confidence_percentage >= 90 ? 'bg-green-100 text-green-800' :
-                          caseItem.confidence_percentage >= 80 ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-orange-100 text-orange-800'
-                        }`}>
-                          {caseItem.confidence_percentage}% match
-                        </Badge>
-                        
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-                   
-                      <span><strong>Source:</strong> {caseItem.source}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        ) : null}
-
- 
-        {currentStep === 4 && (aiSuggestions.length > 0 || aiSuggestionsLoading) && (
-           <Card className="bg-white shadow-sm">
-             <CardHeader>
-               <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
-                 <FiZap className="w-5 h-5 mr-2 text-yellow-500" />
-                 AI Suggestions
-               </CardTitle>
-             </CardHeader>
-             <CardContent className="space-y-3">
-               {aiSuggestionsLoading ? (
-                 // Skeleton loader for AI suggestions
-                 Array.from({ length: 3 }).map((_, index) => (
-                   <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                     <Skeleton className="h-4 w-full mb-2" />
-                     <Skeleton className="h-4 w-3/4 mb-1" />
-                     <Skeleton className="h-4 w-1/2" />
-                   </div>
-                 ))
-               ) : (
-                 aiSuggestions.map((suggestion, index) => (
-                   <div 
-                     key={index} 
-                     className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
-                     onClick={() => onResponseChange(suggestion)}
-                   >
-                     <p className="text-sm text-gray-700">{suggestion}</p>
-                   </div>
-                 ))
-               )}
-             </CardContent>
-           </Card>
-         )} */}
-      </div>
-      )}
       </div>
     </div>
   )

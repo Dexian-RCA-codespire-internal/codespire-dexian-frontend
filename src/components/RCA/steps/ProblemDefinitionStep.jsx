@@ -278,7 +278,7 @@ const ProblemDefinitionStep = ({
                 disabled={!response.trim() || isGeneratingProblemStatement}
                 className={`ml-auto ${
                   (response.trim() && !isGeneratingProblemStatement)
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >

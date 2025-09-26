@@ -266,7 +266,7 @@ Confidence: ${solution.confidence}%`
                                   <div className="flex-1">
                                     <div className="flex items-center justify-between mb-1">
                                       <h6 className="font-medium text-sm text-gray-900">{step.title}</h6>
-                                      <span className="text-xs text-gray-500">{step.duration}</span>
+                                      {/* <span className="text-xs text-gray-500">{step.duration}</span> */}
                                     </div>
                                     <p className="text-sm text-gray-600 mb-2">{step.description}</p>
                                     <div className="flex items-center gap-4 text-xs text-gray-500">
