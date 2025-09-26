@@ -79,6 +79,22 @@ const Dashboard = () => {
   // Time update state for dynamic time display
   const [currentTime, setCurrentTime] = useState(new Date())
   
+  // Update statsWithTrends when pingStatusData changes
+  useEffect(() => {
+    if (pingStatusData) {
+      console.log('Updating statsWithTrends with ping data:', pingStatusData.uptime)
+      setStatsWithTrends(prevStats => ({
+        ...prevStats,
+        systemHealth: {
+          ...prevStats.systemHealth,
+          value: pingStatusData.uptime,
+          trend: pingStatusData.trend || 0,
+          dailyData: pingStatusData.dailyData || prevStats.systemHealth.dailyData
+        }
+      }))
+    }
+  }, [pingStatusData])
+  
   // Fetch chart data from SLA endpoints
   useEffect(() => {
     const fetchChartData = async () => {
@@ -103,7 +119,6 @@ const Dashboard = () => {
           
           const endTime = performance.now()
           const pingMs = Math.round(endTime - startTime)
-          
           if (pingResponse.ok) {
             setPingStatusData({
               uptime: pingMs, // Real measured ping in ms
