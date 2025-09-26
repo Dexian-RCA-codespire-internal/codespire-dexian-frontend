@@ -13,8 +13,9 @@ import {
 import { IoIosColorWand } from "react-icons/io";
 import { FiLoader } from "react-icons/fi";
 import { BsStars } from "react-icons/bs";
-import { aiService } from "../../../api/services/aiService";
 import { RiRobot2Line } from "react-icons/ri";
+import EnhancementModal from "../../ui/EnhancementModal";
+import { useTextEnhancement } from "../../../hooks/useTextEnhancement";
 const ProblemDefinitionStep = ({
   stepData,
   setStepData,
@@ -30,6 +31,11 @@ const ProblemDefinitionStep = ({
   onPrevious,
 }) => {
   const [problemSummary, setProblemSummary] = useState("");
+  const [isEnhancementModalOpen, setIsEnhancementModalOpen] = useState(false);
+  const [enhancementOptions, setEnhancementOptions] = useState([]);
+  
+  // Use the custom hook for text enhancement
+  const { enhanceText, isLoading: isEnhancing, error: enhancementError } = useTextEnhancement();
 
   // Use data from props
   const problemDefinitions = problemStatementData?.problemDefinitions || [];
@@ -66,41 +72,39 @@ const ProblemDefinitionStep = ({
     onResponseChange(definition);
   };
 
-  // Handle enhancing problem statement
+  // Handle opening enhancement modal
   const handleEnhanceProblemStatement = async () => {
     if (!problemSummary.trim()) {
       alert("Please enter some text in the problem statement to enhance.");
       return;
     }
 
-    try {
-      setIsGeneratingProblemStatement(true);
-
-      const requestData = {
-        text: problemSummary,
-        reference:
-          `${ticketData?.short_description || ""} ${ticketData?.description || ""}`.trim(),
-      };
-
-      const response = await aiService.textEnhancement.enhance(requestData);
-
-      if (response.success && response.data && response.data.enhancedText) {
-        const enhancedText = response.data.enhancedText;
-
-        // Update the problem statement with enhanced text
-        setProblemSummary(enhancedText);
-        onResponseChange(enhancedText);
-
-        console.log("Text enhanced successfully:", response.data);
-      } else {
-        alert("Failed to enhance text. Please try again.");
-      }
-    } catch (error) {
-      console.error("Error enhancing text:", error);
-      alert("Failed to enhance text. Please try again.");
-    } finally {
-      setIsGeneratingProblemStatement(false);
+    setIsEnhancementModalOpen(true);
+    
+    // Call the enhancement API
+    const reference = `${ticketData?.short_description || ""} ${ticketData?.description || ""}`.trim();
+    const result = await enhanceText(problemSummary, reference);
+    
+    if (result && result.enhancedOptions) {
+      setEnhancementOptions(result.enhancedOptions);
+    } else if (enhancementError) {
+      alert(`Failed to enhance text: ${enhancementError}`);
+      setIsEnhancementModalOpen(false);
     }
+  };
+
+  // Handle selecting an enhancement option
+  const handleSelectEnhancement = (enhancedText) => {
+    setProblemSummary(enhancedText);
+    onResponseChange(enhancedText);
+    setIsEnhancementModalOpen(false);
+    setEnhancementOptions([]);
+  };
+
+  // Handle closing the modal
+  const handleCloseModal = () => {
+    setIsEnhancementModalOpen(false);
+    setEnhancementOptions([]);
   };
 
   return (
@@ -244,12 +248,16 @@ const ProblemDefinitionStep = ({
                 />
                 <Button
                   onClick={handleEnhanceProblemStatement}
-                  disabled={isGeneratingProblemStatement}
+                  disabled={isGeneratingProblemStatement || isEnhancing}
                   className="absolute bottom-2 right-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded-md shadow-sm flex items-center gap-1"
                   size="sm"
                 >
-                  <IoIosColorWand className="w-4 h-4 color-green-600" />
-                  <span className="text-sm">Enhance</span>
+                  {isEnhancing ? (
+                    <FiLoader className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <IoIosColorWand className="w-4 h-4 text-green-600" />
+                  )}
+                  <span className="text-sm">{isEnhancing ? 'Enhancing...' : 'Enhance'}</span>
                 </Button>
               </div>
             </div>
@@ -306,6 +314,17 @@ const ProblemDefinitionStep = ({
           </Card>
         </div>
       )}
+
+      {/* Enhancement Modal */}
+      <EnhancementModal
+        isOpen={isEnhancementModalOpen}
+        onClose={handleCloseModal}
+        originalText={problemSummary}
+        onSelectOption={handleSelectEnhancement}
+        enhancedOptions={enhancementOptions}
+        isLoading={isEnhancing}
+        title="Enhance Problem Statement"
+      />
     </div>
   );
 };
