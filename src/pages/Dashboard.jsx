@@ -264,7 +264,7 @@ const Dashboard = () => {
         const startTime = performance.now()
         
         // Measure actual ping to server
-        const pingResponse = await fetch('http://localhost:8081/api/v1/health', {
+        const pingResponse = await fetch('http://localhost:8081/health', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
