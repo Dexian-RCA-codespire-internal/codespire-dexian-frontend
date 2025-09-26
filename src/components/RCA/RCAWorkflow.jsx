@@ -249,7 +249,7 @@ const RCAWorkflow = ({
         </div>
       )}
       {/* Main Content Area */}
-      <div className={(currentStep === 1 || currentStep === 4) ? 'lg:col-span-2' : 'lg:col-span-1'}>
+      <div >
         <Card className="bg-white shadow-sm border-t-0 rounded-t-none">
           <CardContent className="p-8">
             {/* Step Header */}
@@ -325,6 +325,7 @@ const RCAWorkflow = ({
               {currentStep === 4 && (
                 <CorrectiveActionsStep
                   ticketData={ticketData}
+                  stepData={stepData}
                   response={response}
                   onResponseChange={onResponseChange}
                   isEnhancingCorrectiveActions={isEnhancingCorrectiveActions}
@@ -371,12 +372,12 @@ const RCAWorkflow = ({
 
       {/* Right Sidebar - Show for Problem Definition (step 1) and Root Cause (step 4) */}
       {(currentStep === 4) && (
-      <div className="lg:col-span-1 space-y-6">
+      <div className="lg:col-span-1space-y-6">
          
         {/* Note: Problem Definitions are now handled within the ProblemDefinitionStep component */}
 
-        {/* Similar Cases - Only show for Root Cause step (step 4) */}
-        {currentStep === 4 && ((similarCases && similarCases.results && similarCases.results.length > 0) || similarCasesLoading) ? (
+
+        {/* {currentStep === 4 && ((similarCases && similarCases.results && similarCases.results.length > 0) || similarCasesLoading) ? (
           <Card className="bg-white shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
@@ -391,7 +392,7 @@ const RCAWorkflow = ({
             </CardHeader>
             <CardContent className="space-y-3">
               {similarCasesLoading ? (
-                // Skeleton loader for similar cases
+             
                 Array.from({ length: 3 }).map((_, index) => (
                   <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="flex items-center justify-between mb-2">
@@ -428,13 +429,11 @@ const RCAWorkflow = ({
                         }`}>
                           {caseItem.confidence_percentage}% match
                         </Badge>
-                        {/* <span className="text-xs text-gray-500">Rank #{caseItem.rank}</span> */}
+                        
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-                      {/* <span><strong>Status:</strong> {caseItem.status}</span>
-                      <span><strong>Priority:</strong> {caseItem.priority}</span>
-                      <span><strong>Category:</strong> {caseItem.category}</span> */}
+                   
                       <span><strong>Source:</strong> {caseItem.source}</span>
                     </div>
                   </div>
@@ -444,7 +443,7 @@ const RCAWorkflow = ({
           </Card>
         ) : null}
 
-        {/* AI Suggestions - Only show for Root Cause step (step 4) */}
+ 
         {currentStep === 4 && (aiSuggestions.length > 0 || aiSuggestionsLoading) && (
            <Card className="bg-white shadow-sm">
              <CardHeader>
@@ -476,7 +475,7 @@ const RCAWorkflow = ({
                )}
              </CardContent>
            </Card>
-         )}
+         )} */}
       </div>
       )}
       </div>

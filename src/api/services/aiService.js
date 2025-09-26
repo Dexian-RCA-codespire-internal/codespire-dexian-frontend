@@ -235,5 +235,14 @@ export const aiService = {
       const response = await api.post('/v1/rca-root-cause/analyze', data);
       return response.data;
     }
+  },
+
+  // Solution Generation
+  solutionGeneration: {
+    // Generate solutions for a ticket
+    generate: async (data) => {
+      const response = await api.post('/v1/solution-generation/generate', data);
+      return response.data;
+    }
   }
 };
