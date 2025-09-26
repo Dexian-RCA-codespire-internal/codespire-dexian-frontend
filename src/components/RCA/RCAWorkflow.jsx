@@ -53,80 +53,7 @@ const RCAWorkflow = ({
   // Note: Problem statement generation is now handled within the ProblemDefinitionStep component
 
 
-  // Generate impact assessment when on Impact step (step 2)
-  useEffect(() => {
-    const generateImpactAssessment = async () => {
-      if (currentStep === 2 && stepData && !isGeneratingImpactAssessment && !hasAttemptedImpactGeneration) {
-        try {
-          setIsGeneratingImpactAssessment(true)
-          setHasAttemptedImpactGeneration(true)
-          
-          // Check if we have the required data from previous steps
-          if (stepData.rca_workflow_steps[0]) {
-          const requestData = {
-              problemStatement: stepData.rca_workflow_steps[0],
-              timelineContext: stepData.rca_workflow_steps[0] // Use problem statement as context since timeline is removed
-            }
-            
-            const response = await aiService.impactAssessment.analyze(requestData)
-            
-            if (response.success && response.data) {
-              const { impactAssessment, impactLevel: aiImpactLevel, department } = response.data
-              
-              // Map AI impact level to our dropdown values
-              const impactLevelMap = {
-                'Sev 1 - Critical Impact': 'sev1',
-                'Sev 2 - Major Impact': 'sev2', 
-                'Sev 3 - Normal Impact': 'sev3',
-                'Sev 4 - Minor Impact': 'sev4'
-              }
-              
-              // Map AI department to our dropdown values
-              const departmentMap = {
-                'Customer Support': 'customer_support',
-                'Sales': 'sales',
-                'IT Operations': 'it_operations',
-                'Finance': 'finance',
-                'Human Resources': 'hr',
-                'Other': 'other'
-              }
-              
-              // Set the impact level
-              const mappedImpactLevel = impactLevelMap[aiImpactLevel] || ''
-              if (mappedImpactLevel) {
-               setStepData((prevData) => ({
-                 ...prevData,
-                  impact_level_step2: mappedImpactLevel
-                }))
-              }
-              
-              // Set the department affected
-              const mappedDepartment = departmentMap[department] || ''
-              if (mappedDepartment) {
-                setStepData((prevData) => ({
-                  ...prevData,
-                  department_affected_step2: mappedDepartment
-                }))
-              }
-              
-              // Set the impact assessment description
-              if (impactAssessment) {
-                onResponseChange(impactAssessment)
-                // Don't update stepData here - let handleRcaNext handle it
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error generating impact assessment:', error)
-          alert('Failed to generate AI impact assessment. Please fill in the fields manually.')
-        } finally {
-          setIsGeneratingImpactAssessment(false)
-        }
-      }
-    }
-    
-    generateImpactAssessment()
-  }, [currentStep, stepData, isGeneratingImpactAssessment, hasAttemptedImpactGeneration, onResponseChange])
+  // Note: Impact assessment generation is now handled within the ImpactAssessmentStep component
 
   // Handle clicking on problem definition
   // Note: Problem definition click handling is now done within the ProblemDefinitionStep component
@@ -317,11 +244,14 @@ const RCAWorkflow = ({
         {/* Ticket Information Header */}
 {ticketData ? (
         <div className="p-4 bg-white rounded-lg shadow-sm border rounded-b-none">
-          <h1 className="text-xl text-gray-900">
-            <span className='font-bold'>Problem:</span> {ticketData.short_description || 'No Title'}
+          <h1 className="text-xl font-bold text-gray-900">
+            Source Data
           </h1>
-          <div className="text-sm text-gray-600">
-            <span className='font-bold'>Description:</span> {ticketData.description}
+          <h1 className="text-xl text-gray-900">
+            <span className='font-semibold'>Problem:</span> {ticketData.short_description || 'No Title'}
+          </h1>
+          <div className="text-sm text-gray-600 mx-2">
+            {ticketData.description}
             </div>
           <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-600">
             <span><strong>Ticket ID:</strong> {ticketData.ticket_id}</span>
@@ -403,6 +333,7 @@ const RCAWorkflow = ({
                   setIsGeneratingImpactAssessment={setIsGeneratingImpactAssessment}
                   hasAttemptedImpactGeneration={hasAttemptedImpactGeneration}
                   setHasAttemptedImpactGeneration={setHasAttemptedImpactGeneration}
+                  currentStep={currentStep}
                 />
               )}
               

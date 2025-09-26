@@ -196,9 +196,7 @@ const Analysis = () => {
             console.log('Triggering problem statement generation...')
             generateProblemStatement(ticket)
           } else {
-            console.log('Problem statement generation already attempted, but forcing it anyway...')
-            // Force it to run anyway for testing
-            generateProblemStatement(ticket)
+            console.log('Problem statement generation already attempted, skipping...')
           }
         }
         
@@ -237,8 +235,13 @@ const Analysis = () => {
       return
     }
     
-    // For testing, let's always run it
-    console.log('Forcing problem statement generation for testing...')
+    // Check if problem statement data already exists
+    if (problemStatementData.generatedProblemStatement && problemStatementData.generatedProblemStatement.trim().length > 0) {
+      console.log('Problem statement already exists, skipping generation')
+      return
+    }
+    
+    console.log('Generating problem statement...')
 
     try {
       setIsGeneratingProblemStatement(true)
@@ -647,6 +650,7 @@ const Analysis = () => {
     console.log('Clicked step:', stepNumber);
     console.log('Current stepData:', stepData);
     console.log('rca_workflow_steps:', stepData.rca_workflow_steps);
+    console.log('Current analysisResponse before update:', analysisResponse);
     
     // Allow navigation to any step
     setRcaStep(stepNumber)
@@ -654,7 +658,13 @@ const Analysis = () => {
     // Load existing step data if available
     const stepResponse = stepData.rca_workflow_steps[stepNumber - 1] || ''
     console.log('Loading response for step', stepNumber, ':', stepResponse);
+    console.log('Setting analysisResponse to:', stepResponse);
     debugSetAnalysisResponse(stepResponse)
+    
+    // Debug: Check if the response was set correctly
+    setTimeout(() => {
+      console.log('analysisResponse after update:', analysisResponse);
+    }, 100);
   }
 
   // Show loading state with skeleton loaders instead of full page spinner

@@ -18,7 +18,8 @@ const ImpactAssessmentStep = ({
   isGeneratingImpactAssessment,
   setIsGeneratingImpactAssessment,
   hasAttemptedImpactGeneration,
-  setHasAttemptedImpactGeneration
+  setHasAttemptedImpactGeneration,
+  currentStep = 2 // Default to step 2 since this component is only rendered for step 2
 }) => {
   const [impactLevel, setImpactLevel] = useState('')
   const [departmentAffected, setDepartmentAffected] = useState('')
@@ -28,10 +29,47 @@ const ImpactAssessmentStep = ({
   // Use the custom hook for text enhancement
   const { enhanceText, isLoading: isEnhancing, error: enhancementError } = useTextEnhancement()
 
-  // Generate impact assessment when component mounts
+  // Load existing dropdown values when stepData changes
+  useEffect(() => {
+    if (stepData) {
+      if (stepData.impact_level_step2) {
+        setImpactLevel(stepData.impact_level_step2)
+      }
+      if (stepData.department_affected_step2) {
+        setDepartmentAffected(stepData.department_affected_step2)
+      }
+    }
+  }, [stepData])
+
+  // Debug: Log when response changes
+  useEffect(() => {
+    console.log('ImpactAssessmentStep: response changed:', response);
+    console.log('ImpactAssessmentStep: response length:', response?.length || 0);
+    console.log('ImpactAssessmentStep: stepData.rca_workflow_steps[1]:', stepData?.rca_workflow_steps?.[1]);
+  }, [response, stepData])
+
+  // Load existing impact assessment data from stepData if response is empty
+  useEffect(() => {
+    if (currentStep === 2 && stepData?.rca_workflow_steps?.[1] && stepData.rca_workflow_steps[1].trim().length > 0 && (!response || response.trim().length === 0)) {
+      console.log('Loading existing impact assessment data from stepData');
+      onResponseChange(stepData.rca_workflow_steps[1]);
+    }
+  }, [currentStep, stepData, response, onResponseChange])
+
+  // Generate impact assessment when component mounts (only for step 2)
   useEffect(() => {
     const generateImpactAssessment = async () => {
-      if (stepData && !isGeneratingImpactAssessment && !hasAttemptedImpactGeneration) {
+      // Check if impact assessment data already exists
+      const hasExistingData = response && response.trim().length > 0
+      const hasExistingDataInStepData = stepData?.rca_workflow_steps?.[1] && stepData.rca_workflow_steps[1].trim().length > 0
+      
+      console.log('ImpactAssessmentStep: hasExistingData:', hasExistingData);
+      console.log('ImpactAssessmentStep: hasExistingDataInStepData:', hasExistingDataInStepData);
+      console.log('ImpactAssessmentStep: currentStep:', currentStep);
+      console.log('ImpactAssessmentStep: isGeneratingImpactAssessment:', isGeneratingImpactAssessment);
+      console.log('ImpactAssessmentStep: hasAttemptedImpactGeneration:', hasAttemptedImpactGeneration);
+      
+      if (currentStep === 2 && stepData && !isGeneratingImpactAssessment && !hasAttemptedImpactGeneration && !hasExistingData && !hasExistingDataInStepData) {
         try {
           setIsGeneratingImpactAssessment(true)
           setHasAttemptedImpactGeneration(true)
@@ -102,7 +140,7 @@ const ImpactAssessmentStep = ({
     }
     
     generateImpactAssessment()
-  }, [stepData, isGeneratingImpactAssessment, hasAttemptedImpactGeneration, onResponseChange, setStepData])
+  }, [currentStep, stepData, isGeneratingImpactAssessment, hasAttemptedImpactGeneration, onResponseChange, setStepData, response])
 
   // Handle opening enhancement modal
   const handleEnhanceImpactAssessment = async () => {
