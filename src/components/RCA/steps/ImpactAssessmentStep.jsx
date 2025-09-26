@@ -6,6 +6,8 @@ import { IoIosColorWand } from "react-icons/io"
 import { FiLoader } from "react-icons/fi"
 import { BsStars } from "react-icons/bs"
 import { aiService } from '../../../api/services/aiService'
+import EnhancementModal from '../../ui/EnhancementModal'
+import { useTextEnhancement } from '../../../hooks/useTextEnhancement'
 
 const ImpactAssessmentStep = ({
   stepData,
@@ -20,6 +22,11 @@ const ImpactAssessmentStep = ({
 }) => {
   const [impactLevel, setImpactLevel] = useState('')
   const [departmentAffected, setDepartmentAffected] = useState('')
+  const [isEnhancementModalOpen, setIsEnhancementModalOpen] = useState(false)
+  const [enhancementOptions, setEnhancementOptions] = useState([])
+  
+  // Use the custom hook for text enhancement
+  const { enhanceText, isLoading: isEnhancing, error: enhancementError } = useTextEnhancement()
 
   // Generate impact assessment when component mounts
   useEffect(() => {
@@ -97,40 +104,39 @@ const ImpactAssessmentStep = ({
     generateImpactAssessment()
   }, [stepData, isGeneratingImpactAssessment, hasAttemptedImpactGeneration, onResponseChange, setStepData])
 
-  // Generic text enhancement function
-  const handleEnhanceText = async (currentText, setLoadingState, setLoadingFunction) => {
-    if (!currentText.trim()) {
-      alert('Please enter some text to enhance.')
-      return
+  // Handle opening enhancement modal
+  const handleEnhanceImpactAssessment = async () => {
+    if (!response.trim()) {
+      alert("Please enter some text in the impact assessment to enhance.");
+      return;
     }
 
-    try {
-      setLoadingFunction(true)
-      
-      const requestData = {
-        text: currentText,
-        reference: `${ticketData?.short_description || ''} ${ticketData?.description || ''}`.trim()
-      }
-      
-      const response = await aiService.textEnhancement.enhance(requestData)
-      
-      if (response.success && response.data && response.data.enhancedText) {
-        const enhancedText = response.data.enhancedText
-        
-        // Update the response with enhanced text
-        onResponseChange(enhancedText)
-        
-        console.log('Text enhanced successfully:', response.data)
-      } else {
-        alert('Failed to enhance text. Please try again.')
-      }
-    } catch (error) {
-      console.error('Error enhancing text:', error)
-      alert('Failed to enhance text. Please try again.')
-    } finally {
-      setLoadingFunction(false)
+    setIsEnhancementModalOpen(true);
+    
+    // Call the enhancement API
+    const reference = `${ticketData?.short_description || ""} ${ticketData?.description || ""}`.trim();
+    const result = await enhanceText(response, reference);
+    
+    if (result && result.enhancedOptions) {
+      setEnhancementOptions(result.enhancedOptions);
+    } else if (enhancementError) {
+      alert(`Failed to enhance text: ${enhancementError}`);
+      setIsEnhancementModalOpen(false);
     }
-  }
+  };
+
+  // Handle selecting an enhancement option
+  const handleSelectEnhancement = (enhancedText) => {
+    onResponseChange(enhancedText);
+    setIsEnhancementModalOpen(false);
+    setEnhancementOptions([]);
+  };
+
+  // Handle closing the modal
+  const handleCloseModal = () => {
+    setIsEnhancementModalOpen(false);
+    setEnhancementOptions([]);
+  };
 
   return (
     <div className="space-y-6">
@@ -217,16 +223,31 @@ const ImpactAssessmentStep = ({
             disabled={isGeneratingImpactAssessment}
           />
           <Button
-            onClick={() => handleEnhanceText(response, false, () => {})}
-            disabled={isGeneratingImpactAssessment}
-            className="absolute bottom-0 right-0 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded-md shadow-sm flex items-center gap-1"
+            onClick={handleEnhanceImpactAssessment}
+            disabled={isGeneratingImpactAssessment || isEnhancing}
+            className="absolute bottom-2 right-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded-md shadow-sm flex items-center gap-1"
             size="sm"
           >
-            <IoIosColorWand className="w-4 h-4" />
-            <span className="text-sm">Enhance</span>
+            {isEnhancing ? (
+              <FiLoader className="w-4 h-4 animate-spin" />
+            ) : (
+              <IoIosColorWand className="w-4 h-4 text-green-600" />
+            )}
+            <span className="text-sm">{isEnhancing ? 'Enhancing...' : 'Enhance'}</span>
           </Button>
         </div>
       </div>
+
+      {/* Enhancement Modal */}
+      <EnhancementModal
+        isOpen={isEnhancementModalOpen}
+        onClose={handleCloseModal}
+        originalText={response}
+        onSelectOption={handleSelectEnhancement}
+        enhancedOptions={enhancementOptions}
+        isLoading={isEnhancing}
+        title="Enhance Impact Assessment"
+      />
     </div>
   )
 }
