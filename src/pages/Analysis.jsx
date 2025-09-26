@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ticketService } from '../api'
+import { ticketService, aiService } from '../api'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -38,6 +38,18 @@ const Analysis = () => {
   const [rcaStep, setRcaStep] = useState(1)
   const [analysisResponse, setAnalysisResponse] = useState('')
   
+  // Problem Statement State
+  const [problemStatementData, setProblemStatementData] = useState({
+    problemDefinitions: [],
+    aiQuestion: '',
+    issueType: '',
+    severity: '',
+    businessImpactCategory: '',
+    generatedProblemStatement: ''
+  })
+  const [isGeneratingProblemStatement, setIsGeneratingProblemStatement] = useState(false)
+  const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false)
+  
   // Debug wrapper for setAnalysisResponse
   const debugSetAnalysisResponse = (value) => {
     console.log('setAnalysisResponse called with:', value);
@@ -48,7 +60,11 @@ const Analysis = () => {
   const [stepData, setStepData] = useState({
     rca_workflow_steps: ['', '', '', ''], // Array for 4 steps
     impact_level_step2: '',
-    department_affected_step2: ''
+    department_affected_step2: '',
+    // Step 1 dropdown values
+    issueType: '',
+    severity: '',
+    businessImpactCategory: ''
   })
 
   // Fetch similar cases
@@ -140,7 +156,10 @@ const Analysis = () => {
             existingStepData = {
               rca_workflow_steps: ticket.rca_workflow_steps.length > 0 ? ticket.rca_workflow_steps : ['', '', '', ''],
               impact_level_step2: ticket.impact_level_step2 || '',
-              department_affected_step2: ticket.department_affected_step2 || ''
+              department_affected_step2: ticket.department_affected_step2 || '',
+              issueType: ticket.issueType || '',
+              severity: ticket.severity || '',
+              businessImpactCategory: ticket.businessImpactCategory || ''
             }
           } else {
             // Old structure: convert individual step fields to array
@@ -154,7 +173,10 @@ const Analysis = () => {
                 ticket.corrective_actions_step5 || ''
               ].slice(0, 4), // Take only first 4 steps since we removed timeline
               impact_level_step2: ticket.impact_level_step2 || '',
-              department_affected_step2: ticket.department_affected_step2 || ''
+              department_affected_step2: ticket.department_affected_step2 || '',
+              issueType: ticket.issueType || '',
+              severity: ticket.severity || '',
+              businessImpactCategory: ticket.businessImpactCategory || ''
             }
           }
           console.log('Final existingStepData:', existingStepData);
@@ -168,6 +190,14 @@ const Analysis = () => {
           const stepResponse = existingStepData.rca_workflow_steps[firstIncompleteStep - 1] || ''
           console.log('Loading step response for step', firstIncompleteStep, ':', stepResponse)
           debugSetAnalysisResponse(stepResponse)
+          
+          // Generate problem statement if not already generated
+          if (!hasAttemptedGeneration) {
+            console.log('Triggering problem statement generation...')
+            generateProblemStatement(ticket)
+          } else {
+            console.log('Problem statement generation already attempted, skipping...')
+          }
         }
         
         // Start fetching similar cases and AI suggestions after ticket data is loaded
@@ -192,7 +222,152 @@ const Analysis = () => {
     }
   }, [id])
 
+  // Generate problem statement function
+  const generateProblemStatement = async (ticket) => {
+    console.log('generateProblemStatement called with:', {
+      ticket: !!ticket,
+      isGeneratingProblemStatement,
+      hasAttemptedGeneration
+    })
+    
+    if (!ticket || isGeneratingProblemStatement) {
+      console.log('Skipping problem statement generation due to conditions')
+      return
+    }
+    
+    // Check if problem statement data already exists
+    if (problemStatementData.generatedProblemStatement && problemStatementData.generatedProblemStatement.trim().length > 0) {
+      console.log('Problem statement already exists, skipping generation')
+      return
+    }
+    
+    console.log('Generating problem statement...')
 
+    try {
+      setIsGeneratingProblemStatement(true)
+      setHasAttemptedGeneration(true)
+      
+      const requestData = {
+        shortDescription: ticket.short_description || '',
+        description: ticket.description || '',
+        category: ticket.category || '',
+        logs: ticket.logs || []
+      }
+      
+      console.log('Generating problem statement with data:', requestData)
+      const response = await aiService.problemStatement.generate(requestData)
+      // const response = {
+      //   success: true,
+      //   message: "Problem statement generated successfully",
+      //   inputData: {
+      //     hasDescription: true,
+      //     logCount: 0
+      //   },
+      //   problemStatement: {
+      //     problemDefinitions: [
+      //       "The operating system's registry entries responsible for file type associations are corrupted or incorrectly configured, preventing applications from launching correctly when specific file types are opened. This may involve issues with the .reg files or system-level settings.",
+      //       "Users are unable to open files using their default applications, leading to potential delays in completing tasks and impacting overall productivity. This disruption affects workflow efficiency and may result in missed deadlines.",
+      //       "Users report an inability to open files with their preferred programs, resulting in a frustrating and unproductive user experience.  This impacts user satisfaction and may lead to increased help desk tickets."
+      //     ],
+      //     question: "Are the file type associations in the Windows Registry correctly mapped to the appropriate executable files?",
+      //     issueType: "Software",
+      //     severity: "Sev 3 – Moderate",
+      //     businessImpact: "Operational Downtime",
+      //     confidence: 0.85
+      //   },
+      //   processingTimeMs: 19527,
+      //   metadata: {
+      //     timestamp: "2025-09-25T11:16:28.941Z"
+      //   }
+      // }
+      // console.log('Problem statement API response:', response)
+      
+      if (response.success && response.problemStatement) {
+        const { problemStatement } = response
+        
+        // Update problem statement data
+        const newProblemStatementData = {
+          problemDefinitions: problemStatement.problemDefinitions || [],
+          aiQuestion: problemStatement.question || '',
+          issueType: problemStatement.issueType || '',
+          severity: problemStatement.severity || '',
+          businessImpactCategory: problemStatement.businessImpact || '',
+          generatedProblemStatement: problemStatement.problemDefinitions?.[0] || ''
+        }
+        
+        setProblemStatementData(newProblemStatementData)
+        
+        // Auto-populate step 1 with the first problem definition and dropdown values
+        if (problemStatement.problemDefinitions && problemStatement.problemDefinitions.length > 0) {
+          const firstDefinition = problemStatement.problemDefinitions[0]
+          setAnalysisResponse(firstDefinition)
+          
+          // Map AI values to dropdown values
+          const issueTypeMap = {
+            'Software': 'software',
+            'Hardware': 'hardware', 
+            'Network': 'network',
+            'Configuration': 'configuration',
+            'User Error': 'user_error',
+            'Other': 'other'
+          }
+          
+          const severityMap = {
+            'Sev 1 – Critical': 'sev1',
+            'Sev 2 – Major': 'sev2',
+            'Sev 3 – Moderate': 'sev3',
+            'Sev 4 – Minor': 'sev4'
+          }
+          
+          const impactMap = {
+            'Revenue Loss': 'revenue_loss',
+            'Compliance Issue': 'compliance_issue',
+            'Operational Downtime': 'operational_downtime',
+            'Customer Support': 'customer_support',
+            'Other': 'other'
+          }
+          
+           // Update step data with problem statement and dropdown values
+           setStepData(prevData => {
+             const updatedStepData = {
+               ...prevData,
+               rca_workflow_steps: [
+                 firstDefinition,
+                 prevData.rca_workflow_steps[1] || '',
+                 prevData.rca_workflow_steps[2] || '',
+                 prevData.rca_workflow_steps[3] || ''
+               ],
+               issueType: issueTypeMap[problemStatement.issueType] || '',
+               severity: severityMap[problemStatement.severity] || '',
+               businessImpactCategory: impactMap[problemStatement.businessImpact] || ''
+             }
+             
+             console.log('Auto-populating dropdowns with values:', {
+               issueType: updatedStepData.issueType,
+               severity: updatedStepData.severity,
+               businessImpactCategory: updatedStepData.businessImpactCategory,
+               originalValues: {
+                 issueType: problemStatement.issueType,
+                 severity: problemStatement.severity,
+                 businessImpact: problemStatement.businessImpact
+               }
+             })
+             
+             return updatedStepData
+           })
+        }
+        
+        console.log('Problem statement generated successfully:', newProblemStatementData)
+      } else {
+        console.warn('Problem statement API returned unsuccessful response:', response)
+      }
+    } catch (error) {
+      console.error('Error generating problem statement:', error)
+      // Don't show alert here as it's automatic generation
+    } finally {
+      setIsGeneratingProblemStatement(false)
+    }
+  }
 
   const analysisInsights = [
     {
@@ -475,6 +650,7 @@ const Analysis = () => {
     console.log('Clicked step:', stepNumber);
     console.log('Current stepData:', stepData);
     console.log('rca_workflow_steps:', stepData.rca_workflow_steps);
+    console.log('Current analysisResponse before update:', analysisResponse);
     
     // Allow navigation to any step
     setRcaStep(stepNumber)
@@ -482,7 +658,13 @@ const Analysis = () => {
     // Load existing step data if available
     const stepResponse = stepData.rca_workflow_steps[stepNumber - 1] || ''
     console.log('Loading response for step', stepNumber, ':', stepResponse);
+    console.log('Setting analysisResponse to:', stepResponse);
     debugSetAnalysisResponse(stepResponse)
+    
+    // Debug: Check if the response was set correctly
+    setTimeout(() => {
+      console.log('analysisResponse after update:', analysisResponse);
+    }, 100);
   }
 
   // Show loading state with skeleton loaders instead of full page spinner
@@ -516,6 +698,10 @@ const Analysis = () => {
             onGenerateReport={handleGenerateReport}
             ticketData={null}
             onStepClick={handleStepClick}
+            problemStatementData={problemStatementData}
+            isGeneratingProblemStatement={isGeneratingProblemStatement}
+            setIsGeneratingProblemStatement={setIsGeneratingProblemStatement}
+            hasAttemptedGeneration={hasAttemptedGeneration}
           />
         </div>
       </div>
@@ -567,6 +753,10 @@ const Analysis = () => {
           onGenerateReport={handleGenerateReport}
           ticketData={ticketData}
           onStepClick={handleStepClick}
+          problemStatementData={problemStatementData}
+          isGeneratingProblemStatement={isGeneratingProblemStatement}
+          setIsGeneratingProblemStatement={setIsGeneratingProblemStatement}
+          hasAttemptedGeneration={hasAttemptedGeneration}
         />
       </div>
     </div>

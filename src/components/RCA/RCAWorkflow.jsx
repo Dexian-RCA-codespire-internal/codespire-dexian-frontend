@@ -11,6 +11,7 @@ import {
   CorrectiveActionsStep 
 } from './steps';
 import { BsStars } from "react-icons/bs";
+import { aiService } from '../../api/services/aiService';
 
 const RCAWorkflow = ({ 
   currentStep, 
@@ -33,12 +34,13 @@ const RCAWorkflow = ({
   onSaveProgress,
   onGenerateReport,
   ticketData = null,
-  onStepClick = null
+  onStepClick = null,
+  problemStatementData = null,
+  isGeneratingProblemStatement = false,
+  setIsGeneratingProblemStatement,
+  hasAttemptedGeneration = false
 }) => {
-  // State for Problem Definition step fields
-  // State for Problem Definition step (step 1)
-  const [isGeneratingProblemStatement, setIsGeneratingProblemStatement] = useState(false)
-  const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false)
+  // Note: Problem statement state is now managed in the parent component (Analysis.jsx)
   
   // State for Impact step (step 2)
   const [isGeneratingImpactAssessment, setIsGeneratingImpactAssessment] = useState(false)
@@ -48,122 +50,10 @@ const RCAWorkflow = ({
   const [isEnhancingRootCause, setIsEnhancingRootCause] = useState(false)
   const [isEnhancingCorrectiveActions, setIsEnhancingCorrectiveActions] = useState(false)
 
-  // Generate problem statement when component mounts and we're on step 1
-  useEffect(() => {
-    const generateProblemStatement = async () => {
-      if (currentStep === 1 && ticketData && !isGeneratingProblemStatement && !hasAttemptedGeneration) {
-        try {
-          setIsGeneratingProblemStatement(true)
-          setHasAttemptedGeneration(true)
-          
-          const requestData = {
-            shortDescription: ticketData.short_description || '',
-            description: ticketData.description || ticketData.short_description || '',
-            serverLogs: ticketData?.logs || []
-          }
-          
-          const response = await aiService.problemStatement.generate(requestData)
-          
-          if (response.success && response.problemStatement) {
-            const { problemStatement } = response
-            
-             // Set the first problem definition in the textarea and store all definitions
-             // Note: Problem definitions handling is now done within the ProblemDefinitionStep component
-            
-            // Note: AI question handling is now done within the ProblemDefinitionStep component
-            
-            // Note: Issue type, severity, and business impact mapping 
-            // is now handled within the ProblemDefinitionStep component
-          }
-        } catch (error) {
-          console.error('Error generating problem statement:', error)
-          alert('Failed to generate AI problem statement. Please fill in the fields manually.')
-        } finally {
-          setIsGeneratingProblemStatement(false)
-        }
-      }
-    }
-    
-    generateProblemStatement()
-  }, [currentStep, ticketData, isGeneratingProblemStatement, hasAttemptedGeneration])
+  // Note: Problem statement generation is now handled within the ProblemDefinitionStep component
 
 
-  // Generate impact assessment when on Impact step (step 2)
-  useEffect(() => {
-    const generateImpactAssessment = async () => {
-      if (currentStep === 2 && stepData && !isGeneratingImpactAssessment && !hasAttemptedImpactGeneration) {
-        try {
-          setIsGeneratingImpactAssessment(true)
-          setHasAttemptedImpactGeneration(true)
-          
-          // Check if we have the required data from previous steps
-          if (stepData.rca_workflow_steps[0]) {
-            const requestData = {
-              problemStatement: stepData.rca_workflow_steps[0],
-              timelineContext: stepData.rca_workflow_steps[0] // Use problem statement as context since timeline is removed
-            }
-            
-            const response = await aiService.impactAssessment.analyze(requestData)
-            
-            if (response.success && response.data) {
-              const { impactAssessment, impactLevel: aiImpactLevel, department } = response.data
-              
-              // Map AI impact level to our dropdown values
-              const impactLevelMap = {
-                'Sev 1 - Critical Impact': 'sev1',
-                'Sev 2 - Major Impact': 'sev2', 
-                'Sev 3 - Normal Impact': 'sev3',
-                'Sev 4 - Minor Impact': 'sev4'
-              }
-              
-              // Map AI department to our dropdown values
-              const departmentMap = {
-                'Customer Support': 'customer_support',
-                'Sales': 'sales',
-                'IT Operations': 'it_operations',
-                'Finance': 'finance',
-                'Human Resources': 'hr',
-                'Other': 'other'
-              }
-              
-              // Set the impact level
-              const mappedImpactLevel = impactLevelMap[aiImpactLevel] || ''
-              if (mappedImpactLevel) {
-                setImpactLevel(mappedImpactLevel)
-                setStepData((prevData) => ({
-                  ...prevData,
-                  impact_level_step2: mappedImpactLevel
-                }))
-              }
-              
-              // Set the department affected
-              const mappedDepartment = departmentMap[department] || ''
-              if (mappedDepartment) {
-                setDepartmentAffected(mappedDepartment)
-    setStepData((prevData) => ({
-      ...prevData,
-                  department_affected_step2: mappedDepartment
-                }))
-              }
-              
-              // Set the impact assessment description
-              if (impactAssessment) {
-                onResponseChange(impactAssessment)
-                // Don't update stepData here - let handleRcaNext handle it
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error generating impact assessment:', error)
-          alert('Failed to generate AI impact assessment. Please fill in the fields manually.')
-        } finally {
-          setIsGeneratingImpactAssessment(false)
-        }
-      }
-    }
-    
-    generateImpactAssessment()
-  }, [currentStep, stepData, isGeneratingImpactAssessment, hasAttemptedImpactGeneration, onResponseChange])
+  // Note: Impact assessment generation is now handled within the ImpactAssessmentStep component
 
   // Handle clicking on problem definition
   // Note: Problem definition click handling is now done within the ProblemDefinitionStep component
@@ -320,18 +210,28 @@ const RCAWorkflow = ({
         </CardContent>
       </Card>
 
-{/* Ticket Information Header */}
+      
+      {/* Main Content */}
+      <div className={`grid grid-cols-1 ${(currentStep === 4) ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
+        {/* Ticket Information Header */}
 {ticketData ? (
-        <div className="p-4 bg-white rounded-lg shadow-sm border">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            {ticketData.short_description || 'No Title'}
+        <div className="p-4 bg-white rounded-lg shadow-sm border rounded-b-none">
+          <h1 className="text-xl font-bold text-gray-900">
+            Source Data
           </h1>
-          <div className="flex flex-wrap gap-4 text-sm text-gray-600">
+          
+          <h1 className="text-md text-gray-900">
+            <span className='font-semibold'>Problem:</span> {ticketData.short_description || 'No Title'}
+          </h1>
+          <div className="text-sm text-gray-600 mx-2">
+            {ticketData.description}
+            </div>
+          <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-600">
             <span><strong>Ticket ID:</strong> {ticketData.ticket_id}</span>
             <span><strong>Source:</strong> {ticketData.source}</span>
-            <span><strong>Status:</strong> {ticketData.status}</span>
-            <span><strong>Priority:</strong> {ticketData.priority}</span>
-            <span><strong>Category:</strong> {ticketData.category}</span>
+            <span><strong>Status:</strong> <Badge className="bg-green-100" variant="secondary">{ticketData.status}</Badge></span>
+            <span><strong>Priority:</strong> <Badge className="bg-yellow-100" variant="secondary">{ticketData.priority}</Badge></span>
+            <span><strong>Category:</strong> <Badge className="bg-blue-100" variant="secondary">{ticketData.category}</Badge></span>
           </div>
         </div>
       ) : (
@@ -348,12 +248,9 @@ const RCAWorkflow = ({
           </div>
         </div>
       )}
-      
-      {/* Main Content */}
-      <div className={`grid grid-cols-1 gap-8 ${(currentStep === 1 || currentStep === 4) ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
       {/* Main Content Area */}
       <div className={(currentStep === 1 || currentStep === 4) ? 'lg:col-span-2' : 'lg:col-span-1'}>
-        <Card className="bg-white shadow-sm">
+        <Card className="bg-white shadow-sm border-t-0 rounded-t-none">
           <CardContent className="p-8">
             {/* Step Header */}
             <div className="flex items-center mb-6">
@@ -367,7 +264,7 @@ const RCAWorkflow = ({
             </div>
 
             {/* AI Guidance */}
-            <div className="mb-6">
+            {/* <div className="mb-6">
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div className="flex items-center mb-2">
                   <FiMessageCircle className="w-5 h-5 text-green-600 mr-2" />
@@ -375,25 +272,28 @@ const RCAWorkflow = ({
                 </div>
                 <p className="text-sm text-green-700">{aiGuidance}</p>
               </div>
-            </div>
+            </div> */}
 
             {/* Note: AI Question is now handled within the ProblemDefinitionStep component */}
 
             {/* Step Content */}
             <div className="mb-8">
-              {currentStep === 1 && (
-                <ProblemDefinitionStep
-                  stepData={stepData}
-                  setStepData={setStepData}
-                  ticketData={ticketData}
-                  response={response}
-                  onResponseChange={onResponseChange}
-                  isGeneratingProblemStatement={isGeneratingProblemStatement}
-                  setIsGeneratingProblemStatement={setIsGeneratingProblemStatement}
-                  hasAttemptedGeneration={hasAttemptedGeneration}
-                  setHasAttemptedGeneration={setHasAttemptedGeneration}
-                />
-              )}
+               {currentStep === 1 && (
+                 <ProblemDefinitionStep
+                   stepData={stepData}
+                   setStepData={setStepData}
+                   ticketData={ticketData}
+                   response={response}
+                   onResponseChange={onResponseChange}
+                   isGeneratingProblemStatement={isGeneratingProblemStatement}
+                   setIsGeneratingProblemStatement={setIsGeneratingProblemStatement}
+                   hasAttemptedGeneration={hasAttemptedGeneration}
+                   problemStatementData={problemStatementData}
+                   onNext={onNext}
+                   showPrevious={showPrevious}
+                   onPrevious={onPrevious}
+                 />
+               )}
               
               {currentStep === 2 && (
                 <ImpactAssessmentStep
@@ -406,6 +306,7 @@ const RCAWorkflow = ({
                   setIsGeneratingImpactAssessment={setIsGeneratingImpactAssessment}
                   hasAttemptedImpactGeneration={hasAttemptedImpactGeneration}
                   setHasAttemptedImpactGeneration={setHasAttemptedImpactGeneration}
+                  currentStep={currentStep}
                 />
               )}
               
@@ -416,6 +317,8 @@ const RCAWorkflow = ({
                   onResponseChange={onResponseChange}
                   isEnhancingRootCause={isEnhancingRootCause}
                   setIsEnhancingRootCause={setIsEnhancingRootCause}
+                  stepData={stepData}
+                  similarCases={similarCases}
                 />
               )}
               
@@ -430,7 +333,8 @@ const RCAWorkflow = ({
                )}
             </div>
 
-            {/* Navigation */}
+            {/* Navigation - Only show for steps 2-4, step 1 has its own navigation */}
+            {currentStep !== 1 && (
             <div className="flex items-center justify-between">
               {showPrevious && (
                 <Button 
@@ -442,19 +346,17 @@ const RCAWorkflow = ({
               )}
               <Button 
                 onClick={onNext}
-                disabled={
-                  currentStep === 1 ? (!response.trim() || isGeneratingProblemStatement) :
-                  currentStep === 2 ? (!response.trim() || isGeneratingImpactAssessment) :
-                  currentStep === 3 ? (!response.trim() || isEnhancingRootCause) :
-                  currentStep === 4 ? (!response.trim() || isEnhancingCorrectiveActions) :
-                  !canProceed
-                }
+                  disabled={
+                    currentStep === 2 ? (!response.trim() || isGeneratingImpactAssessment) :
+                    currentStep === 3 ? (!response.trim() || isEnhancingRootCause) :
+                    currentStep === 4 ? (!response.trim() || isEnhancingCorrectiveActions) :
+                    !canProceed
+                  }
                 className={`ml-auto ${
-                  (currentStep === 1 ? (response.trim() && !isGeneratingProblemStatement) :
-                   currentStep === 2 ? (response.trim() && !isGeneratingImpactAssessment) :
-                   currentStep === 3 ? (response.trim() && !isEnhancingRootCause) :
-                   currentStep === 4 ? (response.trim() && !isEnhancingCorrectiveActions) :
-                   canProceed)
+                    (currentStep === 2 ? (response.trim() && !isGeneratingImpactAssessment) :
+                     currentStep === 3 ? (response.trim() && !isEnhancingRootCause) :
+                     currentStep === 4 ? (response.trim() && !isEnhancingCorrectiveActions) :
+                     canProceed)
                     ? 'bg-green-600 hover:bg-green-700 text-white' 
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
@@ -462,12 +364,13 @@ const RCAWorkflow = ({
                 {nextButtonText}
               </Button>
             </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
       {/* Right Sidebar - Show for Problem Definition (step 1) and Root Cause (step 4) */}
-      {(currentStep === 1 || currentStep === 4) && (
+      {(currentStep === 4) && (
       <div className="lg:col-span-1 space-y-6">
          
         {/* Note: Problem Definitions are now handled within the ProblemDefinitionStep component */}

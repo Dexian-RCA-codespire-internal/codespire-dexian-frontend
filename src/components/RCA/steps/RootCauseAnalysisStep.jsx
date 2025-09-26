@@ -682,23 +682,35 @@ const RootCauseAnalysisStep = ({
   response = '', 
   onResponseChange = () => {},
   isEnhancingRootCause = false,
-  setIsEnhancingRootCause = () => {}
+  setIsEnhancingRootCause = () => {},
+  stepData = {},
+  similarCases = null
 }) => {
-  // Use ticketData prop or fallback to dummy data
+  // Build currentTicket from real data from previous steps and ticketData
   const currentTicket = ticketData ? {
     ...ticketData,
-    // Ensure impact is always an array
-    impact: Array.isArray(ticketData.impact) ? ticketData.impact : 
-            ticketData.impact ? [ticketData.impact] : []
+    // Use problem statement from step 1 as enhanced_problem
+    enhanced_problem: stepData.rca_workflow_steps?.[0] || ticketData.description || ticketData.short_description || "",
+    // Use impact assessment from step 2 as impact
+    impact: stepData.rca_workflow_steps?.[1] ? [stepData.rca_workflow_steps[1]] : 
+            Array.isArray(ticketData.impact) ? ticketData.impact : 
+            ticketData.impact ? [ticketData.impact] : [],
+    // Use dropdown values from step 1
+    issueType: stepData.issueType || ticketData.category || "Unknown",
+    severity: stepData.severity || ticketData.priority || "Medium",
+    businessImpactCategory: stepData.businessImpactCategory || "Other",
+    // Use impact level and department from step 2
+    impactLevel: stepData.impact_level_step2 || "",
+    departmentAffected: stepData.department_affected_step2 || ""
   } : {
-    category: "Network Infrastructure",
-    description: "Multiple users are reporting intermittent connectivity issues when accessing internal applications hosted in the data center. Latency spikes have been observed during peak hours. Network monitoring tools are showing sporadic packet loss between core switches and distribution layer devices.",
-    short_description: "Intermittent connectivity and latency issues in internal network",
-    enhanced_problem: "The issue appears to be affecting connectivity between core switches and distribution switches in the data center, causing performance degradation for internal apps. Latency and packet loss are correlated with high network traffic times.",
-    impact: ["Service degradation for internal apps", "80% of corporate users impacted during peak hours"],
-    priority: "High",
-    urgency: "Critical",
-    source: "ServiceNow"
+    category: "Unknown",
+    description: "No ticket data available",
+    short_description: "No ticket data available",
+    enhanced_problem: stepData.rca_workflow_steps?.[0] || "No problem statement available",
+    impact: stepData.rca_workflow_steps?.[1] ? [stepData.rca_workflow_steps[1]] : [],
+    priority: "Medium",
+    urgency: "Medium",
+    source: "Unknown"
   }
 
   // Initial root causes from analysis with concise data
@@ -785,30 +797,17 @@ const RootCauseAnalysisStep = ({
     }
   ]
 
-  // Similar tickets data for API request
-  const similarTickets = [
-    {
-      id: "INC-2023-5612",
-      short_description: "Core switch buffer overflows during peak hours",
-      category: "Network Infrastructure",
-      description: "Observed consistent packet loss and increased latency traced to buffer overflows on core switch ports connected to distribution switches. Issue was resolved after adjusting buffer thresholds and upgrading firmware.",
-      priority: "High"
-    },
-    {
-      id: "INC-2024-1489",
-      short_description: "High CPU utilization on distribution switches",
-      category: "Network Infrastructure",
-      description: "Distribution switches showed CPU utilization above 90% during peak usage, leading to delays in routing decisions and intermittent connectivity. Resolved after identifying malformed broadcast traffic causing CPU spikes.",
-      priority: "Medium"
-    },
-    {
-      id: "INC-2024-2277",
-      short_description: "Misconfigured QoS policy impacting internal app performance",
-      category: "Network Infrastructure",
-      description: "QoS misconfiguration led to non-prioritized internal app traffic during congestion. Users experienced slow response times. Fixed by reclassifying traffic and adjusting QoS policy on distribution layer.",
-      priority: "High"
-    }
-  ]
+  // Use real similar cases data from API or fallback to empty array
+  const similarTickets = similarCases && similarCases.results ? 
+    similarCases.results.map(ticket => ({
+      id: ticket.ticket_id || ticket.id || "Unknown",
+      short_description: ticket.short_description || ticket.title || "No description",
+      category: ticket.category || "Unknown",
+      description: ticket.description || ticket.short_description || "No description available",
+      priority: ticket.priority || "Medium",
+      source: ticket.source || "Unknown",
+      confidence_percentage: ticket.confidence_percentage || 0
+    })) : []
 
   const [rootCauses, setRootCauses] = useState([])
   const [collapsedRootCauses, setCollapsedRootCauses] = useState({})
@@ -844,7 +843,7 @@ const RootCauseAnalysisStep = ({
       setIsAnalyzing(true)
       setAnalysisError(null)
 
-      // Ensure all required fields are present and properly formatted
+      // Build comprehensive request data using real data from previous steps
       const requestData = {
         currentTicket: {
           category: currentTicket.category || "Unknown",
@@ -854,9 +853,25 @@ const RootCauseAnalysisStep = ({
           impact: Array.isArray(currentTicket.impact) ? currentTicket.impact : 
                   currentTicket.impact ? [currentTicket.impact] : [],
           priority: currentTicket.priority || "Medium",
-          urgency: currentTicket.urgency || "Medium"
+          urgency: currentTicket.urgency || "Medium",
+          // Include additional data from previous steps
+          issueType: currentTicket.issueType || "",
+          severity: currentTicket.severity || "",
+          businessImpactCategory: currentTicket.businessImpactCategory || "",
+          impactLevel: currentTicket.impactLevel || "",
+          departmentAffected: currentTicket.departmentAffected || "",
+          // Include step data for context
+          problemStatement: stepData.rca_workflow_steps?.[0] || "",
+          impactAssessment: stepData.rca_workflow_steps?.[1] || ""
         },
-        similarTickets: similarTickets
+        similarTickets: similarTickets,
+        // Include metadata about the analysis
+        analysisContext: {
+          hasProblemStatement: !!(stepData.rca_workflow_steps?.[0] && stepData.rca_workflow_steps[0].trim().length > 0),
+          hasImpactAssessment: !!(stepData.rca_workflow_steps?.[1] && stepData.rca_workflow_steps[1].trim().length > 0),
+          hasSimilarTickets: similarTickets.length > 0,
+          stepData: stepData
+        }
       }
 
       console.log('Sending RCA analysis request:', requestData)
@@ -877,10 +892,10 @@ const RootCauseAnalysisStep = ({
         setRootCauses(transformedResults)
         setHasAnalyzed(true)
         
-        // Initialize all root causes as collapsed by default
+        // Initialize first root cause as uncollapsed, rest as collapsed
         const initialCollapsedState = {}
-        transformedResults.forEach(cause => {
-          initialCollapsedState[cause.id] = true // true means collapsed
+        transformedResults.forEach((cause, index) => {
+          initialCollapsedState[cause.id] = index !== 0 // true means collapsed, false means uncollapsed
         })
         setCollapsedRootCauses(initialCollapsedState)
         
@@ -923,6 +938,18 @@ const RootCauseAnalysisStep = ({
     if (confidence >= 60) return 'Medium'
     return 'Low'
   }
+
+  // Debug: Log the data being used for analysis
+  useEffect(() => {
+    console.log('RootCauseAnalysisStep: Data for analysis:', {
+      currentTicket: currentTicket,
+      stepData: stepData,
+      similarTickets: similarTickets,
+      hasProblemStatement: !!(stepData.rca_workflow_steps?.[0] && stepData.rca_workflow_steps[0].trim().length > 0),
+      hasImpactAssessment: !!(stepData.rca_workflow_steps?.[1] && stepData.rca_workflow_steps[1].trim().length > 0),
+      hasSimilarTickets: similarTickets.length > 0
+    })
+  }, [currentTicket, stepData, similarTickets])
 
   // Trigger analysis when component mounts (only once)
   useEffect(() => {
@@ -1016,7 +1043,7 @@ const RootCauseAnalysisStep = ({
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* SOURCE SECTION */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          {/* <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 rounded-lg">
@@ -1081,7 +1108,7 @@ const RootCauseAnalysisStep = ({
                 )}
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* AI SUGGESTED SECTION */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -1092,9 +1119,9 @@ const RootCauseAnalysisStep = ({
                     <HiSparkles className="w-5 h-5 text-purple-600" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                       AI Root Cause Analysis
-                      <BsRobot className="w-5 h-5 text-purple-600" />
+                    
                     </h2>
                     <p className="text-sm text-gray-600">AI-powered analysis with confidence scoring</p>
                   </div>
@@ -1146,82 +1173,7 @@ const RootCauseAnalysisStep = ({
                 </div>
               )}
 
-              {/* Add New Root Cause Form */}
-              {showAddForm && (
-                <div className="mb-6 p-6 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                    <HiLightBulb className="w-5 h-5 text-yellow-500" />
-                    Add Custom Root Cause Analysis
-                  </h3>
-                  <div className="space-y-4">
-                    <input
-                      type="text"
-                      value={newRootCause.rootCause}
-                      onChange={(e) => setNewRootCause({...newRootCause, rootCause: e.target.value})}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                      placeholder="Enter the identified root cause..."
-                    />
-                    
-                    <textarea
-                      value={newRootCause.analysis}
-                      onChange={(e) => setNewRootCause({...newRootCause, analysis: e.target.value})}
-                      rows={4}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                      placeholder="Provide detailed technical analysis..."
-                    />
-                    
-                    <div className="grid grid-cols-3 gap-4">
-                      <select
-                        value={newRootCause.category}
-                        onChange={(e) => setNewRootCause({...newRootCause, category: e.target.value})}
-                        className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                      >
-                        <option value="Configuration">Configuration</option>
-                        <option value="Capacity">Capacity</option>
-                        <option value="Infrastructure">Infrastructure</option>
-                        <option value="Code">Code</option>
-                        <option value="Security/Configuration">Security</option>
-                      </select>
-                      
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={newRootCause.confidence}
-                        onChange={(e) => setNewRootCause({...newRootCause, confidence: parseInt(e.target.value)})}
-                        className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                        placeholder="Confidence %"
-                      />
-                      
-                      <select
-                        value={newRootCause.severity}
-                        onChange={(e) => setNewRootCause({...newRootCause, severity: e.target.value})}
-                        className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                      >
-                        <option value="Critical">Critical</option>
-                        <option value="High">High</option>
-                        <option value="Medium">Medium</option>
-                        <option value="Low">Low</option>
-                      </select>
-                    </div>
-                    
-                    <div className="flex gap-3">
-                      <button
-                        onClick={addRootCause}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-                      >
-                        Add Analysis
-                      </button>
-                      <button
-                        onClick={() => setShowAddForm(false)}
-                        className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors text-sm font-medium"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+      
 
               {/* Root Causes List - Collapsible Cards */}
               <div className="space-y-4">
@@ -1235,16 +1187,16 @@ const RootCauseAnalysisStep = ({
                       <div className="flex items-start gap-4">
                         {/* AI Badge */}
                         <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 rounded-full flex items-center justify-center text-sm font-bold border border-purple-200">
-                          AI{index + 1}
+                          {index + 1}
                         </div>
                         
                         {/* Content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1">
-                              <h3 className="font-semibold text-gray-900 text-base leading-tight mb-2 pr-4">
+                              <h3 className=" text-gray-900 text-base text-md font-semibold text-gray-600  leading-tight mb-2 pr-4">
                                 {cause.rootCause}
-                              </h3>
+                              </h3> 
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getConfidenceColor(cause.confidence)}`}>
                                   {cause.confidence}% Confidence
@@ -1356,6 +1308,51 @@ const RootCauseAnalysisStep = ({
                     <p className="text-sm text-gray-500">Click "Analyze Root Causes" to begin AI-powered analysis</p>
                   </div>
                 )}
+
+
+                        {/* Add New Root Cause Form */}
+              {showAddForm && (
+                <div className="mb-6 p-6 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg border border-gray-200">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                    <HiLightBulb className="w-5 h-5 text-yellow-500" />
+                    Add Custom Root Cause Analysis
+                  </h3>
+                  <div className="space-y-4">
+                    <input
+                      type="text"
+                      value={newRootCause.rootCause}
+                      onChange={(e) => setNewRootCause({...newRootCause, rootCause: e.target.value})}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      placeholder="Enter the identified root cause..."
+                    />
+                    
+                    <textarea
+                      value={newRootCause.analysis}
+                      onChange={(e) => setNewRootCause({...newRootCause, analysis: e.target.value})}
+                      rows={4}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      placeholder="Provide detailed technical analysis..."
+                    />
+                    
+                    
+                    
+                    <div className="flex gap-3">
+                      <button
+                        onClick={addRootCause}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                      >
+                        Add Analysis
+                      </button>
+                      <button
+                        onClick={() => setShowAddForm(false)}
+                        className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors text-sm font-medium"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
               </div>
 
               {/* Add Root Cause Button */}
@@ -1388,42 +1385,62 @@ const RootCauseAnalysisStep = ({
             </div>
             
             <div className="p-6">
-              <div className="space-y-4">
-                {similarTickets.map((ticket) => (
-                  <div key={ticket.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        {getCategoryIcon(ticket.category)}
-                        <span className="text-sm font-medium text-gray-900 font-mono">{ticket.id}</span>
+              {similarTickets.length > 0 ? (
+                <div className="space-y-4">
+                  {similarTickets.slice(0, 3).map((ticket) => (
+                    <div key={ticket.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          {getCategoryIcon(ticket.category)}
+                          <span className="text-sm font-medium text-gray-900 font-mono">{ticket.id}</span>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                
+                          {ticket.confidence_percentage && (
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                              ticket.confidence_percentage >= 90 ? 'bg-green-100 text-green-800' :
+                              ticket.confidence_percentage >= 80 ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-orange-100 text-orange-800'
+                            }`}>
+                              {ticket.confidence_percentage}% match
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-200">
-                        Similar
-                      </span>
+                      
+                      <h4 className="font-medium text-gray-800 mb-2 text-sm leading-tight">{ticket.short_description}</h4>
+                      <p className="text-xs text-gray-600 mb-3 line-clamp-3 leading-relaxed">{ticket.description}</p>
+                      
+                      <div className="flex items-center justify-between text-xs">
+                        <span className={`px-2 py-1 rounded-full font-medium border ${getPriorityColor(ticket.priority)}`}>
+                          {ticket.priority}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                            {ticket.category}
+                          </span>
+                          {ticket.source && (
+                            <span className="text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                              {ticket.source}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    
-                    <h4 className="font-medium text-gray-800 mb-2 text-sm leading-tight">{ticket.short_description}</h4>
-                    <p className="text-xs text-gray-600 mb-3 line-clamp-3 leading-relaxed">{ticket.description}</p>
-                    
-                    <div className="flex items-center justify-between text-xs">
-                      <span className={`px-2 py-1 rounded-full font-medium border ${getPriorityColor(ticket.priority)}`}>
-                        {ticket.priority}
-                      </span>
-                      <span className="text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                        {ticket.category}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              <button className="w-full mt-4 px-4 py-2 text-sm text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 transition-colors font-medium">
-                View All Similar Tickets
-              </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <BsDatabase className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                  <p className="text-sm">No similar tickets found</p>
+                  <p className="text-xs text-gray-400 mt-1">Similar cases will appear here when available</p>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Analysis Summary */}
-          {analysisMetadata ? (
+
+          {/* {analysisMetadata ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -1453,7 +1470,6 @@ const RootCauseAnalysisStep = ({
                   </div>
                 </div>
 
-                {/* Ticket Category */}
                 <div className="mb-4">
                   <div className="text-xs text-gray-600 font-medium mb-2">Ticket Category</div>
                   <div className="text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
@@ -1461,7 +1477,6 @@ const RootCauseAnalysisStep = ({
                   </div>
                 </div>
 
-                {/* Referenced Tickets */}
                 {analysisMetadata.referenced_tickets && analysisMetadata.referenced_tickets.length > 0 && (
                   <div>
                     <div className="text-xs text-gray-600 font-medium mb-2">Referenced Tickets</div>
@@ -1516,7 +1531,7 @@ const RootCauseAnalysisStep = ({
                 </ul>
               </div>
             </div>
-          )}
+          )} */}
         </div>
       </div>
     </div>
