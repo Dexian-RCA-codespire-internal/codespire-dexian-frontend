@@ -9,7 +9,7 @@ import { Checkbox } from '../components/ui/checkbox'
 import { FiSearch, FiCheck, FiAlertTriangle, FiClipboard, FiChevronDown, FiCreditCard, FiChevronLeft, FiChevronRight, FiWifi, FiWifiOff, FiLoader, FiInfo } from 'react-icons/fi'
 import { transformTicketToRCACase } from '../api/rcaService'
 import useWebSocketOnly from '../hooks/useWebSocketOnly'
-import NotificationContainer from '../components/ui/NotificationContainer'
+
 
 const RCADashboard = () => {
   const navigate = useNavigate()
@@ -337,12 +337,6 @@ const RCADashboard = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Notification Container */}
-      <NotificationContainer 
-        notifications={notifications}
-        removeNotification={removeNotification}
-        clearNotifications={clearNotifications}
-      />
       
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-6">
         {/* Page Header */}

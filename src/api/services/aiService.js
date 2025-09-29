@@ -190,5 +190,59 @@ export const aiService = {
       const response = await api.get(`/ai/analytics/performance-predictions?systemId=${systemId}&timeRange=${timeRange}`);
       return response.data;
     }
+  },
+
+  // Problem Statement Generation
+  problemStatement: {
+    // Generate AI-powered problem statement
+    generate: async (ticketData) => {
+      const response = await api.post('/v1/problem-statement/generate', ticketData);
+      return response.data;
+    }
+  },
+
+  // Timeline Context Generation
+  timelineContext: {
+    // Generate AI-powered timeline and context description
+    generate: async (data) => {
+      const response = await api.post('/v1/timeline-context/generate', data);
+      return response.data;
+    }
+  },
+
+  // Impact Assessment
+  impactAssessment: {
+    // Analyze impact assessment based on problem statement and timeline context
+    analyze: async (data) => {
+      const response = await api.post('/v1/impact-assessment/analyze', data);
+      return response.data;
+    }
+  },
+
+  // Text Enhancement
+  textEnhancement: {
+    // Enhance text using AI
+    enhance: async (data) => {
+      const response = await api.post('/v1/text-enhancement/enhance', data);
+      return response.data;
+    }
+  },
+
+  // Root Cause Analysis
+  rootCauseAnalysis: {
+    // Analyze root causes for a ticket
+    analyze: async (data) => {
+      const response = await api.post('/v1/rca-root-cause/analyze', data);
+      return response.data;
+    }
+  },
+
+  // Solution Generation
+  solutionGeneration: {
+    // Generate solutions for a ticket
+    generate: async (data) => {
+      const response = await api.post('/v1/solution-generation/generate', data);
+      return response.data;
+    }
   }
 };
