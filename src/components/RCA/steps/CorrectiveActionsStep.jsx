@@ -7,6 +7,8 @@ import { FiLoader } from "react-icons/fi"
 import { BsStars, BsClock, BsCheckCircle, BsExclamationTriangle, BsLightning } from "react-icons/bs"
 import { FiChevronDown, FiChevronUp, FiUsers, FiCalendar, FiAlertTriangle, FiTool, FiShield, FiTrendingUp } from "react-icons/fi"
 import { aiService } from '../../../api/services/aiService'
+import EnhancementModal from '../../ui/EnhancementModal'
+import { useTextEnhancement } from '../../../hooks/useTextEnhancement'
 
   const CorrectiveActionsStep = ({
   ticketData,
@@ -21,6 +23,11 @@ import { aiService } from '../../../api/services/aiService'
   const [expandedSolution, setExpandedSolution] = useState(null)
   const [selectedSolution, setSelectedSolution] = useState(null)
   const [hasGeneratedSolutions, setHasGeneratedSolutions] = useState(false)
+  const [isEnhancementModalOpen, setIsEnhancementModalOpen] = useState(false)
+  const [enhancementOptions, setEnhancementOptions] = useState([])
+  
+  // Use the custom hook for text enhancement
+  const { enhanceText, isLoading: isEnhancing, error: enhancementError } = useTextEnhancement()
 
   // Generate solutions when component mounts or when ticket data is available
   useEffect(() => {
@@ -131,40 +138,39 @@ Confidence: ${solution.confidence}%`
     }
   }
 
-  // Generic text enhancement function
-  const handleEnhanceText = async (currentText, setLoadingState, setLoadingFunction) => {
-    if (!currentText.trim()) {
-      alert('Please enter some text to enhance.')
-      return
+  // Handle opening enhancement modal
+  const handleEnhanceCorrectiveActions = async () => {
+    if (!response.trim()) {
+      alert("Please enter some text in the corrective actions to enhance.");
+      return;
     }
 
-    try {
-      setLoadingFunction(true)
-      
-      const requestData = {
-        text: currentText,
-        reference: `${ticketData?.short_description || ''} ${ticketData?.description || ''}`.trim()
-      }
-      
-      const response = await aiService.textEnhancement.enhance(requestData)
-      
-      if (response.success && response.data && response.data.enhancedText) {
-        const enhancedText = response.data.enhancedText
-        
-        // Update the response with enhanced text
-        onResponseChange(enhancedText)
-        
-        console.log('Text enhanced successfully:', response.data)
-      } else {
-        alert('Failed to enhance text. Please try again.')
-      }
-    } catch (error) {
-      console.error('Error enhancing text:', error)
-      alert('Failed to enhance text. Please try again.')
-    } finally {
-      setLoadingFunction(false)
+    setIsEnhancementModalOpen(true);
+    
+    // Call the enhancement API
+    const reference = `${ticketData?.short_description || ""} ${ticketData?.description || ""}`.trim();
+    const result = await enhanceText(response, reference);
+    
+    if (result && result.enhancedOptions) {
+      setEnhancementOptions(result.enhancedOptions);
+    } else if (enhancementError) {
+      alert(`Failed to enhance text: ${enhancementError}`);
+      setIsEnhancementModalOpen(false);
     }
-  }
+  };
+
+  // Handle selecting an enhancement option
+  const handleSelectEnhancement = (enhancedText) => {
+    onResponseChange(enhancedText);
+    setIsEnhancementModalOpen(false);
+    setEnhancementOptions([]);
+  };
+
+  // Handle closing the modal
+  const handleCloseModal = () => {
+    setIsEnhancementModalOpen(false);
+    setEnhancementOptions([]);
+  };
 
   return (
     <div className="space-y-6">
@@ -393,17 +399,17 @@ Confidence: ${solution.confidence}%`
               Clear
             </Button>
             <Button
-              onClick={() => handleEnhanceText(response, isEnhancingCorrectiveActions, setIsEnhancingCorrectiveActions)}
-              disabled={isEnhancingCorrectiveActions || !response.trim()}
+              onClick={handleEnhanceCorrectiveActions}
+              disabled={isEnhancing || !response.trim()}
               className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded shadow-sm flex items-center gap-1"
               size="sm"
             >
-              {isEnhancingCorrectiveActions ? (
+              {isEnhancing ? (
                 <FiLoader className="w-4 h-4 animate-spin" />
               ) : (
                 <IoIosColorWand className="w-4 h-4 text-green-600" />
               )}
-              <span className="text-sm text-green-600">{isEnhancingCorrectiveActions ? 'Enhancing...' : 'Enhance'}</span>
+              <span className="text-sm text-green-600">{isEnhancing ? 'Enhancing...' : 'Enhance'}</span>
             </Button>
           </div>
         </div>
@@ -448,6 +454,17 @@ Confidence: ${solution.confidence}%`
           </ul>
         </div>
       </div>
+
+      {/* Enhancement Modal */}
+      <EnhancementModal
+        isOpen={isEnhancementModalOpen}
+        onClose={handleCloseModal}
+        originalText={response}
+        onSelectOption={handleSelectEnhancement}
+        enhancedOptions={enhancementOptions}
+        isLoading={isEnhancing}
+        title="Enhance Corrective Actions"
+      />
     </div>
   )
 }
