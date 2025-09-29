@@ -282,22 +282,34 @@ const ImpactAssessmentStep = ({
             }}
             placeholder={isGeneratingImpactAssessment ? "Generating AI impact assessment..." : "Describe the business and technical impact of this issue..."}
             rows={6}
-            className="w-full resize-none pr-20"
+            className="w-full"
             disabled={isGeneratingImpactAssessment}
           />
-          <Button
-            onClick={handleEnhanceImpactAssessment}
-            disabled={isGeneratingImpactAssessment || isEnhancing}
-            className="absolute bottom-2 right-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded-md shadow-sm flex items-center gap-1"
-            size="sm"
-          >
-            {isEnhancing ? (
-              <FiLoader className="w-4 h-4 animate-spin" />
-            ) : (
-              <IoIosColorWand className="w-4 h-4 text-green-600" />
-            )}
-            <span className="text-sm">{isEnhancing ? 'Enhancing...' : 'Enhance'}</span>
-          </Button>
+          <div className="absolute bottom-1 right-1 flex gap-1">
+            <Button
+              onClick={() => {
+                onResponseChange("");
+              }}
+              disabled={isGeneratingImpactAssessment || !response.trim()}
+              className="bg-white border border-gray-300 text-black hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded shadow-sm text-sm"
+              size="sm"
+            >
+              Clear
+            </Button>
+            <Button
+              onClick={handleEnhanceImpactAssessment}
+              disabled={isGeneratingImpactAssessment || isEnhancing}
+              className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded shadow-sm flex items-center gap-1"
+              size="sm"
+            >
+              {isEnhancing ? (
+                <FiLoader className="w-4 h-4 animate-spin" />
+              ) : (
+                <IoIosColorWand className="w-4 h-4 text-green-600" />
+              )}
+              <span className="text-sm text-green-600">{isEnhancing ? 'Enhancing...' : 'Enhance'}</span>
+            </Button>
+          </div>
         </div>
       </div>
 

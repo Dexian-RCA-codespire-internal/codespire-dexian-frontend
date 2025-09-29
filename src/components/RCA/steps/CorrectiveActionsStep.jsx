@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import AutoSuggestionTextarea from '../../ui/AutoSuggestionTextarea'
+// import AutoSuggestionTextarea from '../../ui/AutoSuggestionTextarea'
+import { Textarea } from '../../ui/Textarea'
+import { Button } from '../../ui/Button'
+import { IoIosColorWand } from "react-icons/io"
+import { FiLoader } from "react-icons/fi"
 import { BsStars, BsClock, BsCheckCircle, BsExclamationTriangle, BsLightning } from "react-icons/bs"
 import { FiChevronDown, FiChevronUp, FiUsers, FiCalendar, FiAlertTriangle, FiTool, FiShield, FiTrendingUp } from "react-icons/fi"
 import { aiService } from '../../../api/services/aiService'
@@ -20,10 +24,8 @@ import { aiService } from '../../../api/services/aiService'
 
   // Generate solutions when component mounts or when ticket data is available
   useEffect(() => {
-    if (ticketData && stepData && !hasGeneratedSolutions && !isGeneratingSolutions) {
-      generateSolutions()
-    }
-  }, [ticketData, stepData, hasGeneratedSolutions, isGeneratingSolutions])
+    generateSolutions();
+  }, [])
 
   // Generate AI solutions
   const generateSolutions = async () => {
@@ -356,18 +358,55 @@ Confidence: ${solution.confidence}%`
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Additional Corrective Actions or Modifications
         </label>
-        <AutoSuggestionTextarea
-          value={response}
-          onChange={(e) => {
-            onResponseChange(e)
-          }}
-          placeholder="Add custom corrective actions or modify the generated solutions..."
-          rows={6}
-          className="w-full resize-none"
-          reference={ticketData ? `${ticketData.short_description} ${ticketData.description || ''}`.trim() : ''}
-          onEnhance={() => handleEnhanceText(response, isEnhancingCorrectiveActions, setIsEnhancingCorrectiveActions)}
-          isEnhancing={isEnhancingCorrectiveActions}
-        />
+        <div className="relative">
+          {/* <AutoSuggestionTextarea
+            value={response}
+            onChange={(e) => {
+              onResponseChange(e)
+            }}
+            placeholder="Add custom corrective actions or modify the generated solutions..."
+            rows={6}
+            className="w-full resize-none pr-20"
+            reference={ticketData ? `${ticketData.short_description} ${ticketData.description || ''}`.trim() : ''}
+            onEnhance={() => handleEnhanceText(response, isEnhancingCorrectiveActions, setIsEnhancingCorrectiveActions)}
+            isEnhancing={isEnhancingCorrectiveActions}
+          /> */}
+          <Textarea
+            value={response}
+            onChange={(e) => {
+              onResponseChange(e.target.value)
+            }}
+            placeholder="Add custom corrective actions or modify the generated solutions..."
+            rows={8}
+            className="w-full"
+            disabled={isEnhancingCorrectiveActions}
+          />
+          <div className="absolute bottom-1 right-1 flex gap-1">
+            <Button
+              onClick={() => {
+                onResponseChange("");
+              }}
+              disabled={!response.trim()}
+              className="bg-white border border-gray-300 text-black hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded shadow-sm text-sm"
+              size="sm"
+            >
+              Clear
+            </Button>
+            <Button
+              onClick={() => handleEnhanceText(response, isEnhancingCorrectiveActions, setIsEnhancingCorrectiveActions)}
+              disabled={isEnhancingCorrectiveActions || !response.trim()}
+              className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded shadow-sm flex items-center gap-1"
+              size="sm"
+            >
+              {isEnhancingCorrectiveActions ? (
+                <FiLoader className="w-4 h-4 animate-spin" />
+              ) : (
+                <IoIosColorWand className="w-4 h-4 text-green-600" />
+              )}
+              <span className="text-sm text-green-600">{isEnhancingCorrectiveActions ? 'Enhancing...' : 'Enhance'}</span>
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Action Categories (kept as reference) */}

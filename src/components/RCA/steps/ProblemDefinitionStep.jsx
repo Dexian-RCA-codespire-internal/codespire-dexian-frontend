@@ -244,22 +244,35 @@ const ProblemDefinitionStep = ({
                       : "AI-generated problem summary..."
                   }
                   rows={6}
-                  className="w-full resize-none pr-20"
+                  className="w-full"
                   disabled={isGeneratingProblemStatement}
                 />
-                <Button
-                  onClick={handleEnhanceProblemStatement}
-                  disabled={isGeneratingProblemStatement || isEnhancing}
-                  className="absolute bottom-2 right-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded-md shadow-sm flex items-center gap-1"
-                  size="sm"
-                >
-                  {isEnhancing ? (
-                    <FiLoader className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <IoIosColorWand className="w-4 h-4 text-green-600" />
-                  )}
-                  <span className="text-sm">{isEnhancing ? 'Enhancing...' : 'Enhance'}</span>
-                </Button>
+                <div className="absolute bottom-1 right-1 flex gap-1">
+                  <Button
+                    onClick={() => {
+                      setProblemSummary("");
+                      onResponseChange("");
+                    }}
+                    disabled={isGeneratingProblemStatement || !problemSummary.trim()}
+                    className="bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded shadow-sm text-sm"
+                    size="sm"
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    onClick={handleEnhanceProblemStatement}
+                    disabled={isGeneratingProblemStatement || isEnhancing}
+                    className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded shadow-sm flex items-center gap-1"
+                    size="sm"
+                  >
+                    {isEnhancing ? (
+                      <FiLoader className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <IoIosColorWand className="w-4 h-4 text-green-600" />
+                    )}
+                    <span className="text-sm text-green-600">{isEnhancing ? 'Enhancing...' : 'Enhance'}</span>
+                  </Button>
+                </div>
               </div>
             </div>
 
