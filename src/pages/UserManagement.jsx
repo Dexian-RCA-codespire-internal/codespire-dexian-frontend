@@ -19,6 +19,7 @@ import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card, CardContent } from '../components/ui/card';
+import useUserWebSocket from '../hooks/useUserWebSocket';
 
 // Mock data
 const mockUsers = [
@@ -144,11 +145,11 @@ const permissionModules = [
 ];
 
 // Summary data - matching RCA Dashboard structure
-const getSummaryData = (users, pagination, paginatedUsers) => [
+const getSummaryData = (statistics) => [
   {
     title: 'Total Users',
-    value: pagination.total.toString(),
-    subtitle: `${paginatedUsers.length} on current page`,
+    value: statistics.totalUsers.toString(),
+    subtitle: `${statistics.totalUsers} total users`,
     subtitleColor: 'text-green-600',
     icon: <LuUsers className="text-2xl text-green-600" />,
     bgColor: 'bg-white',
@@ -156,7 +157,7 @@ const getSummaryData = (users, pagination, paginatedUsers) => [
   },
   {
     title: 'Active Users',
-    value: users.filter(user => user.status === 'Active').length.toString(),
+    value: statistics.activeUsers.toString(),
     subtitle: 'Currently active',
     subtitleColor: 'text-blue-600',
     icon: <LuUserCheck className="text-2xl text-blue-600" />,
@@ -165,7 +166,7 @@ const getSummaryData = (users, pagination, paginatedUsers) => [
   },
   {
     title: 'Inactive Users',
-    value: users.filter(user => user.status === 'Inactive').length.toString(),
+    value: statistics.inactiveUsers.toString(),
     subtitle: 'Currently inactive',
     subtitleColor: 'text-red-600',
     icon: <LuUserX className="text-2xl text-red-600" />,
@@ -174,12 +175,7 @@ const getSummaryData = (users, pagination, paginatedUsers) => [
   },
   {
     title: 'New This Week',
-    value: users.filter(user => {
-      const userDate = new Date(user.createdAt);
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      return userDate >= weekAgo;
-    }).length.toString(),
+    value: statistics.recentUsers.toString(),
     subtitle: 'Recently registered',
     subtitleColor: 'text-emerald-600',
     icon: <LuUserPlus className="text-2xl text-emerald-600" />,
@@ -190,16 +186,16 @@ const getSummaryData = (users, pagination, paginatedUsers) => [
 
 // Utility functions
 const getStatusColor = (status) => {
-  return status === 'Active' ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100';
+  return status === 'active' ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100';
 };
 
 const getRoleColor = (role) => {
   switch (role) {
-    case 'Admin':
+    case 'admin':
       return 'text-purple-600 bg-purple-100';
-    case 'Moderator':
+    case 'moderator':
       return 'text-blue-600 bg-blue-100';
-    case 'User':
+    case 'user':
       return 'text-gray-600 bg-gray-100';
     default:
       return 'text-gray-600 bg-gray-100';
@@ -208,13 +204,13 @@ const getRoleColor = (role) => {
 
 const getDefaultPermission = (userRole, moduleKey) => {
   switch (userRole) {
-    case 'Admin':
+    case 'admin':
       return 'both';
-    case 'Moderator':
+    case 'moderator':
       if (['dashboard', 'tickets', 'ai-rca'].includes(moduleKey)) return 'both';
       if (['pattern-detector', 'playbook'].includes(moduleKey)) return 'read';
       return 'none';
-    case 'User':
+    case 'user':
       if (['dashboard', 'tickets', 'ai-rca'].includes(moduleKey)) return 'read';
       return 'none';
     default:
@@ -369,7 +365,7 @@ const UserTable = ({ users, onDropdownToggle, onDropdownAction, openDropdown }) 
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {users.map((user) => (
-            <tr key={user.id} className="hover:bg-gray-50">
+            <tr key={user._id} className="hover:bg-gray-50">
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center">
                   <div className="flex-shrink-0 h-10 w-10">
@@ -386,8 +382,8 @@ const UserTable = ({ users, onDropdownToggle, onDropdownAction, openDropdown }) 
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}`}>
-                  {user.role}
+                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.roles?.[0] || 'user')}`}>
+                  {user.roles?.[0] || 'user'}
                 </span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
@@ -396,16 +392,16 @@ const UserTable = ({ users, onDropdownToggle, onDropdownAction, openDropdown }) 
                 </span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {user.lastLogin}
+                {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Never'}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {user.createdAt}
+                {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <div className="flex items-center justify-center">
                   <ActionDropdown
                     user={user}
-                    isOpen={openDropdown === user.id}
+                    isOpen={openDropdown === user._id}
                     onToggle={onDropdownToggle}
                     onAction={onDropdownAction}
                   />
@@ -466,9 +462,21 @@ const PermissionModule = ({ module, userRole, defaultPermission }) => (
 
 
 const UserManagement = () => {
-  // State management
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // WebSocket hook for real-time user data
+  const {
+    users,
+    loading,
+    error,
+    pagination,
+    statistics,
+    isConnected,
+    notifications,
+    requestUserData,
+    requestUserStatistics,
+    clearNotifications
+  } = useUserWebSocket(import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081');
+
+  // Local state management
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -478,55 +486,33 @@ const UserManagement = () => {
   const [managingUser, setManagingUser] = useState(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null); // Track which dropdown is open
-  
-  // Pagination state - matching RCA Dashboard structure
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 0,
-    hasNext: false,
-    hasPrev: false
-  });
 
-  // Load users data
+  // Load users data on component mount
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setUsers(mockUsers);
-      // Update pagination state to match RCA Dashboard
-      setPagination({
-        page: 1,
-        limit: 10,
-        total: mockUsers.length,
-        totalPages: Math.ceil(mockUsers.length / 10),
-        hasNext: mockUsers.length > 10,
-        hasPrev: false
-      });
-      setLoading(false);
-    }, 1000);
+    requestUserData({
+      page: 1,
+      limit: 10,
+      query: searchTerm,
+      role: selectedRole,
+      sortBy: 'createdAt',
+      sortOrder: 'desc'
+    });
+    requestUserStatistics();
   }, []);
 
-  // Filter users based on search and role
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = selectedRole === 'all' || user.role.toLowerCase() === selectedRole.toLowerCase();
-    return matchesSearch && matchesRole;
-  });
-
-  // Update pagination when filters change
+  // Request data when filters change
   useEffect(() => {
-    const totalPages = Math.ceil(filteredUsers.length / pagination.limit);
-    setPagination(prev => ({
-      ...prev,
-      page: 1, // Reset to first page when filters change
-      total: filteredUsers.length,
-      totalPages: totalPages,
-      hasNext: totalPages > 1,
-      hasPrev: false
-    }));
-  }, [searchTerm, selectedRole, filteredUsers.length, pagination.limit]);
+    if (isConnected) {
+      requestUserData({
+        page: 1,
+        limit: pagination.limit,
+        query: searchTerm,
+        role: selectedRole,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      });
+    }
+  }, [searchTerm, selectedRole, isConnected]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -544,11 +530,6 @@ const UserManagement = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [openDropdown]);
-
-  // Pagination calculations
-  const startIndex = (pagination.page - 1) * pagination.limit;
-  const endIndex = startIndex + pagination.limit;
-  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
 
   // Event handlers
   const handleAddUser = () => setShowAddUserModal(true);
@@ -570,16 +551,14 @@ const UserManagement = () => {
 
   const handleDeleteUser = (userId) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
-      setUsers(users.filter(user => user.id !== userId));
+      // TODO: Implement API call to delete user
+      console.log('Delete user:', userId);
     }
   };
 
   const handleToggleUserStatus = (userId) => {
-    setUsers(users.map(user => 
-      user.id === userId 
-        ? { ...user, status: user.status === 'Active' ? 'Inactive' : 'Active' }
-        : user
-    ));
+    // TODO: Implement API call to toggle user status
+    console.log('Toggle user status:', userId);
   };
 
   const handleClearFilters = () => {
@@ -589,24 +568,25 @@ const UserManagement = () => {
 
   // Pagination handlers - matching RCA Dashboard
   const handlePageChange = (newPage) => {
-    setPagination(prev => ({
-      ...prev,
+    requestUserData({
       page: newPage,
-      hasNext: newPage < prev.totalPages,
-      hasPrev: newPage > 1
-    }));
+      limit: pagination.limit,
+      query: searchTerm,
+      role: selectedRole,
+      sortBy: 'createdAt',
+      sortOrder: 'desc'
+    });
   };
 
   const handleLimitChange = (newLimit) => {
-    const totalPages = Math.ceil(filteredUsers.length / newLimit);
-    setPagination(prev => ({
-      ...prev,
+    requestUserData({
       page: 1,
       limit: newLimit,
-      totalPages: totalPages,
-      hasNext: totalPages > 1,
-      hasPrev: false
-    }));
+      query: searchTerm,
+      role: selectedRole,
+      sortBy: 'createdAt',
+      sortOrder: 'desc'
+    });
   };
 
   const handleCloseModals = () => {
@@ -631,10 +611,10 @@ const UserManagement = () => {
         handleViewUser(user);
         break;
       case 'toggle-status':
-        handleToggleUserStatus(user.id);
+        handleToggleUserStatus(user._id);
         break;
       case 'delete':
-        handleDeleteUser(user.id);
+        handleDeleteUser(user._id);
         break;
       case 'permission':
         handleManagePermissions(user);
@@ -657,7 +637,7 @@ const UserManagement = () => {
     <div className="p-6">
       <Header />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {getSummaryData(users, pagination, paginatedUsers).map((item, index) => (
+          {getSummaryData(statistics).map((item, index) => (
             <Card key={index} className={`${item.bgColor} ${item.borderColor} shadow-sm hover:shadow-md transition-shadow duration-200`}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -681,17 +661,37 @@ const UserManagement = () => {
         onAddUser={handleAddUser}
       />
 
-      {filteredUsers.length > 0 ? (
+      {/* Connection Status */}
+      {!isConnected && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center">
+            <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
+            <span className="text-red-700">Disconnected from server. Attempting to reconnect...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Error Display */}
+      {error && (
+        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center">
+            <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+            <span className="text-yellow-700">{error}</span>
+          </div>
+        </div>
+      )}
+
+      {users.length > 0 ? (
         <>
           <UserTable 
-            users={paginatedUsers}
+            users={users}
             onDropdownToggle={handleDropdownToggle}
             onDropdownAction={handleDropdownAction}
             openDropdown={openDropdown}
           />
           
           {/* Pagination Controls - matching RCA Dashboard */}
-          {paginatedUsers.length > 0 && (
+          {users.length > 0 && (
             <div className="mt-6 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
@@ -710,7 +710,7 @@ const UserManagement = () => {
                   <span className="text-sm text-gray-700">per page</span>
                 </div>
                 <div className="text-sm text-gray-700">
-                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} results
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.totalCount)} of {pagination.totalCount} results
                 </div>
               </div>
               

@@ -14,7 +14,7 @@ export const navigationConfig = {
   customerRcaSummary: false,     // Customer RCA Summary
   alertCorrelation: false,       // Alert Correlation
   complianceAudit: false,        // Compliance & Audit
-  userManagement: false,          // User Management
+  userManagement: true,          // User Management
 }
 
 // Helper function to get enabled navigation items
