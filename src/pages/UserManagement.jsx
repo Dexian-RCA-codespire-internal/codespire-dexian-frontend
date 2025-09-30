@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   LuUser, 
   LuUserPlus, 
@@ -13,13 +13,17 @@ import {
   LuUsers,
   LuUserCheck,
   LuUserX,
-  LuActivity
+  LuActivity,
+  LuMail,
+  LuMailCheck,
+  LuClock
 } from 'react-icons/lu';
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card, CardContent } from '../components/ui/card';
 import useUserWebSocket from '../hooks/useUserWebSocket';
+import { userService } from '../api/services/userService';
 
 // Mock data
 const mockUsers = [
@@ -145,44 +149,55 @@ const permissionModules = [
 ];
 
 // Summary data - matching RCA Dashboard structure
-const getSummaryData = (statistics) => [
-  {
-    title: 'Total Users',
-    value: statistics.totalUsers.toString(),
-    subtitle: `${statistics.totalUsers} total users`,
-    subtitleColor: 'text-green-600',
-    icon: <LuUsers className="text-2xl text-green-600" />,
-    bgColor: 'bg-white',
-    borderColor: 'border-gray-200'
-  },
-  {
-    title: 'Active Users',
-    value: statistics.activeUsers.toString(),
-    subtitle: 'Currently active',
-    subtitleColor: 'text-blue-600',
-    icon: <LuUserCheck className="text-2xl text-blue-600" />,
-    bgColor: 'bg-white',
-    borderColor: 'border-gray-200'
-  },
-  {
-    title: 'Inactive Users',
-    value: statistics.inactiveUsers.toString(),
-    subtitle: 'Currently inactive',
-    subtitleColor: 'text-red-600',
-    icon: <LuUserX className="text-2xl text-red-600" />,
-    bgColor: 'bg-white',
-    borderColor: 'border-gray-200'
-  },
-  {
-    title: 'New This Week',
-    value: statistics.recentUsers.toString(),
-    subtitle: 'Recently registered',
-    subtitleColor: 'text-emerald-600',
-    icon: <LuUserPlus className="text-2xl text-emerald-600" />,
-    bgColor: 'bg-white',
-    borderColor: 'border-gray-200'
-  }
-]
+const getSummaryData = (statistics) => {
+  // Ensure statistics object exists and has default values
+  const stats = statistics || {};
+  const totalUsers = stats.totalUsers || 0;
+  const activeUsers = stats.activeUsers || 0;
+  const inactiveUsers = stats.inactiveUsers || 0;
+  const recentUsers = stats.recentUsers || 0;
+
+  console.log('📊 Statistics data:', stats); // Debug log
+
+  return [
+    {
+      title: 'Total Users',
+      value: totalUsers.toString(),
+      subtitle: `${totalUsers} total users`,
+      subtitleColor: 'text-green-600',
+      icon: <LuUsers className="text-2xl text-green-600" />,
+      bgColor: 'bg-white',
+      borderColor: 'border-gray-200'
+    },
+    {
+      title: 'Active Users',
+      value: activeUsers.toString(),
+      subtitle: 'Currently active',
+      subtitleColor: 'text-blue-600',
+      icon: <LuUserCheck className="text-2xl text-blue-600" />,
+      bgColor: 'bg-white',
+      borderColor: 'border-gray-200'
+    },
+    {
+      title: 'Inactive Users',
+      value: inactiveUsers.toString(),
+      subtitle: 'Currently inactive',
+      subtitleColor: 'text-red-600',
+      icon: <LuUserX className="text-2xl text-red-600" />,
+      bgColor: 'bg-white',
+      borderColor: 'border-gray-200'
+    },
+    {
+      title: 'New This Week',
+      value: recentUsers.toString(),
+      subtitle: 'Recently registered',
+      subtitleColor: 'text-emerald-600',
+      icon: <LuUserPlus className="text-2xl text-emerald-600" />,
+      bgColor: 'bg-white',
+      borderColor: 'border-gray-200'
+    }
+  ];
+}
 
 // Utility functions
 const getStatusColor = (status) => {
@@ -279,8 +294,8 @@ const Filters = ({ searchTerm, setSearchTerm, selectedRole, setSelectedRole, onA
 const ActionDropdown = ({ user, isOpen, onToggle, onAction }) => (
   <div className="relative dropdown-container">
     <button
-      onClick={() => onToggle(user.id)}
-      className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+      onClick={() => onToggle(user._id)}
+      className="p-1 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
       title="More actions"
     >
       <div className="flex flex-col space-y-1">
@@ -291,18 +306,18 @@ const ActionDropdown = ({ user, isOpen, onToggle, onAction }) => (
     </button>
     
     {isOpen && (
-      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
         <div className="py-1">
           <button
             onClick={() => onAction('view', user)}
-            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
           >
             <LuEye className="w-4 h-4 mr-3" />
             View
           </button>
           <button
             onClick={() => onAction('toggle-status', user)}
-            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
           >
             {user.status === 'Active' ? (
               <>
@@ -318,14 +333,14 @@ const ActionDropdown = ({ user, isOpen, onToggle, onAction }) => (
           </button>
           <button
             onClick={() => onAction('permission', user)}
-            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
           >
             <LuShield className="w-4 h-4 mr-3" />
             Permission
           </button>
           <button
             onClick={() => onAction('delete', user)}
-            className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+            className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 cursor-pointer"
           >
             <LuTrash2 className="w-4 h-4 mr-3" />
             Delete
@@ -337,7 +352,7 @@ const ActionDropdown = ({ user, isOpen, onToggle, onAction }) => (
 );
 
 // User Table Component
-const UserTable = ({ users, onDropdownToggle, onDropdownAction, openDropdown }) => (
+const UserTable = ({ users, onDropdownToggle, onDropdownAction, openDropdown, isOTPSubmitting, handleSendOTP }) => (
   <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -351,6 +366,9 @@ const UserTable = ({ users, onDropdownToggle, onDropdownAction, openDropdown }) 
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Status
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Verification
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Last Login
@@ -390,6 +408,31 @@ const UserTable = ({ users, onDropdownToggle, onDropdownAction, openDropdown }) 
                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(user.status)}`}>
                   {user.status}
                 </span>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="flex items-center space-x-2">
+                  {user.isEmailVerified ? (
+                    <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                      <LuMailCheck className="w-3 h-3 mr-1" />
+                      Verified
+                    </span>
+                  ) : (
+                    <div className="flex items-center space-x-1">
+                      <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                        <LuMail className="w-3 h-3 mr-1" />
+                        Pending
+                      </span>
+                      <button
+                        onClick={() => handleSendOTP(user)}
+                        disabled={isOTPSubmitting}
+                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                        title="Send OTP for verification"
+                      >
+                        <LuClock className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                 {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Never'}
@@ -485,10 +528,35 @@ const UserManagement = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [managingUser, setManagingUser] = useState(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
+  
+  // Form state for user creation
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    firstName: '',
+    lastName: '',
+    phone: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
   const [openDropdown, setOpenDropdown] = useState(null); // Track which dropdown is open
+  const searchTimeoutRef = useRef(null); // Ref for search debounce timeout
+
+  // OTP verification state
+  const [showOTPModal, setShowOTPModal] = useState(false);
+  const [verifyingUser, setVerifyingUser] = useState(null);
+  const [otpData, setOtpData] = useState({
+    email: '',
+    otp: '',
+    deviceId: null,
+    preAuthSessionId: null
+  });
+  const [isOTPSubmitting, setIsOTPSubmitting] = useState(false);
+  const [otpErrors, setOtpErrors] = useState({});
 
   // Load users data on component mount
   useEffect(() => {
+    console.log('🚀 Component mounted, requesting data...');
     requestUserData({
       page: 1,
       limit: 10,
@@ -500,18 +568,41 @@ const UserManagement = () => {
     requestUserStatistics();
   }, []);
 
-  // Request data when filters change
+  // Request statistics when connection is established
   useEffect(() => {
     if (isConnected) {
-      requestUserData({
-        page: 1,
-        limit: pagination.limit,
-        query: searchTerm,
-        role: selectedRole,
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
-      });
+      console.log('🔌 WebSocket connected, requesting statistics...');
+      requestUserStatistics();
     }
+  }, [isConnected]);
+
+  // Debounced search - prevents abrupt refreshes
+  useEffect(() => {
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Set new timeout for search
+    searchTimeoutRef.current = setTimeout(() => {
+      if (isConnected) {
+        requestUserData({
+          page: 1,
+          limit: pagination.limit,
+          query: searchTerm,
+          role: selectedRole,
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        });
+      }
+    }, 500); // 500ms delay
+
+    // Cleanup function
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
   }, [searchTerm, selectedRole, isConnected]);
 
   // Close dropdown when clicking outside
@@ -532,11 +623,106 @@ const UserManagement = () => {
   }, [openDropdown]);
 
   // Event handlers
-  const handleAddUser = () => setShowAddUserModal(true);
+  const handleAddUser = () => {
+    setFormData({
+      email: '',
+      password: '',
+      firstName: '',
+      lastName: '',
+      phone: ''
+    });
+    setFormErrors({});
+    setEditingUser(null);
+    setShowAddUserModal(true);
+  };
   
   const handleEditUser = (user) => {
     setEditingUser(user);
     setShowAddUserModal(true);
+  };
+
+  // Form handling functions
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    // Clear error when user starts typing
+    if (formErrors[name]) {
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+    
+    if (!formData.password.trim()) {
+      errors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSubmitUser = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      const result = await userService.createUser(formData);
+      
+      // Debug: Log the full result to see what we're getting
+      console.log('User creation result:', result);
+      console.log('OTP Data:', result.otpData);
+      
+      // Close modal and refresh data
+      handleCloseModals();
+      requestUserData(); // Refresh user list via WebSocket
+      
+      // Show success message
+      if (result.otpData) {
+        console.log('User created successfully and verification OTP sent');
+        // You might want to show a toast notification here
+        alert('User created successfully! A verification OTP has been sent to the user\'s email.');
+      } else {
+        console.log('User created successfully (verification OTP could not be sent)');
+        alert('User created successfully, but verification OTP could not be sent. Please contact the user directly.');
+      }
+      
+    } catch (error) {
+      console.error('Error creating user:', error);
+      
+      // Handle API errors
+      if (error.response?.data?.error) {
+        if (error.response.data.error.includes('already exists')) {
+          setFormErrors({ email: 'User with this email already exists' });
+        } else {
+          setFormErrors({ general: error.response.data.error });
+        }
+      } else {
+        setFormErrors({ general: 'Failed to create user. Please try again.' });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleViewUser = (user) => {
@@ -566,6 +752,131 @@ const UserManagement = () => {
     setSelectedRole('all');
   };
 
+  // OTP verification handlers
+  const handleSendOTP = async (user) => {
+    try {
+      setIsOTPSubmitting(true);
+      const result = await userService.sendUserOTP(user.email);
+      
+      if (result.success) {
+        setOtpData({
+          email: user.email,
+          otp: '',
+          deviceId: result.deviceId,
+          preAuthSessionId: result.preAuthSessionId
+        });
+        setVerifyingUser(user);
+        setShowOTPModal(true);
+        alert('OTP sent successfully to user\'s email!');
+      } else {
+        alert(`Failed to send OTP: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Error sending OTP:', error);
+      alert('Error sending OTP. Please try again.');
+    } finally {
+      setIsOTPSubmitting(false);
+    }
+  };
+
+  const handleOTPInputChange = (e) => {
+    const { name, value } = e.target;
+    setOtpData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    // Clear error when user starts typing
+    if (otpErrors[name]) {
+      setOtpErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
+
+  const validateOTPForm = () => {
+    const errors = {};
+    
+    if (!otpData.otp || otpData.otp.length !== 6) {
+      errors.otp = 'OTP must be 6 digits';
+    }
+    
+    if (!/^\d{6}$/.test(otpData.otp)) {
+      errors.otp = 'OTP must contain only numbers';
+    }
+    
+    setOtpErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleVerifyOTP = async (e) => {
+    e.preventDefault();
+    
+    if (!validateOTPForm()) {
+      return;
+    }
+    
+    try {
+      setIsOTPSubmitting(true);
+      const result = await userService.verifyUserOTP(
+        otpData.email,
+        otpData.otp,
+        otpData.deviceId,
+        otpData.preAuthSessionId
+      );
+      
+      if (result.success) {
+        alert('User email verified successfully!');
+        setShowOTPModal(false);
+        setOtpData({ email: '', otp: '', deviceId: null, preAuthSessionId: null });
+        setVerifyingUser(null);
+        requestUserData(); // Refresh user list
+      } else {
+        alert(`Verification failed: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Error verifying OTP:', error);
+      alert('Error verifying OTP. Please try again.');
+    } finally {
+      setIsOTPSubmitting(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    try {
+      setIsOTPSubmitting(true);
+      const result = await userService.resendUserOTP(
+        otpData.email,
+        otpData.deviceId,
+        otpData.preAuthSessionId
+      );
+      
+      if (result.success) {
+        setOtpData(prev => ({
+          ...prev,
+          deviceId: result.deviceId,
+          preAuthSessionId: result.preAuthSessionId
+        }));
+        alert('OTP resent successfully!');
+      } else {
+        alert(`Failed to resend OTP: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Error resending OTP:', error);
+      alert('Error resending OTP. Please try again.');
+    } finally {
+      setIsOTPSubmitting(false);
+    }
+  };
+
+  const handleCloseOTPModal = () => {
+    setShowOTPModal(false);
+    setOtpData({ email: '', otp: '', deviceId: null, preAuthSessionId: null });
+    setVerifyingUser(null);
+    setOtpErrors({});
+  };
+
   // Pagination handlers - matching RCA Dashboard
   const handlePageChange = (newPage) => {
     requestUserData({
@@ -593,10 +904,16 @@ const UserManagement = () => {
     setShowAddUserModal(false);
     setShowViewModal(false);
     setShowPermissionModal(false);
+    setShowOTPModal(false);
     setEditingUser(null);
     setViewingUser(null);
     setManagingUser(null);
+    setVerifyingUser(null);
     setOpenDropdown(null);
+    setFormData({ email: '', password: '', firstName: '', lastName: '', phone: '' });
+    setFormErrors({});
+    setOtpData({ email: '', otp: '', deviceId: null, preAuthSessionId: null });
+    setOtpErrors({});
   };
 
   // Dropdown handlers
@@ -637,20 +954,41 @@ const UserManagement = () => {
     <div className="p-6">
       <Header />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {getSummaryData(statistics).map((item, index) => (
-            <Card key={index} className={`${item.bgColor} ${item.borderColor} shadow-sm hover:shadow-md transition-shadow duration-200`}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-600 mb-2">{item.title}</p>
-                    <p className="text-3xl font-bold text-gray-900 mb-2">{item.value}</p>
-                    <p className={`text-sm font-medium ${item.subtitleColor}`}>{item.subtitle}</p>
+          {loading && statistics.totalUsers === 0 ? (
+            // Show loading skeleton
+            Array.from({ length: 4 }).map((_, index) => (
+              <Card key={index} className="bg-white border-gray-200 shadow-sm">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="h-4 bg-gray-200 rounded mb-2 animate-pulse"></div>
+                      <div className="h-8 bg-gray-200 rounded mb-2 animate-pulse"></div>
+                      <div className="h-3 bg-gray-200 rounded animate-pulse"></div>
+                    </div>
+                    <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
                   </div>
-                  <div className="opacity-80">{item.icon}</div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            getSummaryData(statistics).map((item, index) => {
+              console.log('📊 Rendering summary card:', item.title, item.value); // Debug log
+              return (
+              <Card key={index} className={`${item.bgColor} ${item.borderColor} shadow-sm hover:shadow-md transition-shadow duration-200`}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-600 mb-2">{item.title}</p>
+                      <p className="text-3xl font-bold text-gray-900 mb-2">{item.value}</p>
+                      <p className={`text-sm font-medium ${item.subtitleColor}`}>{item.subtitle}</p>
+                    </div>
+                    <div className="opacity-80">{item.icon}</div>
+                  </div>
+                </CardContent>
+              </Card>
+              );
+            })
+          )}
         </div>
       
       <Filters 
@@ -688,6 +1026,8 @@ const UserManagement = () => {
             onDropdownToggle={handleDropdownToggle}
             onDropdownAction={handleDropdownAction}
             openDropdown={openDropdown}
+            isOTPSubmitting={isOTPSubmitting}
+            handleSendOTP={handleSendOTP}
           />
           
           {/* Pagination Controls - matching RCA Dashboard */}
@@ -776,50 +1116,102 @@ const UserManagement = () => {
             <h2 className="text-xl font-bold mb-4">
               {editingUser ? 'Edit User' : 'Add New User'}
             </h2>
-            <form className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Full Name
-                </label>
-                <Input
-                  type="text"
-                  defaultValue={editingUser?.name || ''}
-                  placeholder="Enter full name"
-                />
+            
+            {formErrors.general && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-600">{formErrors.general}</p>
               </div>
+            )}
+            
+            <form onSubmit={handleSubmitUser} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
+                  Email *
                 </label>
                 <Input
                   type="email"
-                  defaultValue={editingUser?.email || ''}
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
                   placeholder="Enter email address"
+                  className={formErrors.email ? 'border-red-500' : ''}
                 />
+                {formErrors.email && (
+                  <p className="text-sm text-red-600 mt-1">{formErrors.email}</p>
+                )}
               </div>
+              
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Role
+                  Password *
                 </label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-lime-500">
-                  <option value="user">User</option>
-                  <option value="moderator">Moderator</option>
-                  <option value="admin">Admin</option>
-                </select>
+                <Input
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  placeholder="Enter password (min 6 characters)"
+                  className={formErrors.password ? 'border-red-500' : ''}
+                />
+                {formErrors.password && (
+                  <p className="text-sm text-red-600 mt-1">{formErrors.password}</p>
+                )}
               </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  First Name
+                </label>
+                <Input
+                  type="text"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleInputChange}
+                  placeholder="Enter first name"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Last Name
+                </label>
+                <Input
+                  type="text"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleInputChange}
+                  placeholder="Enter last name"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone Number
+                </label>
+                <Input
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  placeholder="Enter phone number"
+                />
+              </div>
+              
               <div className="flex justify-end space-x-3 pt-4">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => {
-                    setShowAddUserModal(false);
-                    setEditingUser(null);
-                  }}
+                  onClick={handleCloseModals}
+                  disabled={isSubmitting}
                 >
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-lime-600 hover:bg-lime-700 text-white">
-                  {editingUser ? 'Update User' : 'Add User'}
+                <Button 
+                  type="submit" 
+                  className="bg-lime-600 hover:bg-lime-700 text-white"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Creating...' : 'Add User'}
                 </Button>
               </div>
             </form>
@@ -966,6 +1358,80 @@ const UserManagement = () => {
                 Save Permissions
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* OTP Verification Modal */}
+      {showOTPModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h2 className="text-xl font-bold mb-4 flex items-center">
+              <LuMail className="w-5 h-5 mr-2 text-blue-600" />
+              Email Verification
+            </h2>
+            
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-2">
+                An OTP has been sent to <strong>{verifyingUser?.email}</strong>
+              </p>
+              <p className="text-xs text-gray-500">
+                Please enter the 6-digit code to verify the user's email address.
+              </p>
+            </div>
+
+            <form onSubmit={handleVerifyOTP}>
+              <div className="mb-4">
+                <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-2">
+                  Verification Code
+                </label>
+                <Input
+                  type="text"
+                  id="otp"
+                  name="otp"
+                  value={otpData.otp}
+                  onChange={handleOTPInputChange}
+                  placeholder="Enter 6-digit code"
+                  maxLength={6}
+                  className={`w-full ${otpErrors.otp ? 'border-red-500' : ''}`}
+                  disabled={isOTPSubmitting}
+                />
+                {otpErrors.otp && (
+                  <p className="mt-1 text-sm text-red-600">{otpErrors.otp}</p>
+                )}
+              </div>
+
+              <div className="flex justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCloseOTPModal}
+                  disabled={isOTPSubmitting}
+                >
+                  Cancel
+                </Button>
+                
+                <div className="flex space-x-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleResendOTP}
+                    disabled={isOTPSubmitting}
+                    className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                  >
+                    {isOTPSubmitting ? 'Sending...' : 'Resend OTP'}
+                  </Button>
+                  
+                  <Button
+                    type="submit"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    disabled={isOTPSubmitting || !otpData.otp || otpData.otp.length !== 6}
+                  >
+                    {isOTPSubmitting ? 'Verifying...' : 'Verify Email'}
+                  </Button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}

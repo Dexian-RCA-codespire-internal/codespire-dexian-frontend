@@ -97,7 +97,10 @@ const useUserWebSocket = (backendUrl) => {
         socketRef.current.on('user_statistics_response', (data) => {
           console.log('📊 Received user statistics:', data);
           if (data.success) {
+            console.log('📊 Setting statistics data:', data.data);
             setStatistics(data.data);
+          } else {
+            console.error('📊 Statistics response failed:', data.error);
           }
         });
 
