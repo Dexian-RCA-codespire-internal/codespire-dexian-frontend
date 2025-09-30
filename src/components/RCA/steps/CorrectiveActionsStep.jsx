@@ -13,6 +13,7 @@ import { useTextEnhancement } from '../../../hooks/useTextEnhancement'
   const CorrectiveActionsStep = ({
   ticketData,
   stepData,
+  setStepData,
   response,
   onResponseChange,
   isEnhancingCorrectiveActions,
@@ -29,10 +30,21 @@ import { useTextEnhancement } from '../../../hooks/useTextEnhancement'
   // Use the custom hook for text enhancement
   const { enhanceText, isLoading: isEnhancing, error: enhancementError } = useTextEnhancement()
 
-  // Generate solutions when component mounts or when ticket data is available
+  // Restore corrective actions data from stepData when component mounts
   useEffect(() => {
-    generateSolutions();
-  }, [])
+    if (stepData?.correctiveActions) {
+      console.log('CorrectiveActionsStep: Restoring corrective actions from stepData:', stepData.correctiveActions)
+      setGeneratedSolutions(stepData.correctiveActions.generatedSolutions || null)
+      setHasGeneratedSolutions(true)
+    }
+  }, [stepData?.correctiveActions])
+
+  // Generate solutions when component mounts (only if no existing data)
+  useEffect(() => {
+    if (ticketData && !hasGeneratedSolutions && !stepData?.correctiveActions) {
+      generateSolutions();
+    }
+  }, [stepData?.correctiveActions])
 
   // Generate AI solutions
   const generateSolutions = async () => {
@@ -77,6 +89,21 @@ import { useTextEnhancement } from '../../../hooks/useTextEnhancement'
         setGeneratedSolutions(result)
         setHasGeneratedSolutions(true)
         console.log('Solutions generated successfully:', result)
+        
+        // Store corrective actions in stepData for persistence
+        const correctiveActionsData = {
+          generatedSolutions: result,
+          timestamp: new Date().toISOString()
+        }
+        
+        // Update stepData with corrective actions
+        if (typeof setStepData === 'function') {
+          setStepData(prevData => ({
+            ...prevData,
+            correctiveActions: correctiveActionsData
+          }))
+          console.log('CorrectiveActionsStep: Stored corrective actions in stepData:', correctiveActionsData)
+        }
       } else {
         console.error('Failed to generate solutions:', result)
         alert('Failed to generate solutions. Please try again.')

@@ -55,6 +55,16 @@ const ProblemDefinitionStep = ({
     fullStepData: stepData
   });
 
+  // Debug: Log when stepData changes
+  useEffect(() => {
+    console.log('ProblemDefinitionStep: stepData changed:', stepData);
+    console.log('ProblemDefinitionStep: extracted values:', {
+      issueType: stepData?.issueType || "",
+      severity: stepData?.severity || "",
+      businessImpactCategory: stepData?.businessImpactCategory || ""
+    });
+  }, [stepData]);
+
   // Update problemSummary when response changes from parent
   useEffect(() => {
     if (response && response !== problemSummary) {

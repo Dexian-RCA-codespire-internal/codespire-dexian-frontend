@@ -50,6 +50,15 @@ const ImpactAssessmentStep = ({
       if (stepData.impact_assessments_step2 && Array.isArray(stepData.impact_assessments_step2)) {
         setImpactAssessments(stepData.impact_assessments_step2);
         console.log('ImpactAssessmentStep: Restored impact assessments:', stepData.impact_assessments_step2);
+        
+        // Auto-populate the first assessment if no response is set yet
+        if (stepData.impact_assessments_step2.length > 0 && (!response || !response.trim())) {
+          const firstAssessment = stepData.impact_assessments_step2[0];
+          if (firstAssessment.impactAssessment) {
+            console.log('ImpactAssessmentStep: Auto-populating description from first assessment:', firstAssessment.impactAssessment);
+            onResponseChange(firstAssessment.impactAssessment);
+          }
+        }
       }
     }
   }, [stepData])

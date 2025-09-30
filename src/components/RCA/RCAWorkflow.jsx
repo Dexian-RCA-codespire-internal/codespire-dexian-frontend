@@ -170,7 +170,7 @@ const RCAWorkflow = ({
                 const isCompleted = stepNumber < currentStep
                 const isCurrent = stepNumber === currentStep
                 const isFuture = stepNumber > currentStep
-                const isClickable = onStepClick
+                const isClickable = onStepClick && (stepNumber <= currentStep || stepNumber === currentStep + 1)
                 
                 return (
                   <div 
@@ -189,7 +189,9 @@ const RCAWorkflow = ({
                         ? 'bg-green-600 text-white hover:bg-green-700' 
                         : isCurrent 
                         ? 'bg-green-600 text-white hover:bg-green-700' 
-                        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                        : isClickable
+                        ? 'bg-blue-500 text-white hover:bg-blue-600'
+                        : 'bg-gray-200 text-gray-600 cursor-not-allowed'
                     } ${isClickable ? 'hover:scale-105 cursor-pointer' : 'cursor-default'}`}>
                       {isCompleted ? <FiCheck className="w-4 h-4" /> : stepNumber}
                     </div>
@@ -316,6 +318,7 @@ const RCAWorkflow = ({
                   isEnhancingRootCause={isEnhancingRootCause}
                   setIsEnhancingRootCause={setIsEnhancingRootCause}
                   stepData={stepData}
+                  setStepData={setStepData}
                   similarCases={similarCases}
                 />
               )}
@@ -324,6 +327,7 @@ const RCAWorkflow = ({
                 <CorrectiveActionsStep
                   ticketData={ticketData}
                   stepData={stepData}
+                  setStepData={setStepData}
                   response={response}
                   onResponseChange={onResponseChange}
                   isEnhancingCorrectiveActions={isEnhancingCorrectiveActions}

@@ -136,7 +136,11 @@ const Analysis = () => {
               department_affected_step2: ticket.department_affected_step2 || '',
               issueType: ticket.issueType || '',
               severity: ticket.severity || '',
-              businessImpactCategory: ticket.businessImpactCategory || ''
+              businessImpactCategory: ticket.businessImpactCategory || '',
+              problemStatementData: ticket.problemStatementData || null,
+              impactAssessments: ticket.impactAssessments || null,
+              rootCauseAnalysis: ticket.rootCauseAnalysis || null,
+              correctiveActions: ticket.correctiveActions || null
             }
           }
           console.log('Final existingStepData:', existingStepData);
@@ -150,6 +154,16 @@ const Analysis = () => {
           const stepResponse = existingStepData.rca_workflow_steps[firstIncompleteStep - 1] || ''
           console.log('Loading step response for step', firstIncompleteStep, ':', stepResponse)
           debugSetAnalysisResponse(stepResponse)
+          
+          // Restore problem statement data if available
+          if (existingStepData.problemStatementData) {
+            setProblemStatementData(existingStepData.problemStatementData)
+          }
+          
+          // Restore impact assessments if available
+          if (existingStepData.impactAssessments) {
+            console.log('Restoring impact assessments:', existingStepData.impactAssessments)
+          }
           
           // Generate problem statement if not already generated
           if (!hasAttemptedGeneration) {
@@ -251,6 +265,12 @@ const Analysis = () => {
         }
         
         setProblemStatementData(newProblemStatementData)
+        
+        // Store problem statement data in stepData for persistence
+        setStepData(prevData => ({
+          ...prevData,
+          problemStatementData: newProblemStatementData
+        }))
         
         // Auto-populate step 1 with the first problem definition and dropdown values
         if (problemStatement.problemDefinitions && problemStatement.problemDefinitions.length > 0) {
@@ -429,9 +449,8 @@ const Analysis = () => {
       console.log('updatedSteps after mapping:', updatedSteps);
       
       const updatedStepData = {
+        ...stepData, // Preserve all existing stepData
         rca_workflow_steps: updatedSteps,
-        impact_level_step2: stepData.impact_level_step2 || '',
-        department_affected_step2: stepData.department_affected_step2 || '',
         status: rcaStep === 4 ? 'Resolved' : 'In Progress'
       }
 
@@ -586,6 +605,11 @@ const Analysis = () => {
     console.log('Current stepData:', stepData);
     console.log('rca_workflow_steps:', stepData.rca_workflow_steps);
     console.log('Current analysisResponse before update:', analysisResponse);
+    console.log('Step 1 dropdown values:', {
+      issueType: stepData.issueType,
+      severity: stepData.severity,
+      businessImpactCategory: stepData.businessImpactCategory
+    });
     
     // Allow navigation to any step
     setRcaStep(stepNumber)
