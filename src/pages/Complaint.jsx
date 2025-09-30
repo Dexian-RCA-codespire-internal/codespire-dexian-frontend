@@ -22,75 +22,59 @@ const Complaint = () => {
 
   // Form data state
   const [formData, setFormData] = useState({
-    ticket_id: '',
-    source: '',
-    short_description: '',
-    description: '',
-    category: '',
-    subcategory: '',
-    urgency: '',
-    opened_time: '',
-    // RCA Step Data
-    problem_step1: '',
-    timeline_step2: '',
-    impact_step3: '',
-    findings_step4: '',
-    root_cause_step5: ''
+    typeOfComplaint: 'Payment Gateway Timeout Issues',
+    category: 'E-commerce',
+    priority: 'Critical',
+    source: 'Jira',
+    complaintDetails: 'The payment gateway is experiencing intermittent timeout issues, causing transactions to fail.',
+    comments: ''
   })
 
-  // Fetch ticket data when component loads
-  useEffect(() => {
-    const fetchTicketData = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const response = await ticketService.getTicketById(ticketId)
-        
-        // Handle different response structures
-        let ticket
-        if (response.success && response.data) {
-          ticket = response.data
-        } else if (response.data) {
-          ticket = response.data
-        } else {
-          ticket = response
-        }
-        
-        setTicketData(ticket)
-        
-        // Populate form data
-        if (ticket) {
-          const formDataToSet = {
-            ticket_id: ticket.ticket_id || '',
-            source: ticket.source || '',
-            short_description: ticket.short_description || '',
-            description: ticket.description || '',
-            category: ticket.category || '',
-            subcategory: ticket.subcategory || '',
-            urgency: ticket.urgency || '',
-            opened_time: ticket.opened_time ? new Date(ticket.opened_time).toISOString().slice(0, 16) : '',
-            // RCA Step Data
-            problem_step1: ticket.problem_step1 || '',
-            timeline_step2: ticket.timeline_step2 || '',
-            impact_step3: ticket.impact_step3 || '',
-            findings_step4: ticket.findings_step4 || '',
-            root_cause_step5: ticket.root_cause_step5 || ''
-          }
-          
-          setFormData(formDataToSet)
-        }
-      } catch (err) {
-        console.error('Error fetching ticket data:', err)
-        setError(err.message || 'Failed to fetch ticket data')
-      } finally {
-        setLoading(false)
-      }
-    }
+  // RCA Workflow State
+  const [rcaStep, setRcaStep] = useState(1)
+  const [problemDefinition, setProblemDefinition] = useState('')
 
-    if (ticketId) {
-      fetchTicketData()
+  const [uploadedFiles, setUploadedFiles] = useState([
+    { name: 'error_screenshot.png', type: 'image' },
+    { name: 'gateway_log.txt', type: 'text' },
+    { name: 'repot.pdf', type: 'pdf' }
+  ])
+
+  const similarCases = [
+    { id: 'RCA-087', title: 'Payment timeout issues', match: 89 },
+    { id: 'RCA-053', title: 'Database connection failures', match: 76 },
+    { id: 'RCA-091', title: 'API response delays', match: 64 }
+  ]
+
+  // RCA Workflow Data
+  const rcaSteps = [
+    {
+      step: 1,
+      title: 'Problem Definition',
+      aiGuidance: 'What specific problem or incident occurred? Please describe the symptoms observed.',
+    },
+    {
+      step: 2,
+      title: 'Timeline & Context',
+      aiGuidance: 'When did this issue first occur? What events preceded it?'
+    },
+    {
+      step: 3,
+      title: 'Impact Assessment',
+      aiGuidance: 'What was the business and technical impact of this issue?'
+    },
+    {
+      step: 4,
+      title: 'Investigation Findings',
+      aiGuidance: 'What data have you gathered? What patterns or clues were discovered?'
+    },
+    {
+      step: 5,
+      title: 'Root Cause Analysis',
+      aiGuidance: 'Based on your investigation, what is the underlying root cause?'
     }
-  }, [ticketId])
+  ]
+
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -220,283 +204,25 @@ const Complaint = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Button
-              onClick={() => navigate('/rca-dashboard')}
-              className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
-            >
-              <FiArrowLeft className="w-4 h-4" />
-              Back to Dashboard
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-black">Ticket Details</h1>
-              <p className="text-black">View and manage ticket information</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {!isEditing ? (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-2"
-                >
-                  <FiEdit className="w-4 h-4" />
-                  Edit
-                </Button>
-                <Button
-                  onClick={handleResolve}
-                  className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
-                >
-                  <FiCheckCircle className="w-4 h-4" />
-                  Resolve
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={handleCancel}
-                  className="flex items-center gap-2"
-                >
-                  <FiX className="w-4 h-4" />
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
-                >
-                  <FiSave className="w-4 h-4" />
-                  {saving ? 'Saving...' : 'Save'}
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-
-        {/* Single Page: Ticket Details with RCA Progress */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-black">
-              <FiFileText className="w-5 h-5" />
-              Ticket Details & RCA Analysis
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Basic Ticket Information */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-black mb-2">
-                  Ticket ID
-                </label>
-                <Input
-                  value={formData.ticket_id}
-                  onChange={(e) => handleInputChange('ticket_id', e.target.value)}
-                  disabled={!isEditing}
-                  className="bg-gray-50 text-black"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-black mb-2">
-                  Source
-                </label>
-                <Input
-                  value={formData.source}
-                  onChange={(e) => handleInputChange('source', e.target.value)}
-                  disabled={!isEditing}
-                  className="bg-gray-50 text-black"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-black mb-2">
-                Short Description
-              </label>
-              <Input
-                value={formData.short_description}
-                onChange={(e) => handleInputChange('short_description', e.target.value)}
-                disabled={!isEditing}
-                className="bg-gray-50 text-black"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-black mb-2">
-                Description
-              </label>
-              <Textarea
-                value={formData.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
-                disabled={!isEditing}
-                rows={4}
-                className="bg-gray-50 text-black"
-              />
-            </div>
-
-            {/* Category and Classification */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-black mb-2">
-                  Category
-                </label>
-                <Input
-                  value={formData.category}
-                  onChange={(e) => handleInputChange('category', e.target.value)}
-                  disabled={!isEditing}
-                  className="bg-gray-50 text-black"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-black mb-2">
-                  Subcategory
-                </label>
-                <Input
-                  value={formData.subcategory}
-                  onChange={(e) => handleInputChange('subcategory', e.target.value)}
-                  disabled={!isEditing}
-                  className="bg-gray-50 text-black"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-black mb-2">
-                  Urgency
-                </label>
-                <Input
-                  value={formData.urgency}
-                  onChange={(e) => handleInputChange('urgency', e.target.value)}
-                  disabled={!isEditing}
-                  className="bg-gray-50 text-black"
-                />
-              </div>
-            </div>
-
-            {/* Timestamp */}
-            <div>
-              <label className="block text-sm font-medium text-black mb-2">
-                <FiClock className="w-4 h-4 inline mr-1" />
-                Opened Time
-              </label>
-              <Input
-                type="datetime-local"
-                value={formData.opened_time}
-                onChange={(e) => handleInputChange('opened_time', e.target.value)}
-                disabled={!isEditing}
-                className="bg-gray-50 text-black"
-              />
-            </div>
-
-            {/* RCA Steps Status */}
-            <div className="border-t pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-lg font-medium text-black">RCA Analysis Steps</h4>
-              </div>
-            </div>
-
-            {/* RCA Steps - Only show steps that have data */}
-            <div className="space-y-4">
-              
-              {/* Step 1: Problem Definition - Only show if has data */}
-              {formData.problem_step1 && formData.problem_step1.trim().length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-black mb-2">
-                    Step 1: Problem Definition
-                  </label>
-                  <Textarea
-                    value={formData.problem_step1}
-                    onChange={(e) => handleInputChange('problem_step1', e.target.value)}
-                    disabled={!isEditing}
-                    rows={3}
-                    placeholder="Describe the problem that occurred..."
-                    className="bg-gray-50 text-black"
-                  />
-                </div>
-              )}
-
-              {/* Step 2: Timeline & Context - Only show if has data */}
-              {formData.timeline_step2 && formData.timeline_step2.trim().length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-black mb-2">
-                    Step 2: Timeline & Context
-                  </label>
-                  <Textarea
-                    value={formData.timeline_step2}
-                    onChange={(e) => handleInputChange('timeline_step2', e.target.value)}
-                    disabled={!isEditing}
-                    rows={3}
-                    placeholder="When did this issue occur? What events preceded it?"
-                    className="bg-gray-50 text-black"
-                  />
-                </div>
-              )}
-
-              {/* Step 3: Impact Assessment - Only show if has data */}
-              {formData.impact_step3 && formData.impact_step3.trim().length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-black mb-2">
-                    Step 3: Impact Assessment
-                  </label>
-                  <Textarea
-                    value={formData.impact_step3}
-                    onChange={(e) => handleInputChange('impact_step3', e.target.value)}
-                    disabled={!isEditing}
-                    rows={3}
-                    placeholder="What was the impact on users, systems, or business?"
-                    className="bg-gray-50 text-black"
-                  />
-                </div>
-              )}
-
-              {/* Step 4: Investigation Findings - Only show if has data */}
-              {formData.findings_step4 && formData.findings_step4.trim().length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-black mb-2">
-                    Step 4: Investigation Findings
-                  </label>
-                  <Textarea
-                    value={formData.findings_step4}
-                    onChange={(e) => handleInputChange('findings_step4', e.target.value)}
-                    disabled={!isEditing}
-                    rows={3}
-                    placeholder="What did the investigation reveal? Any error logs or evidence?"
-                    className="bg-gray-50 text-black"
-                  />
-                </div>
-              )}
-
-              {/* Step 5: Root Cause Analysis - Only show if has data */}
-              {formData.root_cause_step5 && formData.root_cause_step5.trim().length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-black mb-2">
-                    Step 5: Root Cause Analysis
-                  </label>
-                  <Textarea
-                    value={formData.root_cause_step5}
-                    onChange={(e) => handleInputChange('root_cause_step5', e.target.value)}
-                    disabled={!isEditing}
-                    rows={3}
-                    placeholder="What is the root cause of this issue?"
-                    className="bg-gray-50 text-black"
-                  />
-                </div>
-              )}
-
-              {/* Show message if no steps have data */}
-              {calculateRCAProgress().completedSteps === 0 && (
-                <div className="text-center py-8 text-black">
-                  <p>No RCA analysis steps have been completed yet.</p>
-                  <p className="text-sm mt-1">Click "Resolve" to start the RCA process.</p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {/* RCA Workflow */}
+        <RCAWorkflow
+          currentStep={rcaStep}
+          totalSteps={5}
+          stepTitle={getCurrentStepData().title}
+          aiGuidance={getCurrentStepData().aiGuidance}
+          response={problemDefinition}
+          onResponseChange={setProblemDefinition}
+          onNext={handleRcaNext}
+          onPrevious={handleRcaPrevious}
+          similarCases={similarCases}
+          nextButtonText={rcaStep === 5 ? "Complete RCA →" : "Next Step →"}
+          showPrevious={rcaStep > 1}
+          canProceed={problemDefinition.trim().length > 0}
+          onSaveProgress={handleSaveProgress}
+          onGenerateReport={handleGenerateReport}
+        />
       </div>
     </div>
   )

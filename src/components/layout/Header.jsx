@@ -1,30 +1,30 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, X, User, Mail, Phone, LogOut } from "lucide-react";
+import { X, User, Mail, Phone, LogOut } from "lucide-react";
 import { signOut, doesSessionExist } from "supertokens-auth-react/recipe/session";
+import useNotifications from "../../hooks/useNotifications";
+import NotificationBell from "../notifications/NotificationBell";
+import NotificationPortal from "../notifications/NotificationPortal";
 
 const Header = () => {
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const notificationRef = useRef(null);
   const userMenuRef = useRef(null);
-
-  const notifications = [
-    {
-      id: 1,
-      title: "New RCA Created",
-      message: "Service outage RCA #1234 has been created",
-      time: "2 minutes ago",
-      type: "info"
-    },
-    {
-      id: 2,
-      title: "Integration Alert",
-      message: "Jira connection status changed to connected",
-      time: "15 minutes ago",
-      type: "success"
-    }
-  ];
+  
+  // Use the notification hook
+  const {
+    items: notifications,
+    unread,
+    open: isNotificationOpen,
+    onOpen: openNotifications,
+    onClose: closeNotifications,
+    markAsRead,
+    markAllAsRead,
+    loading: notificationsLoading,
+    loadingMore: notificationsLoadingMore,
+    error: notificationsError,
+    pagination: notificationsPagination,
+    loadMore: loadMoreNotifications
+  } = useNotifications();
 
   const userProfile = {
     name: "John Doe",
@@ -32,18 +32,20 @@ const Header = () => {
     phone: "+1 (555) 123-4567"
   };
 
-  const toggleNotifications = () => {
-    setIsNotificationOpen(!isNotificationOpen);
+  const handleNotificationClick = () => {
+    if (isNotificationOpen) {
+      closeNotifications();
+    } else {
+      openNotifications();
+    }
     setIsUserMenuOpen(false); // Close user menu when opening notifications
-  };
-
-  const closeNotifications = () => {
-    setIsNotificationOpen(false);
   };
 
   const toggleUserMenu = () => {
     setIsUserMenuOpen(!isUserMenuOpen);
-    setIsNotificationOpen(false); // Close notifications when opening user menu
+    if (isNotificationOpen) {
+      closeNotifications(); // Close notifications when opening user menu
+    }
   };
 
   const closeUserMenu = () => {
@@ -65,12 +67,9 @@ const Header = () => {
     }
   };
 
-  // Close popups when clicking outside
+  // Close user menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
-        setIsNotificationOpen(false);
-      }
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setIsUserMenuOpen(false);
       }
@@ -109,68 +108,25 @@ const Header = () => {
         {/* before proofile I want a notification icon 2 as notification number*/}
 
         <div className="flex items-center space-x-4 gap-4">
-          <div className="relative" ref={notificationRef}>
-            <button
-              onClick={toggleNotifications}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
-            >
-              <span className="text-gray-600 text-sm relative">
-                <Bell className="w-6 h-6 p-1 text-gray-600" />
-                <span className="text-white rounded-full px-[4px] bg-red-600 text-xs absolute left-3 bottom-3">2</span>
-              </span>
-            </button>
+          {/* New Notification Bell */}
+          <NotificationBell
+            count={unread}
+            onClick={handleNotificationClick}
+          />
 
-            {/* Notification Popup */}
-            <AnimatePresence>
-              {isNotificationOpen && (
-                <motion.div
-                  className="absolute right-0 top-10 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
-                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <div className="p-4 border-b border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-gray-900">Notifications</h3>
-                      <button
-                        onClick={closeNotifications}
-                        className="p-1 hover:bg-gray-100 rounded-md transition-colors"
-                      >
-                        <X className="w-4 h-4 text-gray-500" />
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className="max-h-96 overflow-y-auto">
-                    {notifications.map((notification) => (
-                      <div
-                        key={notification.id}
-                        className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-start space-x-3">
-                          <div className={`w-2 h-2 rounded-full mt-2 ${
-                            notification.type === 'success' ? 'bg-green-500' : 'bg-blue-500'
-                          }`}></div>
-                          <div className="flex-1">
-                            <h4 className="font-medium text-gray-900 text-sm">{notification.title}</h4>
-                            <p className="text-gray-600 text-sm mt-1">{notification.message}</p>
-                            <p className="text-gray-400 text-xs mt-2">{notification.time}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="p-3 border-t border-gray-200">
-                    <button className="w-full text-center text-sm text-blue-600 hover:text-blue-800 font-medium">
-                      View All Notifications
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          {/* New Notification Portal */}
+          <NotificationPortal
+            open={isNotificationOpen}
+            items={notifications}
+            onClose={closeNotifications}
+            markAsRead={markAsRead}
+            markAllAsRead={markAllAsRead}
+            loading={notificationsLoading}
+            loadingMore={notificationsLoadingMore}
+            error={notificationsError}
+            pagination={notificationsPagination}
+            loadMore={loadMoreNotifications}
+          />
           
           <div className="relative" ref={userMenuRef}>
             <button

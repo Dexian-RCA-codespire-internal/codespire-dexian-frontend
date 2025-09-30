@@ -1,5 +1,5 @@
 import React from 'react'
-import WorkInProgress from '../components/WorkInProgress'
+import WorkInProgress from '../components/common/WorkInProgress'
 
 const PatternDetector = () => {
   return <WorkInProgress title="Pattern & Duplicate Detector" />

@@ -4,6 +4,7 @@ import { SessionAuth } from 'supertokens-auth-react/recipe/session'
 import MainLayout from '../components/layout/MainLayout'
 import Dashboard from '../pages/Dashboard'
 import RCADashboard from '../pages/RCADashboard'
+import SLAWrapper from '../pages/SLAWrapper'
 import Complaint from '../pages/Complaint'
 import Investigation from '../pages/Investigation'
 import Analysis from '../pages/Analysis'
@@ -26,6 +27,7 @@ import VerifyPasswordResetOTP from '../pages/Auth/VerifyPasswordResetOTP.jsx'
 import ResetPasswordWithOTP from '../pages/Auth/ResetPasswordWithOTP.jsx'
 import VerifyOTP from '../pages/Auth/VerifyOTP.jsx'
 import VerifyMagicLink from '../pages/Auth/VerifyMagicLink.jsx'
+import RCACompletion from '../pages/RCACompletion.jsx'
 
 export default function RoutesIndex() {
   return (
@@ -52,11 +54,13 @@ export default function RoutesIndex() {
       }>
         <Route index element={<Dashboard />} />
         <Route path="rca-dashboard" element={<RCADashboard />} />
+        <Route path="sla" element={<SLAWrapper />} />
         <Route path="complaint/:ticketId" element={<Complaint />} />
         <Route path="investigation/:ticketId" element={<Investigation />} />
         <Route path="analysis/:id/:ticketId" element={<Analysis />} />
         <Route path="resolution/:ticketId" element={<Resolution />} />
         <Route path="complete-rca/:ticketId" element={<CompleteRCA />} />
+        <Route path="rca-completion/:id/:ticketId" element={<RCACompletion />} />
         <Route path="ai-rca-guidance/add-integration" element={<AddIntegration />} />
         {isFeatureEnabled('patternDetector') && <Route path="pattern-detector" element={<PatternDetector />} />}
         {isFeatureEnabled('playbookRecommender') && <Route path="playbook-recommender" element={<PlaybookRecommender />} />}

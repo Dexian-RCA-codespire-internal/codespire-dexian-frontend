@@ -29,6 +29,7 @@ export { aiService } from './services/aiService.js'
 export { notificationService } from './services/notificationService.js'
 export { auditService } from './services/auditService.js'
 export { playbookService } from './services/playbookService.js'
+export { autoSuggestionService } from './services/autoSuggestionService.js'
 
 // Legacy export for backward compatibility
 export { getTickets, transformTicketToRCACase } from './rcaService.js'

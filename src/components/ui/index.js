@@ -10,6 +10,7 @@ export {
 export { Badge } from "./badge";
 export { Input } from "./input";
 export { Textarea } from "./textarea";
+export { StreamingTextarea } from "./StreamingTextarea";
 export {
   Dialog,
   DialogPortal,
