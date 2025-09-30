@@ -31,12 +31,6 @@ const Complaint = () => {
     { name: 'repot.pdf', type: 'pdf' }
   ])
 
-  const aiSuggestions = [
-    'Payment gateway timeouts during peak traffic',
-    'User authentication failures after deployment',
-    'Database connection pool exhaustion'
-  ]
-
   const similarCases = [
     { id: 'RCA-087', title: 'Payment timeout issues', match: 89 },
     { id: 'RCA-053', title: 'Database connection failures', match: 76 },
@@ -49,51 +43,26 @@ const Complaint = () => {
       step: 1,
       title: 'Problem Definition',
       aiGuidance: 'What specific problem or incident occurred? Please describe the symptoms observed.',
-      aiSuggestions: [
-        'Payment gateway timeouts during peak traffic',
-        'User authentication failures after deployment',
-        'Database connection pool exhaustion'
-      ]
     },
     {
       step: 2,
       title: 'Timeline & Context',
-      aiGuidance: 'When did this issue first occur? What events preceded it?',
-      aiSuggestions: [
-        'Started after recent deployment at 2:30 PM',
-        'Coincided with traffic spike during marketing campaign',
-        'Followed database maintenance window'
-      ]
+      aiGuidance: 'When did this issue first occur? What events preceded it?'
     },
     {
       step: 3,
       title: 'Impact Assessment',
-      aiGuidance: 'What was the business and technical impact of this issue?',
-      aiSuggestions: [
-        '50% increase in failed transactions',
-        'Customer support tickets increased by 200%',
-        'Revenue loss of $15K during outage'
-      ]
+      aiGuidance: 'What was the business and technical impact of this issue?'
     },
     {
       step: 4,
       title: 'Investigation Findings',
-      aiGuidance: 'What data have you gathered? What patterns or clues were discovered?',
-      aiSuggestions: [
-        'Database CPU spiked to 95% during incident',
-        'Error logs show connection timeout exceptions',
-        'Monitoring alerts triggered for response time SLA'
-      ]
+      aiGuidance: 'What data have you gathered? What patterns or clues were discovered?'
     },
     {
       step: 5,
       title: 'Root Cause Analysis',
-      aiGuidance: 'Based on your investigation, what is the underlying root cause?',
-      aiSuggestions: [
-        'Inefficient database query causing resource contention',
-        'Missing connection pool configuration limits',
-        'Inadequate load balancing for traffic spikes'
-      ]
+      aiGuidance: 'Based on your investigation, what is the underlying root cause?'
     }
   ]
 
@@ -186,7 +155,6 @@ const Complaint = () => {
           onResponseChange={setProblemDefinition}
           onNext={handleRcaNext}
           onPrevious={handleRcaPrevious}
-          aiSuggestions={getCurrentStepData().aiSuggestions}
           similarCases={similarCases}
           nextButtonText={rcaStep === 5 ? "Complete RCA →" : "Next Step →"}
           showPrevious={rcaStep > 1}
