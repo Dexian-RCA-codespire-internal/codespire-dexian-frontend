@@ -684,6 +684,7 @@ const RootCauseAnalysisStep = ({
   isEnhancingRootCause = false,
   setIsEnhancingRootCause = () => {},
   stepData = {},
+  setStepData = () => {},
   similarCases = null
 }) => {
   // Build currentTicket from real data from previous steps and ticketData
@@ -904,6 +905,22 @@ const RootCauseAnalysisStep = ({
           setAnalysisMetadata(response.analysis_metadata)
         }
         
+        // Store root cause analysis in stepData for persistence
+        const rootCauseAnalysisData = {
+          rootCauses: transformedResults,
+          analysisMetadata: response.analysis_metadata || null,
+          timestamp: new Date().toISOString()
+        }
+        
+        // Update stepData with root cause analysis (assuming setStepData is passed as prop)
+        if (typeof setStepData === 'function') {
+          setStepData(prevData => ({
+            ...prevData,
+            rootCauseAnalysis: rootCauseAnalysisData
+          }))
+          console.log('RootCauseAnalysisStep: Stored root cause analysis in stepData:', rootCauseAnalysisData)
+        }
+        
         // Update the response in the parent component
         if (onResponseChange) {
           const summaryText = `Root cause analysis completed. Found ${transformedResults.length} potential causes with confidence scores ranging from ${Math.min(...transformedResults.map(r => r.confidence))}% to ${Math.max(...transformedResults.map(r => r.confidence))}%.`
@@ -951,15 +968,34 @@ const RootCauseAnalysisStep = ({
     })
   }, [currentTicket, stepData, similarTickets])
 
-  // Trigger analysis when component mounts (only once)
+  // Restore root cause analysis data from stepData when component mounts
   useEffect(() => {
-    if (currentTicket && !hasAnalyzed && !isAnalyzing) {
+    if (stepData?.rootCauseAnalysis) {
+      console.log('RootCauseAnalysisStep: Restoring root cause analysis from stepData:', stepData.rootCauseAnalysis)
+      setRootCauses(stepData.rootCauseAnalysis.rootCauses || [])
+      setAnalysisMetadata(stepData.rootCauseAnalysis.analysisMetadata || null)
+      setHasAnalyzed(true)
+      
+      // Initialize collapse state for restored root causes
+      const initialCollapsedState = {}
+      if (stepData.rootCauseAnalysis.rootCauses) {
+        stepData.rootCauseAnalysis.rootCauses.forEach((cause, index) => {
+          initialCollapsedState[cause.id] = index !== 0 // true means collapsed, false means uncollapsed
+        })
+      }
+      setCollapsedRootCauses(initialCollapsedState)
+    }
+  }, [stepData?.rootCauseAnalysis])
+
+  // Trigger analysis when component mounts (only if no existing data)
+  useEffect(() => {
+    if (currentTicket && !hasAnalyzed && !isAnalyzing && !stepData?.rootCauseAnalysis) {
       // Auto-analyze after a short delay to show the loading state
       setTimeout(() => {
         analyzeRootCauses()
       }, 500)
     }
-  }, []) // Empty dependency array to run only once on mount
+  }, [stepData?.rootCauseAnalysis]) // Depend on stepData.rootCauseAnalysis to prevent re-analysis
 
   const addRootCause = () => {
     if (!newRootCause.rootCause.trim() || !newRootCause.analysis.trim()) {
@@ -1194,7 +1230,7 @@ const RootCauseAnalysisStep = ({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1">
-                              <h3 className=" text-gray-900 text-base text-md font-semibold text-gray-600  leading-tight mb-2 pr-4">
+                              <h3 className="text-gray-900 text-base font-semibold leading-tight mb-2 pr-4">
                                 {cause.rootCause}
                               </h3> 
                               <div className="flex items-center gap-2 flex-wrap">

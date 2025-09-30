@@ -25,10 +25,6 @@ const Analysis = () => {
   const [similarCasesError, setSimilarCasesError] = useState(null)
   
   // AI suggestions state
-  const [aiSuggestions, setAiSuggestions] = useState([])
-  const [aiSuggestionsData, setAiSuggestionsData] = useState([]) // Store full suggestion objects
-  const [aiSuggestionsLoading, setAiSuggestionsLoading] = useState(false)
-  const [aiSuggestionsError, setAiSuggestionsError] = useState(null)
   
   const [analysisNotes, setAnalysisNotes] = useState('')
   const [rootCause, setRootCause] = useState('')
@@ -95,42 +91,6 @@ const Analysis = () => {
     }
   }
 
-  // Fetch AI suggestions based on similar cases
-  const fetchAISuggestions = async (similarCasesData, currentTicket) => {
-    try {
-      setAiSuggestionsLoading(true)
-      setAiSuggestionsError(null)
-      console.log('Fetching AI suggestions for similar cases:', similarCasesData)
-      
-      if (similarCasesData && similarCasesData.results && similarCasesData.results.length > 0) {
-        const response = await ticketService.getAISuggestions(similarCasesData.results, currentTicket)
-        console.log('AI suggestions received:', response)
-        
-        // Extract suggestions from response - adjust based on actual API response structure
-        const suggestions = response.suggestions || response.data?.suggestions || []
-        console.log('Raw suggestions from API:', suggestions)
-        
-        // Convert suggestion objects to strings for display
-        const suggestionStrings = suggestions.map(suggestion => {
-          if (typeof suggestion === 'string') {
-            return suggestion
-          } else if (suggestion && typeof suggestion === 'object') {
-            return suggestion.suggestion || suggestion.text || suggestion.description || JSON.stringify(suggestion)
-          }
-          return String(suggestion)
-        })
-        
-        console.log('Processed suggestion strings:', suggestionStrings)
-        setAiSuggestions(suggestionStrings)
-        setAiSuggestionsData(suggestions) // Store full objects for future use
-      }
-    } catch (err) {
-      console.error('Error fetching AI suggestions:', err)
-      setAiSuggestionsError(err.message || 'Failed to fetch AI suggestions')
-    } finally {
-      setAiSuggestionsLoading(false)
-    }
-  }
 
   // Fetch ticket data when component loads
   useEffect(() => {
@@ -176,7 +136,11 @@ const Analysis = () => {
               department_affected_step2: ticket.department_affected_step2 || '',
               issueType: ticket.issueType || '',
               severity: ticket.severity || '',
-              businessImpactCategory: ticket.businessImpactCategory || ''
+              businessImpactCategory: ticket.businessImpactCategory || '',
+              problemStatementData: ticket.problemStatementData || null,
+              impactAssessments: ticket.impactAssessments || null,
+              rootCauseAnalysis: ticket.rootCauseAnalysis || null,
+              correctiveActions: ticket.correctiveActions || null
             }
           }
           console.log('Final existingStepData:', existingStepData);
@@ -191,6 +155,16 @@ const Analysis = () => {
           console.log('Loading step response for step', firstIncompleteStep, ':', stepResponse)
           debugSetAnalysisResponse(stepResponse)
           
+          // Restore problem statement data if available
+          if (existingStepData.problemStatementData) {
+            setProblemStatementData(existingStepData.problemStatementData)
+          }
+          
+          // Restore impact assessments if available
+          if (existingStepData.impactAssessments) {
+            console.log('Restoring impact assessments:', existingStepData.impactAssessments)
+          }
+          
           // Generate problem statement if not already generated
           if (!hasAttemptedGeneration) {
             console.log('Triggering problem statement generation...')
@@ -200,14 +174,9 @@ const Analysis = () => {
           }
         }
         
-        // Start fetching similar cases and AI suggestions after ticket data is loaded
+        // Start fetching similar cases after ticket data is loaded
         if (ticket) {
-          // Start both requests in parallel for better UX
-          fetchSimilarCases(ticket).then(similarCasesData => {
-            if (similarCasesData) {
-              fetchAISuggestions(similarCasesData, ticket)
-            }
-          })
+          fetchSimilarCases(ticket)
         }
       } catch (err) {
         console.error('Error fetching ticket data:', err)
@@ -296,6 +265,12 @@ const Analysis = () => {
         }
         
         setProblemStatementData(newProblemStatementData)
+        
+        // Store problem statement data in stepData for persistence
+        setStepData(prevData => ({
+          ...prevData,
+          problemStatementData: newProblemStatementData
+        }))
         
         // Auto-populate step 1 with the first problem definition and dropdown values
         if (problemStatement.problemDefinitions && problemStatement.problemDefinitions.length > 0) {
@@ -406,41 +381,21 @@ const Analysis = () => {
       step: 1,
       title: 'Problem Definition',
       aiGuidance: 'What specific problem or incident occurred? Please describe the symptoms observed.',
-      aiSuggestions: [
-        'Payment gateway timeouts during peak traffic',
-        'User authentication failures after deployment',
-        'Database connection pool exhaustion'
-      ]
     },
     {
       step: 2,
       title: 'Impact Assessment',
-      aiGuidance: 'What was the business and technical impact of this issue?',
-      aiSuggestions: [
-        '50% increase in failed transactions',
-        'Customer support tickets increased by 200%',
-        'Revenue loss of $15K during outage'
-      ]
+      aiGuidance: 'What was the business and technical impact of this issue?'
     },
     {
       step: 3,
       title: 'Root Cause Analysis',
-      aiGuidance: 'Based on your investigation, what is the underlying root cause?',
-      aiSuggestions: [
-        'Inefficient database query causing resource contention',
-        'Missing connection pool configuration limits',
-        'Inadequate load balancing for traffic spikes'
-      ]
+      aiGuidance: 'Based on your investigation, what is the underlying root cause?'
     },
     {
       step: 4,
       title: 'Corrective Actions',
-      aiGuidance: 'What specific actions will you take to prevent this issue from recurring?',
-      aiSuggestions: [
-        'Implement database query optimization and indexing',
-        'Configure proper connection pool limits and monitoring',
-        'Set up auto-scaling for traffic spikes'
-      ]
+      aiGuidance: 'What specific actions will you take to prevent this issue from recurring?'
     }
   ]
 
@@ -494,9 +449,8 @@ const Analysis = () => {
       console.log('updatedSteps after mapping:', updatedSteps);
       
       const updatedStepData = {
+        ...stepData, // Preserve all existing stepData
         rca_workflow_steps: updatedSteps,
-        impact_level_step2: stepData.impact_level_step2 || '',
-        department_affected_step2: stepData.department_affected_step2 || '',
         status: rcaStep === 4 ? 'Resolved' : 'In Progress'
       }
 
@@ -651,6 +605,11 @@ const Analysis = () => {
     console.log('Current stepData:', stepData);
     console.log('rca_workflow_steps:', stepData.rca_workflow_steps);
     console.log('Current analysisResponse before update:', analysisResponse);
+    console.log('Step 1 dropdown values:', {
+      issueType: stepData.issueType,
+      severity: stepData.severity,
+      businessImpactCategory: stepData.businessImpactCategory
+    });
     
     // Allow navigation to any step
     setRcaStep(stepNumber)
@@ -687,9 +646,7 @@ const Analysis = () => {
             onResponseChange={debugSetAnalysisResponse}
             onNext={handleRcaNext}
             onPrevious={handleRcaPrevious}
-            aiSuggestions={[]}
             similarCases={null}
-            aiSuggestionsLoading={false}
             similarCasesLoading={false}
             nextButtonText={rcaStep === 5 ? "Complete RCA →" : "Next Step →"}
             showPrevious={rcaStep > 1}
@@ -742,9 +699,7 @@ const Analysis = () => {
           onResponseChange={debugSetAnalysisResponse}
           onNext={handleRcaNext}
           onPrevious={handleRcaPrevious}
-          aiSuggestions={aiSuggestions.length > 0 ? aiSuggestions : getCurrentStepData().aiSuggestions}
           similarCases={similarCases}
-          aiSuggestionsLoading={aiSuggestionsLoading}
           similarCasesLoading={similarCasesLoading}
           nextButtonText={rcaStep === 4 ? "Complete RCA →" : "Next Step →"}
           showPrevious={rcaStep > 1}
