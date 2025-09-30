@@ -4,7 +4,7 @@ import { MdEmail, MdLock, MdVisibility, MdVisibilityOff } from 'react-icons/md'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { validateLoginForm } from '../../utils/validation'
 import { AlertCircle, CheckCircle } from 'lucide-react'
-import { authService } from '../../api/services/authService'
+import { useAuth } from '../../contexts/AuthContext'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -19,6 +19,7 @@ export default function Login() {
   
   const navigate = useNavigate()
   const location = useLocation()
+  const { login, isAuthenticated } = useAuth()
 
   // Check for success message from registration
   useEffect(() => {
@@ -27,6 +28,14 @@ export default function Login() {
       setTimeout(() => setSuccessMessage(''), 5000)
     }
   }, [location.state])
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      const redirectPath = new URLSearchParams(location.search).get('redirect') || '/dashboard'
+      navigate(redirectPath)
+    }
+  }, [isAuthenticated, navigate, location.search])
 
   // Clear error when user makes changes
   const clearError = () => {
@@ -87,45 +96,55 @@ export default function Login() {
     clearError()
 
     setIsLoading(true)
-    console.log('📡 Using SuperTokens EmailPassword.signIn...')
+    console.log('📡 Using SuperTokens login via AuthContext...')
 
     try {
-      // Use SuperTokens API for signin
       const credentials = {
         email: email.trim(),
         password: password
       }
 
-      const response = await authService.signin(credentials)
-      console.log('✅ SuperTokens signin response:', response)
+      const response = await login(credentials)
+      console.log('✅ Login response:', response)
 
-      if (response.status === "OK") {
-        console.log('✅ Login successful, redirecting to dashboard...')
-        // Redirect immediately after successful login
-        navigate('/', { replace: true })
+      if (response.success) {
+        console.log('✅ Login successful')
+        
+        // Check if email verification is required
+        if (!response.isEmailVerified) {
+          navigate('/verify-otp', {
+            state: {
+              email: email,
+              fromRegistration: false,
+              message: 'Please verify your email before continuing'
+            }
+          })
+          return
+        }
+        
+        // Successful login with verified email
+        const redirectPath = new URLSearchParams(location.search).get('redirect') || '/dashboard'
+        navigate(redirectPath)
       } else {
-        // Handle different response statuses
-        if (response.status === "WRONG_CREDENTIALS_ERROR") {
+        // Handle different error types
+        if (response.status === 'WRONG_CREDENTIALS_ERROR') {
           setError('Invalid email or password')
-        } else if (response.status === "FIELD_ERROR") {
-          const fieldErrors = response.formFields
-          if (fieldErrors) {
-            const errors = {}
-            fieldErrors.forEach(field => {
-              if (field.id === "email") errors.email = field.error
-              if (field.id === "password") errors.password = field.error
-            })
-            setValidationErrors(errors)
-          }
-        } else if (response.status === "EMAIL_NOT_VERIFIED_ERROR") {
-          setError('Please verify your email address before logging in')
+        } else if (response.formFields) {
+          // Handle field errors from SuperTokens
+          const fieldErrors = {}
+          response.formFields.forEach(field => {
+            if (field.error) {
+              fieldErrors[field.id] = [field.error]
+            }
+          })
+          setValidationErrors(fieldErrors)
         } else {
-          setError('Login failed. Please try again.')
+          setError(response.message || 'Login failed')
         }
       }
-    } catch (err) {
-      console.error('SuperTokens signin error:', err)
-      setError('Login failed. Please try again.')
+    } catch (error) {
+      console.error('Login error:', error)
+      setError('An unexpected error occurred. Please try again.')
     } finally {
       setIsLoading(false)
     }

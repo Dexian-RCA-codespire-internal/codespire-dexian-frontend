@@ -3,7 +3,7 @@ import { Button, Input, Card, CardHeader, CardTitle, CardContent, CardFooter } f
 import { MdEmail, MdArrowBack } from 'react-icons/md'
 import { Link, useNavigate } from 'react-router-dom'
 import { AlertCircle, CheckCircle, Mail } from 'lucide-react'
-import api from '../../api'
+import { useAuth } from '../../contexts/AuthContext'
 
 export default function ForgetPassword() {
   const [email, setEmail] = useState('')
@@ -12,6 +12,7 @@ export default function ForgetPassword() {
   const [emailSent, setEmailSent] = useState(false)
   
   const navigate = useNavigate()
+  const { sendPasswordReset } = useAuth()
 
   const handleInputChange = (e) => {
     setEmail(e.target.value)
@@ -40,21 +41,17 @@ export default function ForgetPassword() {
     setError('')
 
     try {
-      // Call the token-based forgot password API with frontend URL
-      const response = await api.post('/v1/auth/forgot-password', {
-        email: email.trim(),
-        resetUrl: `${window.location.origin}/reset-password` // Send frontend URL
-      })
+      // Use SuperTokens sendPasswordReset method
+      const result = await sendPasswordReset(email.trim())
       
-      if (response.data.success) {
+      if (result.status === 'OK') {
         setEmailSent(true)
       } else {
-        setError(response.data.message || 'Failed to send reset link. Please try again.')
+        setError(result.message || 'Failed to send reset link. Please try again.')
       }
     } catch (err) {
       console.error('Password reset error:', err)
-      const errorMessage = err.response?.data?.message || 'An error occurred. Please try again.'
-      setError(errorMessage)
+      setError('An error occurred. Please try again.')
     } finally {
       setIsLoading(false)
     }

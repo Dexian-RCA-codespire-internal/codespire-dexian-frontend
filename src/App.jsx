@@ -4,6 +4,7 @@ import { SuperTokensWrapper } from 'supertokens-auth-react'
 import RoutesIndex from './routes'
 import useWebSocketOnly from './hooks/useWebSocketOnly'
 import NotificationContainer from './components/ui/NotificationContainer'
+import SessionManager from './components/SessionManager'
 import './utils/websocketChecks' // Import to activate API call monitoring (DEVELOPMENT ONLY - REMOVE IN PRODUCTION)
 
 function AppContent() {
@@ -13,24 +14,27 @@ function AppContent() {
     clearNotifications
   } = useWebSocketOnly(import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081');
 
+  // Initialize session monitoring
+
+
   return (
     <>
       <Helmet>
         <title>Dexian RCA Dashboard</title>
       </Helmet>
 
-      <main className="h-full">
-        <RoutesIndex />
-      </main>
+      <SessionManager>
+        <main className="h-full">
+          <RoutesIndex />
+        </main>
 
-
-
-      {/* Notifications */}
-      <NotificationContainer
-        notifications={notifications}
-        onRemoveNotification={removeNotification}
-        onClearNotifications={clearNotifications}
-      />
+        {/* Notifications */}
+        <NotificationContainer
+          notifications={notifications}
+          onRemoveNotification={removeNotification}
+          onClearNotifications={clearNotifications}
+        />
+      </SessionManager>
     </>
   )
 }

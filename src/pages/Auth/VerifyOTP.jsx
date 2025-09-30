@@ -4,8 +4,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from '../../
 import { ArrowLeft, Mail, Link as LinkIcon, AlertCircle, CheckCircle } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { validateOTP } from '../../utils/validation'
-import { authService } from '../../api/services/authService'
-import { emailVerificationService } from '../../api/services/emailVerificationService'
+import { useAuth } from '../../contexts/AuthContext'
 
 export default function VerifyOTP() {
   const [otp, setOtp] = useState("")
@@ -17,6 +16,7 @@ export default function VerifyOTP() {
   const [error, setError] = useState("")
   const navigate = useNavigate()
   const location = useLocation()
+  const { sendOTP, verifyOTP, sendEmailVerification } = useAuth()
 
   const clearError = () => {
     setError("")
@@ -55,9 +55,9 @@ export default function VerifyOTP() {
     clearError()
     
     try {
-      // Use new email verification service for OTP verification
-      const response = await emailVerificationService.verifyOTP(email, otp, deviceId, preAuthSessionId)
-      console.log('✅ Email verification OTP response:', response)
+      // Use SuperTokens OTP verification via AuthContext
+      const response = await verifyOTP(deviceId, preAuthSessionId, otp)
+      console.log('✅ OTP verification response:', response)
 
       if (response.success) {
         setSuccessMessage('Email verified successfully!')
@@ -69,16 +69,27 @@ export default function VerifyOTP() {
               } 
             })
           } else {
-            navigate('/')
+            navigate('/dashboard')
           }
         }, 2000)
       } else {
-        setError(response.message || 'OTP verification failed. Please try again.')
+        if (response.status === 'INCORRECT_USER_INPUT_CODE_ERROR') {
+          const attemptsLeft = response.maximumCodeInputAttempts - response.failedCodeInputAttemptCount
+          setError(`Incorrect OTP code. ${attemptsLeft} attempts remaining.`)
+        } else if (response.status === 'EXPIRED_USER_INPUT_CODE_ERROR') {
+          setError('OTP code has expired. Please request a new one.')
+        } else if (response.status === 'RESTART_FLOW_ERROR') {
+          setError('Please restart the verification process.')
+          navigate('/register')
+          return
+        } else {
+          setError(response.message || 'OTP verification failed. Please try again.')
+        }
         setIsVerifying(false)
       }
     } catch (err) {
-      console.error('Email verification OTP error:', err)
-      setError(err.response?.data?.message || 'OTP verification failed. Please try again.')
+      console.error('OTP verification error:', err)
+      setError('OTP verification failed. Please try again.')
       setIsVerifying(false)
     }
   }
@@ -94,20 +105,35 @@ export default function VerifyOTP() {
     clearError()
     
     try {
-      // Use new email verification service to resend OTP
-      const response = await emailVerificationService.resendVerification(email, 'otp')
-      console.log('✅ Email verification resend OTP response:', response)
+      // Use SuperTokens to send OTP via AuthContext
+      const response = await sendOTP(email)
+      console.log('✅ Resend OTP response:', response)
 
       if (response.success) {
+        // Update session data for verification
+        const newDeviceId = response.deviceId
+        const newPreAuthSessionId = response.preAuthSessionId
+        
+        // Update the location state (you might need to handle this differently)
         setResendLeft(60)
         setSuccessMessage('OTP has been resent to your email')
         setTimeout(() => setSuccessMessage(''), 3000)
+        
+        // Optionally update the navigation state
+        navigate(location.pathname, {
+          state: {
+            ...location.state,
+            deviceId: newDeviceId,
+            preAuthSessionId: newPreAuthSessionId
+          },
+          replace: true
+        })
       } else {
         setError(response.message || 'Failed to resend OTP. Please try again.')
       }
     } catch (err) {
-      console.error('Email verification resend OTP error:', err)
-      setError(err.response?.data?.message || 'Failed to resend OTP. Please try again.')
+      console.error('Resend OTP error:', err)
+      setError('Failed to resend OTP. Please try again.')
     } finally {
       setIsResending(false)
     }
@@ -124,19 +150,26 @@ export default function VerifyOTP() {
     clearError()
     
     try {
-      // Use new email verification service to send magic link
-      const response = await emailVerificationService.resendVerification(email, 'magic_link')
-      console.log('✅ Email verification magic link response:', response)
+      // Use SuperTokens email verification via AuthContext
+      const response = await sendEmailVerification()
+      console.log('✅ Send email verification response:', response)
 
       if (response.success) {
         setSuccessMessage('Verification link has been sent to your email. Please check your inbox and click the link to verify your email.')
         setTimeout(() => setSuccessMessage(''), 8000)
       } else {
-        setError(response.message || 'Failed to send verification link. Please try again.')
+        if (response.status === 'EMAIL_ALREADY_VERIFIED_ERROR') {
+          setSuccessMessage('Your email is already verified!')
+          setTimeout(() => {
+            navigate('/dashboard')
+          }, 2000)
+        } else {
+          setError(response.message || 'Failed to send verification link. Please try again.')
+        }
       }
     } catch (err) {
-      console.error('Email verification magic link error:', err)
-      setError(err.response?.data?.message || 'Failed to send verification link. Please try again.')
+      console.error('Send email verification error:', err)
+      setError('Failed to send verification link. Please try again.')
     } finally {
       setIsSendingMagicLink(false)
     }

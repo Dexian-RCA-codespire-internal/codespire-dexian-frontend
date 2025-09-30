@@ -21,7 +21,7 @@ export const emailVerificationService = {
   verifyOTP: async (email, otp, deviceId, preAuthSessionId) => {
     try {
       console.log('Verifying OTP for email:', email);
-      const response = await api.post('/v1/email-verification/verify-otp', {
+      const response = await api.post('/api/v1/email-verification/verify-otp', {
         email: email,
         otp: otp,
         deviceId: deviceId,
@@ -39,7 +39,7 @@ export const emailVerificationService = {
   checkVerificationStatus: async (email) => {
     try {
       console.log('Checking verification status for email:', email);
-      const response = await api.get(`/v1/email-verification/status?email=${encodeURIComponent(email)}`);
+      const response = await api.get(`/api/v1/email-verification/status?email=${encodeURIComponent(email)}`);
       console.log('Verification status response:', response.data);
       return response.data;
     } catch (error) {
@@ -68,7 +68,7 @@ export const emailVerificationService = {
   verifyMagicLink: async (token) => {
     try {
       console.log('Verifying magic link token:', token);
-      const response = await api.post('/v1/email-verification/verify-magic-link', {
+      const response = await api.post('/api/v1/email-verification/verify-magic-link', {
         token: token
       });
       console.log('Verify magic link response:', response.data);

@@ -4,11 +4,11 @@ import { Mail, Lock, User, Eye, EyeOff, Phone, ChevronDown, Search, AlertCircle,
 import { Link, useNavigate } from 'react-router-dom'
 import { COUNTRY_CODES, searchCountries } from '../../constants/countryCodes'
 import { validateRegistrationForm, getPasswordStrength, getPasswordRequirements } from '../../utils/validation'
-import { authService } from '../../api/services/authService'
-import { emailVerificationService } from '../../api/services/emailVerificationService'
+import { useAuth } from '../../contexts/AuthContext'
 
 export default function Register() {
   const navigate = useNavigate()
+  const { register, isAuthenticated } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [formData, setFormData] = useState({
@@ -28,6 +28,13 @@ export default function Register() {
   const [showCountryDropdown, setShowCountryDropdown] = useState(false)
   const [countrySearch, setCountrySearch] = useState('')
   const dropdownRef = useRef(null)
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard')
+    }
+  }, [isAuthenticated, navigate])
 
   // Clear error function
   const clearError = () => {
@@ -126,7 +133,7 @@ export default function Register() {
     setIsLoading(true)
 
     try {
-      // Use SuperTokens API for signup
+      // Use SuperTokens registration via AuthContext
       const userData = {
         email: formData.email.trim(),
         password: formData.password,
@@ -135,59 +142,39 @@ export default function Register() {
         phone: `${selectedCountry.code}${formData.phone}`
       }
 
-      const response = await authService.signup(userData)
-      console.log('✅ SuperTokens signup response:', response)
+      const response = await register(userData)
+      console.log('✅ Registration response:', response)
 
-      if (response.status === "OK") {
-        // After successful registration, automatically send OTP for email verification
-        try {
-          console.log('📧 Sending OTP for email verification after registration...')
-          const otpResponse = await emailVerificationService.sendOTP(formData.email.trim())
-          console.log('✅ OTP sent automatically:', otpResponse)
-          
-          // Navigate to OTP verification page with the OTP session data
-          navigate('/verify-otp', { 
-            state: { 
-              email: formData.email,
-              fromRegistration: true,
-              deviceId: otpResponse.data.deviceId,
-              preAuthSessionId: otpResponse.data.preAuthSessionId,
-              otpSent: true
-            } 
-          })
-        } catch (otpErr) {
-          console.error('❌ Failed to send OTP automatically:', otpErr)
-          // Still navigate to OTP page, user can manually send OTP
-          navigate('/verify-otp', { 
-            state: { 
-              email: formData.email,
-              fromRegistration: true,
-              deviceId: response.deviceId,
-              preAuthSessionId: response.preAuthSessionId,
-              otpSent: false
-            } 
-          })
-        }
+      if (response.success) {
+        console.log('✅ Registration successful')
+        
+        // Navigate to login page with success message
+        navigate('/login', {
+          state: {
+            message: 'Registration successful! Please check your email for verification instructions, then log in.',
+            email: formData.email
+          }
+        })
       } else {
-        setError(response.message || 'Registration failed. Please try again.')
-      }
-    } catch (err) {
-      console.error('SuperTokens signup error:', err)
-      if (err.response?.status === "FIELD_ERROR") {
-        const fieldErrors = err.response?.formFields
-        if (fieldErrors) {
-          const errors = {}
-          fieldErrors.forEach(field => {
-            if (field.id === "email") errors.email = field.error
-            if (field.id === "password") errors.password = field.error
+        // Handle different error types
+        if (response.status === 'EMAIL_ALREADY_EXISTS_ERROR') {
+          setError('An account with this email already exists')
+        } else if (response.formFields) {
+          // Handle field errors from SuperTokens
+          const fieldErrors = {}
+          response.formFields.forEach(field => {
+            if (field.error) {
+              fieldErrors[field.id] = [field.error]
+            }
           })
-          setValidationErrors(errors)
+          setValidationErrors(fieldErrors)
+        } else {
+          setError(response.message || 'Registration failed. Please try again.')
         }
-      } else if (err.response?.status === "SIGN_UP_NOT_ALLOWED") {
-        setError('Registration is not allowed at this time')
-      } else {
-        setError('Registration failed. Please try again.')
       }
+    } catch (error) {
+      console.error('Registration error:', error)
+      setError('An unexpected error occurred. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -312,7 +299,7 @@ export default function Register() {
                       onClick={() => setShowCountryDropdown(!showCountryDropdown)}
                       className="flex items-center px-2 sm:px-3 h-10 sm:h-12 border border-gray-200 border-r-0 rounded-l-lg bg-gray-50 hover:bg-gray-100 focus:outline-none"
                     >
-                      <span className="text-base sm:text-lg mr-1 sm:mr-2">{selectedCountry.flag}</span>
+                      <span className="text-base sm:text-lg mr-1 sm:mr-2 flag-emoji">{selectedCountry.flag}</span>
                       <span className="text-xs sm:text-sm font-medium text-gray-700">{selectedCountry.dialCode}</span>
                       <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4 ml-1 text-gray-500" />
                     </button>
@@ -343,7 +330,7 @@ export default function Register() {
                               onClick={() => handleCountrySelect(country)}
                               className="w-full flex items-center px-2 sm:px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
                             >
-                              <span className="text-base sm:text-lg mr-2 sm:mr-3">{country.flag}</span>
+                              <span className="text-base sm:text-lg mr-2 sm:mr-3 flag-emoji">{country.flag}</span>
                               <span className="text-xs sm:text-sm font-medium text-gray-700 mr-1 sm:mr-2">{country.dialCode}</span>
                               <span className="text-xs sm:text-sm text-gray-600 truncate">{country.name}</span>
                             </button>

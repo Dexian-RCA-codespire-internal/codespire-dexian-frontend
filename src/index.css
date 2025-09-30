@@ -89,5 +89,20 @@
       height: 0;
     }
   }
+  
+  /* Prevent automatic flag emoji to SVG conversion */
+  .flag-emoji {
+    font-feature-settings: "liga" off;
+    -webkit-font-feature-settings: "liga" off;
+    text-rendering: auto;
+  }
+  
+  /* Prevent browser extensions from replacing flag emojis */
+  span[data-flag], .country-flag {
+    display: inline-block !important;
+    background: none !important;
+    font-style: normal !important;
+    text-decoration: none !important;
+  }
 }
 

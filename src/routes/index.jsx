@@ -41,8 +41,8 @@ export default function RoutesIndex() {
       <Route path="/verify-magic-link" element={<VerifyMagicLink />} />
       
       {/* Handle SuperTokens auth redirects */}
-      <Route path="/auth" element={<Login />} />
-      <Route path="/auth/*" element={<Login />} />
+      <Route path="/auth" element={<ResetPassword />} />
+      <Route path="/auth/*" element={<ResetPassword />} />
       
       {/* Protected routes - wrapped with SessionAuth */}
       <Route path="/" element={
@@ -51,6 +51,7 @@ export default function RoutesIndex() {
         </SessionAuth>
       }>
         <Route index element={<Dashboard />} />
+        <Route path="dashboard" element={<Dashboard />} />
         <Route path="rca-dashboard" element={<RCADashboard />} />
         <Route path="complaint/:ticketId" element={<Complaint />} />
         <Route path="investigation/:ticketId" element={<Investigation />} />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { emailVerificationService } from '../../api/services/emailVerificationService';
+import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/Button';
 
 const VerifyMagicLink = () => {
@@ -10,6 +10,7 @@ const VerifyMagicLink = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [message, setMessage] = useState('');
+  const { verifyEmail } = useAuth();
 
   useEffect(() => {
     const token = searchParams.get('token');
@@ -24,11 +25,11 @@ const VerifyMagicLink = () => {
   const verifyMagicLink = async (token) => {
     try {
       console.log('Verifying magic link token:', token);
-      const response = await emailVerificationService.verifyMagicLink(token);
+      const result = await verifyEmail();
       
-      if (response.success) {
+      if (result.status === 'OK') {
         setSuccess(true);
-        setMessage(response.message || 'Email verified successfully!');
+        setMessage('Email verified successfully!');
         
         // Redirect to login page after 3 seconds
         setTimeout(() => {
@@ -39,11 +40,11 @@ const VerifyMagicLink = () => {
           });
         }, 3000);
       } else {
-        setError(response.message || 'Verification failed');
+        setError(result.message || 'Verification failed');
       }
     } catch (err) {
       console.error('Magic link verification error:', err);
-      setError(err.response?.data?.message || 'Verification failed');
+      setError('Verification failed');
     } finally {
       setLoading(false);
     }
