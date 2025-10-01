@@ -158,6 +158,15 @@ export const aiService = {
         feedback
       });
       return response.data;
+    },
+
+    // Search AI guidance in playbook triggers
+    searchGuidanceInTriggers: async ({ playbookIds, guidanceQuestion }) => {
+      const response = await api.post('/v1/ai/playbook-recommender/search-guidance', {
+        playbookIds,
+        guidanceQuestion
+      });
+      return response.data;
     }
   },
 

@@ -100,7 +100,8 @@ const RCACompletion = () => {
     
     // Cleanup on unmount
     return () => {
-      // Remove direct socket listeners
+      // Remove direct socket listeners only - don't disconnect the socket
+      // The WebSocket connection is shared across the app and should persist
       const socket = websocketService.getSocket()
       if (socket) {
         socket.off('rca_progress')
@@ -114,8 +115,8 @@ const RCACompletion = () => {
       // Remove websocketService listeners
       websocketService.off('disconnect', handleDisconnect)
       
-      // Disconnect if needed
-      websocketService.disconnect()
+      // ✅ DO NOT disconnect the WebSocket here - it's shared across the application
+      // The WebSocket will be managed by the global service and other components may still need it
     }
   }, [location.state, ticketId])
 
@@ -163,11 +164,19 @@ const RCACompletion = () => {
 
   const connectWebSocket = async () => {
     try {
-      await websocketService.connect()
-      setWebsocketConnected(true)
-      setSocketId(websocketService.getSocket()?.id || null)
-      setStreamingError(null)
-      console.log('✅ Connected to WebSocket server:', websocketService.getSocket()?.id)
+      // Check if already connected before attempting to connect
+      if (websocketService.getConnectionStatus()) {
+        console.log('✅ WebSocket already connected, reusing existing connection')
+        setWebsocketConnected(true)
+        setSocketId(websocketService.getSocket()?.id || null)
+        setStreamingError(null)
+      } else {
+        await websocketService.connect()
+        setWebsocketConnected(true)
+        setSocketId(websocketService.getSocket()?.id || null)
+        setStreamingError(null)
+        console.log('✅ Connected to WebSocket server:', websocketService.getSocket()?.id)
+      }
       
       // Set up event listeners
       console.log('🔧 Setting up event listeners...')
@@ -176,6 +185,14 @@ const RCACompletion = () => {
       const socket = websocketService.getSocket()
       if (socket) {
         console.log('🔧 Setting up direct Socket.IO listeners for RCA events...')
+        
+        // Remove any existing listeners first to prevent duplicates
+        socket.off('rca_progress')
+        socket.off('rca_generation')
+        socket.off('rca_chunk')
+        socket.off('rca_streaming')
+        socket.off('rca_complete')
+        socket.off('rca_error')
         
         // Listen for RCA events directly on the socket
         socket.on('rca_progress', (data) => {
@@ -212,6 +229,7 @@ const RCACompletion = () => {
       }
       
       // Also set up websocketService listeners for other events
+      websocketService.off('disconnect', handleDisconnect) // Remove first to prevent duplicates
       websocketService.on('disconnect', handleDisconnect)
       console.log('✅ Event listeners set up successfully')
       
@@ -433,30 +451,30 @@ const RCACompletion = () => {
   // WebSocket-based RCA generation using websocketService
   const generateRCA = async () => {
     console.log('🚀 generateRCA called')
-    console.log('🔍 WebSocket connected:', websocketConnected)
     console.log('🔍 WebSocket service status:', websocketService.getConnectionStatus())
-    console.log('🔍 Socket instance:', websocketService.getSocket())
     
-    // Check if WebSocket is connected, if not try to reconnect
-    if (!websocketConnected || !websocketService.getConnectionStatus()) {
-      console.log('🔄 WebSocket not connected, attempting to reconnect...')
+    // Ensure WebSocket is connected before proceeding
+    if (!websocketService.getConnectionStatus()) {
+      console.log('🔄 WebSocket not connected, establishing connection...')
       try {
         await connectWebSocket()
-        // Wait a bit more for connection to be fully established
+        // Wait a bit for connection to be fully established
         await new Promise(resolve => setTimeout(resolve, 500))
       } catch (error) {
-        console.error('❌ Failed to reconnect WebSocket:', error)
+        console.error('❌ Failed to connect WebSocket:', error)
         setStreamingError('Failed to connect to WebSocket server')
         return
       }
     }
     
-    // Double check connection after potential reconnect
+    // Verify connection after potential connect attempt
     if (!websocketService.getConnectionStatus()) {
-      console.error('❌ WebSocket still not connected after reconnect attempt')
+      console.error('❌ WebSocket connection failed')
       setStreamingError('WebSocket connection failed')
       return
     }
+    
+    console.log('✅ WebSocket verified connected, proceeding with RCA generation')
 
     const ticketDataPayload = {
       ticket_id: ticketData?.ticket_id || 'INC0001234',
@@ -689,39 +707,10 @@ const RCACompletion = () => {
                 <FiLoader className="w-5 h-5 text-green-500 animate-spin mr-3" />
                 <p className="text-green-700 font-medium">{streamingProgress}</p>
               </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-32 bg-green-200 rounded-full h-2">
-                  <div 
-                    className="bg-green-600 h-2 rounded-full transition-all duration-300" 
-                    style={{ width: `${progress}%` }}
-                  ></div>
-                </div>
-                <span className="text-xs text-green-600">{Math.round(progress)}%</span>
-              </div>
             </div>
           </div>
         )}
 
-        {/* WebSocket Connection Status */}
-        <div className="mb-6 flex justify-end">
-          <div className={`flex items-center px-3 py-2 rounded-full text-sm ${
-            websocketConnected 
-              ? 'bg-green-100 text-green-800' 
-              : 'bg-red-100 text-red-800'
-          }`}>
-            {websocketConnected ? (
-              <>
-                <FiWifi className="w-4 h-4 mr-2" />
-                WebSocket Connected
-              </>
-            ) : (
-              <>
-                <FiWifiOff className="w-4 h-4 mr-2" />
-                WebSocket Disconnected
-              </>
-            )}
-          </div>
-        </div>
 
         {/* Regenerate Button */}
         {ticketData && (

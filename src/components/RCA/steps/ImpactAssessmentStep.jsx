@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Textarea } from '../../ui/Textarea'
 import { Button } from '../../ui/Button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select'
@@ -29,6 +29,9 @@ const ImpactAssessmentStep = ({
   const [enhancementOptions, setEnhancementOptions] = useState([])
   const [impactAssessments, setImpactAssessments] = useState([])
   
+  // Use ref to track if API has been called to prevent loops
+  const hasCalledAPI = useRef(false)
+  
   // Use the custom hook for text enhancement
   const { enhanceText, isLoading: isEnhancing, error: enhancementError } = useTextEnhancement()
 
@@ -47,18 +50,51 @@ const ImpactAssessmentStep = ({
       }
       
       // Restore impact assessments if they exist in stepData
-      if (stepData.impact_assessments_step2 && Array.isArray(stepData.impact_assessments_step2)) {
+      if (stepData.impact_assessments_step2 && Array.isArray(stepData.impact_assessments_step2) && stepData.impact_assessments_step2.length > 0) {
         setImpactAssessments(stepData.impact_assessments_step2);
-        console.log('ImpactAssessmentStep: Restored impact assessments:', stepData.impact_assessments_step2);
+        console.log('ImpactAssessmentStep: Restored impact assessments from stepData:', stepData.impact_assessments_step2);
         
         // Auto-populate the first assessment if no response is set yet
         if (stepData.impact_assessments_step2.length > 0 && (!response || !response.trim())) {
           const firstAssessment = stepData.impact_assessments_step2[0];
+          
+          // Auto-populate description
           if (firstAssessment.impactAssessment) {
             console.log('ImpactAssessmentStep: Auto-populating description from first assessment:', firstAssessment.impactAssessment);
             onResponseChange(firstAssessment.impactAssessment);
           }
+          
+          // Auto-populate dropdown fields if they're not already set
+          if (!impactLevel && firstAssessment.impactLevel) {
+            const impactLevelMap = {
+              'Sev 1 - Critical Impact': 'sev1',
+              'Sev 2 - Major Impact': 'sev2', 
+              'Sev 3 - Normal Impact': 'sev3',
+              'Sev 4 - Minor Impact': 'sev4'
+            }
+            const mappedLevel = impactLevelMap[firstAssessment.impactLevel] || 'sev3'
+            setImpactLevel(mappedLevel)
+            console.log('ImpactAssessmentStep: Auto-populated impact level:', mappedLevel)
+          }
+          
+          if (!departmentAffected && firstAssessment.department) {
+            const departmentMap = {
+              'Customer Support': 'customer_support',
+              'Sales': 'sales',
+              'IT Operations': 'it_operations',
+              'Finance': 'finance',
+              'Human Resources': 'hr',
+              'Other': 'other'
+            }
+            const mappedDepartment = departmentMap[firstAssessment.department] || 'it_operations'
+            setDepartmentAffected(mappedDepartment)
+            console.log('ImpactAssessmentStep: Auto-populated department:', mappedDepartment)
+          }
         }
+        
+        // Set the flag to indicate we have existing data (don't call API)
+        hasCalledAPI.current = true;
+        console.log('ImpactAssessmentStep: Impact assessments exist, skipping API call');
       }
     }
   }, [stepData])
@@ -86,6 +122,14 @@ const ImpactAssessmentStep = ({
     }
   }, [stepData?.impact_assessments_step2, impactAssessments.length])
 
+  // Reset API call flag when leaving step 2
+  useEffect(() => {
+    if (currentStep !== 2) {
+      hasCalledAPI.current = false
+      console.log('ImpactAssessmentStep: Reset API call flag (left step 2)')
+    }
+  }, [currentStep])
+
   // Generate impact assessment when component mounts (only for step 2)
   useEffect(() => {
     const generateImpactAssessment = async () => {
@@ -101,7 +145,10 @@ const ImpactAssessmentStep = ({
       console.log('ImpactAssessmentStep: isGeneratingImpactAssessment:', isGeneratingImpactAssessment);
       console.log('ImpactAssessmentStep: hasAttemptedImpactGeneration:', hasAttemptedImpactGeneration);
       
-      if (currentStep === 2 && stepData && !isGeneratingImpactAssessment && !hasAttemptedImpactGeneration && !hasExistingData && !hasExistingDataInStepData && !hasExistingImpactAssessments) {
+       // Only call API if no impact assessments exist yet
+       if (currentStep === 2 && stepData && !isGeneratingImpactAssessment && !hasCalledAPI.current && impactAssessments.length === 0 && (!stepData.impact_assessments_step2 || stepData.impact_assessments_step2.length === 0)) {
+        console.log('ImpactAssessmentStep: Calling API to get impact assessments (no existing data found)');
+        hasCalledAPI.current = true
         try {
           setIsGeneratingImpactAssessment(true)
           setHasAttemptedImpactGeneration(true)
@@ -189,8 +236,8 @@ const ImpactAssessmentStep = ({
       }
     }
     
-    generateImpactAssessment()
-  }, [currentStep, stepData, isGeneratingImpactAssessment, hasAttemptedImpactGeneration, onResponseChange, setStepData, response])
+     generateImpactAssessment()
+   }, [currentStep, stepData, isGeneratingImpactAssessment, hasAttemptedImpactGeneration, onResponseChange, setStepData, response])
 
   // Handle opening enhancement modal
   const handleEnhanceImpactAssessment = async () => {
