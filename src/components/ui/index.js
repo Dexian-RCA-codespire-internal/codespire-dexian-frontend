@@ -1,4 +1,4 @@
-export { Button } from "./button";
+export { Button } from "./Button";
 export {
   Card,
   CardHeader,
@@ -7,9 +7,9 @@ export {
   CardContent,
   CardFooter,
 } from "./card";
-export { Badge } from "./badge";
-export { Input } from "./input";
-export { Textarea } from "./textarea";
+export { Badge } from "./Badge";
+export { Input } from "./Input";
+export { Textarea } from "./Textarea";
 export { StreamingTextarea } from "./StreamingTextarea";
 export {
   Dialog,

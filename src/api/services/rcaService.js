@@ -117,7 +117,7 @@ export const rcaService = {
 
   // Stream RCA generation
   streamRCAGeneration: async ({ ticketData, rcaFields, socketId }) => {
-    const response = await api.post('/v1/rca/stream', {
+    const response = await api.post('/rca/stream', {
       ticketData,
       rcaFields
     }, {

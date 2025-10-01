@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
-import { Button } from '../components/ui/button'
-import { Textarea } from '../components/ui/textarea'
+import { Button } from '../components/ui/Button'
+import { Textarea } from '../components/ui/Textarea'
 import { StreamingTextarea } from '../components/ui/StreamingTextarea'
-import { Badge } from '../components/ui/badge'
+import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/skeleton'
 import { 
   FiFileText, 

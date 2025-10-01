@@ -1,7 +1,7 @@
 import React from 'react'
 import { motion } from 'framer-motion'
 import { FiLock, FiSettings, FiArrowLeft } from 'react-icons/fi'
-import { Button } from '../ui/button'
+import { Button } from '../ui/Button'
 import { useNavigate } from 'react-router-dom'
 
 const FeatureUnavailable = ({ featureName, featureDescription }) => {

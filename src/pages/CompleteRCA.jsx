@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
-import { Button } from '../components/ui/button'
+import { Button } from '../components/ui/Button'
 import { Textarea } from '../components/ui/Textarea'
-import { Badge } from '../components/ui/badge'
+import { Badge } from '../components/ui/Badge'
 import { FiSave, FiSend, FiArrowLeft, FiFileText, FiUser, FiCheckCircle, FiAlertTriangle, FiClock } from 'react-icons/fi'
 
 const CompleteRCA = () => {
