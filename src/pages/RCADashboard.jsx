@@ -179,9 +179,26 @@ const RCADashboard = () => {
 
   // Calculate RCA progress based on completed steps
   const calculateRCAProgress = (ticket) => {
-    if (!ticket) return { percentage: 0, completedSteps: 0, totalSteps: 5, currentStep: 1 }
+    if (!ticket) return { percentage: 0, completedSteps: 0, totalSteps: 4, currentStep: 1 }
     
-    // Check multiple possible locations for step data (including direct fields)
+    // Priority 1: Check rca_workflow_steps array (primary source from API)
+    if (ticket.rca_workflow_steps && Array.isArray(ticket.rca_workflow_steps)) {
+      const completedSteps = ticket.rca_workflow_steps.filter(step => 
+        step && step.trim().length > 0
+      ).length
+      
+      const totalSteps = 4 // We have 4 steps in RCA workflow
+      const progressPercentage = Math.round((completedSteps / totalSteps) * 100)
+      
+      return {
+        percentage: progressPercentage,
+        completedSteps,
+        totalSteps,
+        currentStep: completedSteps < totalSteps ? completedSteps + 1 : totalSteps
+      }
+    }
+    
+    // Priority 2: Check legacy individual step fields
     const stepData = ticket.stepData || ticket.steps || ticket.rcaSteps || ticket.workflowData || {
       problem_step1: ticket.problem_step1,
       timeline_step2: ticket.timeline_step2,
@@ -190,7 +207,7 @@ const RCADashboard = () => {
       root_cause_step5: ticket.root_cause_step5
     }
     
-    // Define the 5 RCA steps
+    // Define the legacy RCA steps
     const rcaSteps = [
       'problem_step1',
       'timeline_step2', 
@@ -223,7 +240,7 @@ const RCADashboard = () => {
     return {
       percentage: statusBasedProgress.percentage,
       completedSteps: statusBasedProgress.completedSteps,
-      totalSteps: 5,
+      totalSteps: 4,
       currentStep: statusBasedProgress.currentStep
     }
   }
@@ -237,11 +254,11 @@ const RCADashboard = () => {
     if (statusLower.includes('new') || statusLower.includes('pending')) {
       return { percentage: 0, completedSteps: 0, currentStep: 1 }
     } else if (statusLower.includes('progress') || statusLower.includes('assigned')) {
-      return { percentage: 20, completedSteps: 1, currentStep: 2 } // Started RCA
+      return { percentage: 25, completedSteps: 1, currentStep: 2 } // Started RCA (1/4 steps)
     } else if (statusLower.includes('resolved')) {
-      return { percentage: 80, completedSteps: 4, currentStep: 5 } // Almost done
+      return { percentage: 75, completedSteps: 3, currentStep: 4 } // Almost done (3/4 steps)
     } else if (statusLower.includes('closed')) {
-      return { percentage: 100, completedSteps: 5, currentStep: 5 } // Complete
+      return { percentage: 100, completedSteps: 4, currentStep: 4 } // Complete (4/4 steps)
     } else {
       return { percentage: 0, completedSteps: 0, currentStep: 1 }
     }
@@ -974,7 +991,7 @@ const RCADashboard = () => {
                                 </span>
                               </div>
                               {/* Show indicator if using fallback progress */}
-                              {!case_.stepData && !case_.steps && !case_.rcaSteps && 
+                              {!case_.rca_workflow_steps && !case_.stepData && !case_.steps && !case_.rcaSteps && 
                                !case_.problem_step1 && !case_.timeline_step2 && !case_.impact_step3 && 
                                !case_.findings_step4 && !case_.root_cause_step5 && (
                                 <div className="text-xs text-amber-600 mt-1 text-center">
@@ -1075,7 +1092,7 @@ const RCADashboard = () => {
                           </span>
                         </div>
                         {/* Show indicator if using fallback progress */}
-                        {!case_.stepData && !case_.steps && !case_.rcaSteps && 
+                        {!case_.rca_workflow_steps && !case_.stepData && !case_.steps && !case_.rcaSteps && 
                          !case_.problem_step1 && !case_.timeline_step2 && !case_.impact_step3 && 
                          !case_.findings_step4 && !case_.root_cause_step5 && (
                           <div className="text-xs text-amber-600 mt-1 text-center">

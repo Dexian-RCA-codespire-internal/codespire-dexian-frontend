@@ -1,9 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Skeleton } from '../ui/skeleton'
-import PlaybookRecommender from '../PlaybookRecommender'
 import { FiMessageCircle, FiZap, FiSearch, FiArrowRight, FiArrowLeft, FiCheck, FiSave, FiDownload, FiLoader } from 'react-icons/fi'
 import { 
   ProblemDefinitionStep, 
@@ -23,7 +22,7 @@ const RCAWorkflow = ({
   aiGuidance, 
   response, 
   onResponseChange, 
-  onNext,
+  onNext, 
   onPrevious, 
   similarCases = [],
   similarCasesLoading = false,
@@ -37,8 +36,7 @@ const RCAWorkflow = ({
   problemStatementData = null,
   isGeneratingProblemStatement = false,
   setIsGeneratingProblemStatement,
-  hasAttemptedGeneration = false,
-  onGuidanceResult = null
+  hasAttemptedGeneration = false
 }) => {
   // Note: Problem statement state is now managed in the parent component (Analysis.jsx)
   
@@ -372,15 +370,6 @@ const RCAWorkflow = ({
             )}
           </CardContent>
         </Card>
-
-        {/* Playbook Recommender - Moved to bottom of main content */}
-        <div className="mt-8">
-          <PlaybookRecommender 
-          ticketData={ticketData} 
-          aiGuidanceQuestion={aiGuidance} 
-          onGuidanceResult={onGuidanceResult}
-        />
-        </div>
       </div>
 
       </div>

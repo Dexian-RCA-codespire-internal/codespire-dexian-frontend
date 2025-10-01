@@ -124,6 +124,8 @@ export const transformTicketToRCACase = (ticket) => {
     impact_step3: ticket.impact_step3,
     findings_step4: ticket.findings_step4,
     root_cause_step5: ticket.root_cause_step5,
+    // RCA Workflow Steps Array (Primary)
+    rca_workflow_steps: ticket.rca_workflow_steps || [],
     // Alternative step data structures
     stepData: ticket.stepData,
     steps: ticket.steps,

@@ -689,39 +689,10 @@ const RCACompletion = () => {
                 <FiLoader className="w-5 h-5 text-green-500 animate-spin mr-3" />
                 <p className="text-green-700 font-medium">{streamingProgress}</p>
               </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-32 bg-green-200 rounded-full h-2">
-                  <div 
-                    className="bg-green-600 h-2 rounded-full transition-all duration-300" 
-                    style={{ width: `${progress}%` }}
-                  ></div>
-                </div>
-                <span className="text-xs text-green-600">{Math.round(progress)}%</span>
-              </div>
             </div>
           </div>
         )}
 
-        {/* WebSocket Connection Status */}
-        <div className="mb-6 flex justify-end">
-          <div className={`flex items-center px-3 py-2 rounded-full text-sm ${
-            websocketConnected 
-              ? 'bg-green-100 text-green-800' 
-              : 'bg-red-100 text-red-800'
-          }`}>
-            {websocketConnected ? (
-              <>
-                <FiWifi className="w-4 h-4 mr-2" />
-                WebSocket Connected
-              </>
-            ) : (
-              <>
-                <FiWifiOff className="w-4 h-4 mr-2" />
-                WebSocket Disconnected
-              </>
-            )}
-          </div>
-        </div>
 
         {/* Regenerate Button */}
         {ticketData && (

@@ -5,16 +5,16 @@ export const navigationConfig = {
   // Core features (always enabled)
   dashboard: true,
   aiRca: true,
-  sla: false,                    // SLA Monitoring
+  sla: true,                    // SLA Monitoring
 
   
   // Optional features (can be enabled/disabled)
-  patternDetector: false,        // Pattern & Duplicate Detector
-  playbookRecommender:false,    // Playbook Recommender
-  customerRcaSummary: false,     // Customer RCA Summary
-  alertCorrelation: false,       // Alert Correlation
-  complianceAudit: false,        // Compliance & Audit
-  userManagement: false,          // User Management
+  patternDetector: true,        // Pattern & Duplicate Detector
+  playbookRecommender:true,    // Playbook Recommender
+  customerRcaSummary: true,     // Customer RCA Summary
+  alertCorrelation: true,       // Alert Correlation
+  complianceAudit: true,        // Compliance & Audit
+  userManagement: true,          // User Management
 }
 
 // Helper function to get enabled navigation items
