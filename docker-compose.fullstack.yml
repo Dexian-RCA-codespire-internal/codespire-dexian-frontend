@@ -1,8 +1,6 @@
 # Full Stack Docker Compose
 # This file orchestrates both frontend and backend applications with all dependencies
 
-
-
 services:
   # Frontend Application
   frontend:
@@ -15,15 +13,22 @@ services:
       - "3001:80"
     environment:
       - NODE_ENV=production
-      - VITE_API_URL=http://localhost:8081/api/v1
-      - VITE_BACKEND_URL=http://localhost:8081
+      - VITE_API_URL=https://rca-sit.codespiresolutions.cloud/api/v1
+      - VITE_BACKEND_URL=https://rca-sit.codespiresolutions.cloud
       - VITE_APP_NAME=Dexian RCA
       - VITE_APP_VERSION=1.0.0
     networks:
+      - web
       - codespire-network
     depends_on:
       backend:
         condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rca-sit.rule=Host(`rca-sit.codespiresolutions.cloud`)"
+      - "traefik.http.routers.rca-sit.entrypoints=websecure"
+      - "traefik.http.routers.rca-sit.tls.certresolver=letsencrypt"
+      - "traefik.http.services.rca-sit.loadbalancer.server.port=80"
 
   # Backend Application
   backend:
@@ -42,8 +47,8 @@ services:
       - SUPERTOKENS_CONNECTION_URI=http://supertokens:3567
       - SUPERTOKENS_API_KEY=your-super-secret-api-key-here
       - SUPERTOKENS_APP_NAME=test-bg
-      - SUPERTOKENS_API_DOMAIN=http://localhost:8081
-      - SUPERTOKENS_APP_DOMAIN=http://localhost:3001
+      - SUPERTOKENS_API_DOMAIN=https://rca-sit.codespiresolutions.cloud
+      - SUPERTOKENS_APP_DOMAIN=https://rca-sit.codespiresolutions.cloud
       - POSTGRES_USER=supertokens
       - POSTGRES_PASSWORD=supertokens123
       - POSTGRES_DB=supertokens
@@ -51,12 +56,9 @@ services:
       - QDRANT_API_KEY=
       - QDRANT_LOG_LEVEL=INFO
       - ENABLE_QDRANT=true
-      - FRONTEND_URL=http://localhost:3001
-      - CORS_ORIGINS=http://localhost:3001
+      - FRONTEND_URL=https://rca-sit.codespiresolutions.cloud
+      - CORS_ORIGINS=https://rca-sit.codespiresolutions.cloud
       # Email Configuration (for OTP/Magic Link emails)
-
-
-
       - EMAIL_SERVICE=gmail
       - EMAIL_HOST=smtp-mail.outlook.com
       - EMAIL_PORT=587
@@ -73,7 +75,7 @@ services:
       # Email Branding Configuration
       - EMAIL_COMPANY_NAME=Dexian
       - EMAIL_SUPPORT_EMAIL=support@yourcompany.com
-      - EMAIL_LOGO_URL=http://localhost:8081/public/email-asset/logo.png
+      - EMAIL_LOGO_URL=https://rca-sit.codespiresolutions.cloud/public/email-asset/logo.png
       - EMAIL_LOGO_ALT=Dexian
       - EMAIL_LOGO_WIDTH=120
       - EMAIL_LOGO_HEIGHT=40
@@ -132,6 +134,7 @@ services:
       qdrant:
         condition: service_healthy
     networks:
+      - web
       - codespire-network
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:8081/api/v1/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
@@ -139,6 +142,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rca-api.rule=Host(`rca-sit.codespiresolutions.cloud`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.rca-api.entrypoints=websecure"
+      - "traefik.http.routers.rca-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.rca-api.loadbalancer.server.port=8081"
 
   # MongoDB Database
   mongodb:
@@ -232,4 +241,5 @@ volumes:
 networks:
   codespire-network:
     driver: bridge
-
+  web:
+    external: true
