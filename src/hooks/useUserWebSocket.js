@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
 
 /**
@@ -8,6 +8,7 @@ import { io } from 'socket.io-client';
 const useUserWebSocket = (backendUrl) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [error, setError] = useState(null);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -82,6 +83,7 @@ const useUserWebSocket = (backendUrl) => {
             setUsers(data.data);
             setPagination(data.pagination);
             setError(null);
+            setIsInitialLoad(false); // Mark initial load as complete
           } else {
             setError(data.error || 'Failed to fetch users');
           }
@@ -211,10 +213,10 @@ const useUserWebSocket = (backendUrl) => {
     }, 5000);
   };
 
-  // Request user data
-  const requestUserData = (options = {}) => {
+  // Request user data - memoized to prevent unnecessary re-renders
+  const requestUserData = useCallback((options = {}) => {
     if (!socketRef.current || !isConnected) {
-      setError('Not connected to server');
+      console.warn('Cannot request user data: not connected');
       return;
     }
 
@@ -223,35 +225,36 @@ const useUserWebSocket = (backendUrl) => {
     
     console.log('📤 Requesting user data:', options);
     socketRef.current.emit('request_user_data', options);
-  };
+  }, [isConnected]);
 
-  // Request user statistics
-  const requestUserStatistics = (options = {}) => {
+  // Request user statistics - memoized to prevent unnecessary re-renders
+  const requestUserStatistics = useCallback((options = {}) => {
     if (!socketRef.current || !isConnected) {
-      setError('Not connected to server');
+      console.warn('Cannot request user statistics: not connected');
       return;
     }
 
     console.log('📤 Requesting user statistics:', options);
     socketRef.current.emit('request_user_statistics', options);
-  };
+  }, [isConnected]);
 
-  // Ping server
-  const ping = () => {
+  // Ping server - memoized
+  const ping = useCallback(() => {
     if (socketRef.current && isConnected) {
       socketRef.current.emit('ping');
     }
-  };
+  }, [isConnected]);
 
-  // Clear notifications
-  const clearNotifications = () => {
+  // Clear notifications - memoized
+  const clearNotifications = useCallback(() => {
     setNotifications([]);
-  };
+  }, []);
 
   return {
     // State
     users,
     loading,
+    isInitialLoad,
     error,
     pagination,
     statistics,

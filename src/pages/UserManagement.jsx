@@ -16,7 +16,9 @@ import {
   LuActivity,
   LuMail,
   LuMailCheck,
-  LuClock
+  LuClock,
+  LuX,
+  LuLoader
 } from 'react-icons/lu';
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { Button } from '../components/ui/Button';
@@ -249,46 +251,47 @@ const Header = () => (
 );
 
 // Filters Component
-const Filters = ({ searchTerm, setSearchTerm, selectedRole, setSelectedRole, onAddUser }) => (
-  <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-    <div className="flex flex-col sm:flex-row gap-4">
-      <div className="flex-1">
-        <div className="relative">
-          <LuSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <Input
-            type="text"
-            placeholder="Search users by name or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+const Filters = ({ searchTerm, setSearchTerm, onClearFilters, onAddUser }) => {
+  const hasFilters = searchTerm.trim() !== '';
+  
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1">
+          <div className="relative">
+            <LuSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              type="text"
+              placeholder="Search users by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </div>
-      </div>
-      <div className="flex items-center space-x-3">
-        <div className="flex items-center space-x-2">
-
-          <select
-            value={selectedRole}
-            onChange={(e) => setSelectedRole(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent"
+        <div className="flex items-center space-x-3">
+          {hasFilters && (
+            <Button 
+              onClick={onClearFilters}
+              variant="outline"
+              className="flex items-center space-x-2 border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              <LuX className="w-4 h-4" />
+              <span>Clear Filters</span>
+            </Button>
+          )}
+          <Button 
+            onClick={onAddUser}
+            className="flex items-center space-x-2 bg-lime-600 hover:bg-lime-700 text-white"
           >
-            <option value="all">All Roles</option>
-            <option value="admin">Admin</option>
-            <option value="moderator">Moderator</option>
-            <option value="user">User</option>
-          </select>
+            <LuUserPlus className="w-4 h-4" />
+            <span>Add User</span>
+          </Button>
         </div>
-        <Button 
-          onClick={onAddUser}
-          className="flex items-center space-x-2 bg-lime-600 hover:bg-lime-700 text-white"
-        >
-          <LuUserPlus className="w-4 h-4" />
-          <span>Add User</span>
-        </Button>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Dropdown Menu Component
 const ActionDropdown = ({ user, isOpen, onToggle, onAction }) => (
@@ -459,17 +462,17 @@ const UserTable = ({ users, onDropdownToggle, onDropdownAction, openDropdown, is
 );
 
 // Empty State Component
-const EmptyState = ({ searchTerm, selectedRole, onClearFilters, onAddUser }) => (
+const EmptyState = ({ searchTerm, onClearFilters, onAddUser }) => (
   <div className="text-center py-12">
     <LuUser className="w-12 h-12 text-gray-400 mx-auto mb-4" />
     <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
     <p className="text-gray-600 mb-4">
-      {searchTerm || selectedRole !== 'all' 
-        ? 'Try adjusting your search or filter criteria.'
+      {searchTerm 
+        ? 'Try adjusting your search criteria.'
         : 'Get started by adding your first user.'
       }
     </p>
-    {(searchTerm || selectedRole !== 'all') ? (
+    {searchTerm ? (
       <Button onClick={onClearFilters} variant="outline">
         Clear Filters
       </Button>
@@ -509,6 +512,7 @@ const UserManagement = () => {
   const {
     users,
     loading,
+    isInitialLoad,
     error,
     pagination,
     statistics,
@@ -521,7 +525,6 @@ const UserManagement = () => {
 
   // Local state management
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRole, setSelectedRole] = useState('all');
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [viewingUser, setViewingUser] = useState(null);
@@ -535,12 +538,15 @@ const UserManagement = () => {
     password: '',
     firstName: '',
     lastName: '',
-    phone: ''
+    phone: '',
+    roles: ['user'] // Default to user role
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [openDropdown, setOpenDropdown] = useState(null); // Track which dropdown is open
   const searchTimeoutRef = useRef(null); // Ref for search debounce timeout
+  const lastQueryRef = useRef(null); // Track last query to prevent duplicate requests
+  const initialLoadDoneRef = useRef(false); // Track if initial load is complete
 
   // OTP verification state
   const [showOTPModal, setShowOTPModal] = useState(false);
@@ -554,46 +560,70 @@ const UserManagement = () => {
   const [isOTPSubmitting, setIsOTPSubmitting] = useState(false);
   const [otpErrors, setOtpErrors] = useState({});
 
-  // Load users data on component mount
+  // Ensure formData.roles is always initialized
   useEffect(() => {
-    console.log('🚀 Component mounted, requesting data...');
-    requestUserData({
-      page: 1,
-      limit: 10,
-      query: searchTerm,
-      role: selectedRole,
-      sortBy: 'createdAt',
-      sortOrder: 'desc'
-    });
-    requestUserStatistics();
+    setFormData(prev => ({
+      ...prev,
+      roles: prev.roles || ['user']
+    }));
   }, []);
 
-  // Request statistics when connection is established
+  // Load users data on component mount - only once
   useEffect(() => {
-    if (isConnected) {
-      console.log('🔌 WebSocket connected, requesting statistics...');
+    if (!initialLoadDoneRef.current && isConnected && isInitialLoad) {
+      console.log('🚀 Component mounted, requesting initial data...');
+      const initialQuery = {
+        page: 1,
+        limit: 10,
+        query: '',
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      };
+      lastQueryRef.current = JSON.stringify(initialQuery);
+      requestUserData(initialQuery);
+      requestUserStatistics();
+      initialLoadDoneRef.current = true;
+    }
+  }, [isConnected, isInitialLoad, requestUserData, requestUserStatistics]);
+
+  // Request statistics when connection is re-established (not on initial connection)
+  useEffect(() => {
+    if (isConnected && initialLoadDoneRef.current) {
+      console.log('🔌 WebSocket reconnected, refreshing statistics...');
       requestUserStatistics();
     }
-  }, [isConnected]);
+  }, [isConnected, requestUserStatistics]);
 
   // Debounced search - prevents abrupt refreshes
   useEffect(() => {
+    // Skip if initial load hasn't completed
+    if (!initialLoadDoneRef.current || isInitialLoad) {
+      return;
+    }
+
     // Clear existing timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    // Set new timeout for search
+    // Set new timeout for search (only triggers when searchTerm changes, not on connection changes)
     searchTimeoutRef.current = setTimeout(() => {
       if (isConnected) {
-        requestUserData({
+        const newQuery = {
           page: 1,
           limit: pagination.limit,
           query: searchTerm,
-          role: selectedRole,
           sortBy: 'createdAt',
           sortOrder: 'desc'
-        });
+        };
+        
+        // Only fetch if query actually changed
+        const queryString = JSON.stringify(newQuery);
+        if (queryString !== lastQueryRef.current) {
+          console.log('🔍 Search term changed, fetching users...');
+          lastQueryRef.current = queryString;
+          requestUserData(newQuery);
+        }
       }
     }, 500); // 500ms delay
 
@@ -603,7 +633,7 @@ const UserManagement = () => {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [searchTerm, selectedRole, isConnected]);
+  }, [searchTerm, isConnected, isInitialLoad, pagination.limit, requestUserData]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -658,6 +688,16 @@ const UserManagement = () => {
     }
   };
 
+  const handleRoleChange = (e) => {
+    const selectedRole = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      roles: (prev.roles || []).includes(selectedRole)
+        ? (prev.roles || []).filter(role => role !== selectedRole)
+        : [...(prev.roles || []), selectedRole]
+    }));
+  };
+
   const validateForm = () => {
     const errors = {};
     
@@ -671,6 +711,10 @@ const UserManagement = () => {
       errors.password = 'Password is required';
     } else if (formData.password.length < 6) {
       errors.password = 'Password must be at least 6 characters';
+    }
+    
+    if (!formData.roles || !Array.isArray(formData.roles) || formData.roles.length === 0) {
+      errors.roles = 'At least one role must be selected';
     }
     
     setFormErrors(errors);
@@ -695,7 +739,16 @@ const UserManagement = () => {
       
       // Close modal and refresh data
       handleCloseModals();
-      requestUserData(); // Refresh user list via WebSocket
+      // Refresh with current query parameters
+      const refreshQuery = {
+        page: pagination.page || 1,
+        limit: pagination.limit || 10,
+        query: searchTerm,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      };
+      lastQueryRef.current = JSON.stringify(refreshQuery);
+      requestUserData(refreshQuery);
       
       // Show success message
       if (result.otpData) {
@@ -735,10 +788,28 @@ const UserManagement = () => {
     setShowPermissionModal(true);
   };
 
-  const handleDeleteUser = (userId) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
-      // TODO: Implement API call to delete user
-      console.log('Delete user:', userId);
+  const handleDeleteUser = async (userId) => {
+    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      try {
+        const result = await userService.deleteUser(userId);
+        
+        if (result.success) {
+          console.log('✅ User deleted successfully');
+          // Refresh user list with current filters
+          const refreshQuery = {
+            page: pagination.page || 1,
+            limit: pagination.limit || 10,
+            query: searchTerm,
+            sortBy: 'createdAt',
+            sortOrder: 'desc'
+          };
+          lastQueryRef.current = JSON.stringify(refreshQuery);
+          requestUserData(refreshQuery);
+        }
+      } catch (error) {
+        console.error('❌ Error deleting user:', error);
+        alert(`Failed to delete user: ${error.response?.data?.error || error.message}`);
+      }
     }
   };
 
@@ -749,7 +820,16 @@ const UserManagement = () => {
 
   const handleClearFilters = () => {
     setSearchTerm('');
-    setSelectedRole('all');
+    // Fetch users with cleared filters
+    const newQuery = {
+      page: 1,
+      limit: pagination.limit,
+      query: '',
+      sortBy: 'createdAt',
+      sortOrder: 'desc'
+    };
+    lastQueryRef.current = JSON.stringify(newQuery);
+    requestUserData(newQuery);
   };
 
   // OTP verification handlers
@@ -831,7 +911,16 @@ const UserManagement = () => {
         setShowOTPModal(false);
         setOtpData({ email: '', otp: '', deviceId: null, preAuthSessionId: null });
         setVerifyingUser(null);
-        requestUserData(); // Refresh user list
+        // Refresh with current query parameters
+        const refreshQuery = {
+          page: pagination.page || 1,
+          limit: pagination.limit || 10,
+          query: searchTerm,
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        };
+        lastQueryRef.current = JSON.stringify(refreshQuery);
+        requestUserData(refreshQuery);
       } else {
         alert(`Verification failed: ${result.message}`);
       }
@@ -879,25 +968,27 @@ const UserManagement = () => {
 
   // Pagination handlers - matching RCA Dashboard
   const handlePageChange = (newPage) => {
-    requestUserData({
+    const newQuery = {
       page: newPage,
       limit: pagination.limit,
       query: searchTerm,
-      role: selectedRole,
       sortBy: 'createdAt',
       sortOrder: 'desc'
-    });
+    };
+    lastQueryRef.current = JSON.stringify(newQuery);
+    requestUserData(newQuery);
   };
 
   const handleLimitChange = (newLimit) => {
-    requestUserData({
+    const newQuery = {
       page: 1,
       limit: newLimit,
       query: searchTerm,
-      role: selectedRole,
       sortBy: 'createdAt',
       sortOrder: 'desc'
-    });
+    };
+    lastQueryRef.current = JSON.stringify(newQuery);
+    requestUserData(newQuery);
   };
 
   const handleCloseModals = () => {
@@ -910,7 +1001,7 @@ const UserManagement = () => {
     setManagingUser(null);
     setVerifyingUser(null);
     setOpenDropdown(null);
-    setFormData({ email: '', password: '', firstName: '', lastName: '', phone: '' });
+    setFormData({ email: '', password: '', firstName: '', lastName: '', phone: '', roles: ['user'] });
     setFormErrors({});
     setOtpData({ email: '', otp: '', deviceId: null, preAuthSessionId: null });
     setOtpErrors({});
@@ -954,7 +1045,7 @@ const UserManagement = () => {
     <div className="p-6">
       <Header />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {loading && statistics.totalUsers === 0 ? (
+          {isInitialLoad && statistics.totalUsers === 0 ? (
             // Show loading skeleton
             Array.from({ length: 4 }).map((_, index) => (
               <Card key={index} className="bg-white border-gray-200 shadow-sm">
@@ -994,8 +1085,7 @@ const UserManagement = () => {
       <Filters 
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
-        selectedRole={selectedRole}
-        setSelectedRole={setSelectedRole}
+        onClearFilters={handleClearFilters}
         onAddUser={handleAddUser}
       />
 
@@ -1019,16 +1109,36 @@ const UserManagement = () => {
         </div>
       )}
 
-      {users.length > 0 ? (
+      {isInitialLoad ? (
+        <div className="text-center py-12">
+          <div className="text-gray-400 mb-4">
+            <LuLoader className="text-4xl mx-auto animate-spin" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Loading users...</h3>
+          <p className="text-gray-500">Fetching data from the server</p>
+        </div>
+      ) : users.length > 0 ? (
         <>
-          <UserTable 
-            users={users}
-            onDropdownToggle={handleDropdownToggle}
-            onDropdownAction={handleDropdownAction}
-            openDropdown={openDropdown}
-            isOTPSubmitting={isOTPSubmitting}
-            handleSendOTP={handleSendOTP}
-          />
+          <div className="bg-white shadow-sm rounded-lg overflow-hidden relative">
+            {/* Subtle loading overlay for background refreshes */}
+            {loading && !isInitialLoad && (
+              <div className="absolute inset-0 bg-white bg-opacity-75 z-10 flex items-center justify-center">
+                <div className="flex items-center gap-2 text-sm text-gray-600 bg-white px-3 py-2 rounded-lg shadow-sm">
+                  <LuLoader className="w-4 h-4 animate-spin" />
+                  <span>Updating...</span>
+                </div>
+              </div>
+            )}
+            
+            <UserTable 
+              users={users}
+              onDropdownToggle={handleDropdownToggle}
+              onDropdownAction={handleDropdownAction}
+              openDropdown={openDropdown}
+              isOTPSubmitting={isOTPSubmitting}
+              handleSendOTP={handleSendOTP}
+            />
+          </div>
           
           {/* Pagination Controls - matching RCA Dashboard */}
           {users.length > 0 && (
@@ -1040,7 +1150,7 @@ const UserManagement = () => {
                     value={pagination.limit}
                     onChange={(e) => handleLimitChange(parseInt(e.target.value))}
                     className="border border-gray-300 rounded-md px-2 py-1 text-sm"
-                    disabled={loading}
+                    disabled={loading && !isInitialLoad}
                   >
                     <option value={5}>5</option>
                     <option value={10}>10</option>
@@ -1059,7 +1169,7 @@ const UserManagement = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => handlePageChange(pagination.page - 1)}
-                  disabled={!pagination.hasPrev || loading}
+                  disabled={!pagination.hasPrev || (loading && !isInitialLoad)}
                   className="flex items-center gap-1"
                 >
                   <FiChevronLeft className="w-4 h-4" />
@@ -1077,7 +1187,7 @@ const UserManagement = () => {
                         variant={pageNum === pagination.page ? "default" : "outline"}
                         size="sm"
                         onClick={() => handlePageChange(pageNum)}
-                        disabled={loading}
+                        disabled={loading && !isInitialLoad}
                         className="w-8 h-8 p-0"
                       >
                         {pageNum}
@@ -1090,7 +1200,7 @@ const UserManagement = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => handlePageChange(pagination.page + 1)}
-                  disabled={!pagination.hasNext || loading}
+                  disabled={!pagination.hasNext || (loading && !isInitialLoad)}
                   className="flex items-center gap-1"
                 >
                   Next
@@ -1103,7 +1213,6 @@ const UserManagement = () => {
       ) : (
         <EmptyState 
           searchTerm={searchTerm}
-          selectedRole={selectedRole}
           onClearFilters={handleClearFilters}
           onAddUser={handleAddUser}
         />
@@ -1195,6 +1304,29 @@ const UserManagement = () => {
                   onChange={handleInputChange}
                   placeholder="Enter phone number"
                 />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Roles *
+                </label>
+                <div className="space-y-2">
+                  {['admin', 'user'].map(role => (
+                    <label key={role} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        value={role}
+                        checked={(formData.roles || ['user']).includes(role)}
+                        onChange={handleRoleChange}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 capitalize">{role}</span>
+                    </label>
+                  ))}
+                </div>
+                {formErrors.roles && (
+                  <p className="text-sm text-red-600 mt-1">{formErrors.roles}</p>
+                )}
               </div>
               
               <div className="flex justify-end space-x-3 pt-4">
