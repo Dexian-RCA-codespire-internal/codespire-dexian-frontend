@@ -9,103 +9,103 @@ export const notificationService = {
       limit: limit.toString(),
       unreadOnly: unreadOnly.toString()
     });
-    const response = await api.get(`/v1/notifications?${params}`);
+    const response = await api.get(`/notifications?${params}`);
     return response.data;
   },
 
   // Get notification by ID
   getNotificationById: async (notificationId) => {
-    const response = await api.get(`/v1/notifications/${notificationId}`);
+    const response = await api.get(`/notifications/${notificationId}`);
     return response.data;
   },
 
   // Mark notification as read
   markAsRead: async (notificationId) => {
-    const response = await api.patch(`/v1/notifications/${notificationId}/read`);
+    const response = await api.patch(`/notifications/${notificationId}/read`);
     return response.data;
   },
 
   // Mark all notifications as read
   markAllAsRead: async () => {
-    const response = await api.patch('/v1/notifications/mark-all-read');
+    const response = await api.patch('/notifications/mark-all-read');
     return response.data;
   },
 
   // Get unread notifications count
   getUnreadCount: async () => {
-    const response = await api.get('/v1/notifications/unread-count');
+    const response = await api.get('/notifications/unread-count');
     return response.data;
   },
 
   // Delete notification
   deleteNotification: async (notificationId) => {
-    const response = await api.delete(`/v1/notifications/${notificationId}`);
+    const response = await api.delete(`/notifications/${notificationId}`);
     return response.data;
   },
 
   // Delete all notifications
   deleteAllNotifications: async () => {
-    const response = await api.delete('/v1/notifications/delete-all');
+    const response = await api.delete('/notifications/delete-all');
     return response.data;
   },
 
   // Get notification preferences
   getNotificationPreferences: async () => {
-    const response = await api.get('/v1/notifications/preferences');
+    const response = await api.get('/notifications/preferences');
     return response.data;
   },
 
   // Update notification preferences
   updateNotificationPreferences: async (preferences) => {
-    const response = await api.put('/v1/notifications/preferences', preferences);
+    const response = await api.put('/notifications/preferences', preferences);
     return response.data;
   },
 
   // Get notification statistics
   getNotificationStats: async () => {
-    const response = await api.get('/v1/notifications/stats');
+    const response = await api.get('/notifications/stats');
     return response.data;
   },
 
   // Create notification
   createNotification: async (notificationData) => {
-    const response = await api.post('/v1/notifications', notificationData);
+    const response = await api.post('/notifications', notificationData);
     return response.data;
   },
 
   // Send notification to user
   sendNotificationToUser: async ({ userId, notificationData }) => {
-    const response = await api.post(`/v1/notifications/send/${userId}`, notificationData);
+    const response = await api.post(`/notifications/send/${userId}`, notificationData);
     return response.data;
   },
 
   // Send notification to all users
   sendNotificationToAll: async (notificationData) => {
-    const response = await api.post('/v1/notifications/send-all', notificationData);
+    const response = await api.post('/notifications/send-all', notificationData);
     return response.data;
   },
 
   // Get notification templates
   getNotificationTemplates: async () => {
-    const response = await api.get('/v1/notifications/templates');
+    const response = await api.get('/notifications/templates');
     return response.data;
   },
 
   // Create notification template
   createNotificationTemplate: async (templateData) => {
-    const response = await api.post('/v1/notifications/templates', templateData);
+    const response = await api.post('/notifications/templates', templateData);
     return response.data;
   },
 
   // Update notification template
   updateNotificationTemplate: async ({ templateId, templateData }) => {
-    const response = await api.put(`/v1/notifications/templates/${templateId}`, templateData);
+    const response = await api.put(`/notifications/templates/${templateId}`, templateData);
     return response.data;
   },
 
   // Delete notification template
   deleteNotificationTemplate: async (templateId) => {
-    const response = await api.delete(`/v1/notifications/templates/${templateId}`);
+    const response = await api.delete(`/notifications/templates/${templateId}`);
     return response.data;
   }
 };

@@ -1,0 +1,23 @@
+
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: codespire-frontend
+    ports:
+      - "3001:80"
+    restart: unless-stopped
+    networks:
+      - codespire-network
+    environment:
+      - NODE_ENV=production
+    # Uncomment below if you have a backend service
+    # depends_on:
+    #   - backend
+
+networks:
+  codespire-network:
+    driver: bridge
+

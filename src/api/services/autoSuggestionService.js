@@ -4,7 +4,7 @@ import api from '../index.js';
 export const autoSuggestionService = {
   // Get auto-suggestion based on current text and reference
   getSuggestion: async ({ currentText, reference }) => {
-    const response = await api.post('/v1/auto-suggestion/suggest', {
+    const response = await api.post('/auto-suggestion/suggest', {
       currentText,
       reference
     });
