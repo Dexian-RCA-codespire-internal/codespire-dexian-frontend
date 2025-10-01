@@ -937,7 +937,7 @@ const RCADashboard = () => {
                       <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Progress
                       </th>
-                      <th className="w-48 px-8 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-32 px-8 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -1001,8 +1001,8 @@ const RCADashboard = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-8 py-4 whitespace-nowrap text-sm font-medium align-middle">
-                          <div className="flex items-center space-x-2 mr-8">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium align-middle">
+                          <div className="flex items-center space-x-1 mr-8">
                             {progress.percentage === 100 ? (
                               <Button 
                                 size="sm" 
@@ -1020,13 +1020,13 @@ const RCADashboard = () => {
                                 Resolve
                               </Button>
                             )}
-                            <Button 
+                            {/* <Button 
                               variant="outline" 
                               size="sm"
                               onClick={() => navigate(`/complaint/${case_.id}`)}
                             >
                               View
-                            </Button>
+                            </Button> */}
                           </div>
                         </td>
                       </tr>
@@ -1103,7 +1103,7 @@ const RCADashboard = () => {
 
                       {/* Action Buttons */}
                       <div className="flex items-center justify-end">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-1">
                           {progress.percentage === 100 ? (
                             <Button 
                               size="sm" 
@@ -1121,14 +1121,14 @@ const RCADashboard = () => {
                               Resolve
                             </Button>
                           )}
-                          <Button 
+                          {/* <Button 
                             variant="outline" 
                             size="sm"
                             onClick={() => navigate(`/complaint/${case_.id}`)}
                             className="text-xs px-3 py-1"
                           >
                             View
-                          </Button>
+                          </Button> */}
                         </div>
                       </div>
                     </div>
