@@ -22,14 +22,39 @@ export const userService = {
 
   // Create new user
   createUser: async (userData) => {
-    const response = await api.post('/v1/users', userData);
-    return response.data;
+    console.log('🔍 Frontend API: Creating user with data:', userData);
+    try {
+      const response = await api.post('/v1/users', userData);
+      console.log('🔍 Frontend API: Response received:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('🔍 Frontend API: Error creating user:', error);
+      console.error('   Error response:', error.response?.data);
+      console.error('   Error status:', error.response?.status);
+      throw error;
+    }
   },
 
   // Update user status
   updateUserStatus: async (userId, status) => {
-    const response = await api.put(`/v1/users/${userId}/status`, { status });
-    return response.data;
+    console.log('🔍 Frontend API: Updating user status...');
+    console.log('   User ID:', userId);
+    console.log('   Status:', status);
+    console.log('   API endpoint:', `/v1/users/${userId}/status`);
+    
+    try {
+      const response = await api.put(`/v1/users/${userId}/status`, { status });
+      console.log('🔍 Frontend API: Response received:');
+      console.log('   Status code:', response.status);
+      console.log('   Response data:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Frontend API: Error updating user status:');
+      console.error('   Error message:', error.message);
+      console.error('   Error response:', error.response?.data);
+      console.error('   Error status:', error.response?.status);
+      throw error;
+    }
   },
 
   // Update user roles
@@ -74,6 +99,12 @@ export const userService = {
       deviceId,
       preAuthSessionId
     });
+    return response.data;
+  },
+
+  // Add additional roles to user
+  addUserRoles: async (userId, roles) => {
+    const response = await api.post(`/v1/users/${userId}/roles/add`, { roles });
     return response.data;
   }
 };

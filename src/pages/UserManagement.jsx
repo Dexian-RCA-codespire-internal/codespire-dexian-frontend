@@ -139,15 +139,74 @@ const mockUsers = [
   }
 ];
 
-// Permission modules configuration
-const permissionModules = [
-  { key: 'dashboard', name: 'Dashboard' },
-  { key: 'tickets', name: 'Tickets' },
-  { key: 'ai-rca', name: 'AI RCA Guidance' },
-  { key: 'pattern-detector', name: 'Pattern Detector' },
-  { key: 'playbook', name: 'Playbook Recommender' },
-  { key: 'compliance', name: 'Compliance Audit' },
-  { key: 'user-management', name: 'User Management' }
+// Available roles configuration
+const availableRoles = [
+  // Broad roles
+  { value: 'admin', label: 'Admin', description: 'Full system access', category: 'Broad Roles' },
+  { value: 'manager', label: 'Manager', description: 'Broad access without delete permissions', category: 'Broad Roles' },
+  { value: 'support_agent', label: 'Support Agent', description: 'Frontline operations access', category: 'Broad Roles' },
+  { value: 'user', label: 'User', description: 'Standard user access', category: 'Broad Roles' },
+  { value: 'viewer', label: 'Viewer', description: 'Read-only access everywhere', category: 'Broad Roles' },
+  
+  // Dashboard roles
+  { value: 'dashboard_reader', label: 'Dashboard Reader', description: 'Read dashboard data', category: 'Dashboard' },
+  { value: 'dashboard_editor', label: 'Dashboard Editor', description: 'Read and write dashboard data', category: 'Dashboard' },
+  { value: 'dashboard_owner', label: 'Dashboard Owner', description: 'Full dashboard control', category: 'Dashboard' },
+  
+  // Tickets roles
+  { value: 'tickets_reader', label: 'Tickets Reader', description: 'Read ticket data', category: 'Tickets' },
+  { value: 'tickets_editor', label: 'Tickets Editor', description: 'Read and write ticket data', category: 'Tickets' },
+  { value: 'tickets_owner', label: 'Tickets Owner', description: 'Full ticket control', category: 'Tickets' },
+  
+  // SLA roles
+  { value: 'sla_reader', label: 'SLA Reader', description: 'Read SLA data', category: 'SLA' },
+  { value: 'sla_editor', label: 'SLA Editor', description: 'Read and write SLA data', category: 'SLA' },
+  { value: 'sla_owner', label: 'SLA Owner', description: 'Full SLA control', category: 'SLA' },
+  
+  // Playbooks roles
+  { value: 'playbooks_reader', label: 'Playbooks Reader', description: 'Read playbook data', category: 'Playbooks' },
+  { value: 'playbooks_editor', label: 'Playbooks Editor', description: 'Read and write playbook data', category: 'Playbooks' },
+  { value: 'playbooks_owner', label: 'Playbooks Owner', description: 'Full playbook control', category: 'Playbooks' },
+  
+  // AI RCA roles
+  { value: 'aiRca_reader', label: 'AI RCA Reader', description: 'Read AI RCA data', category: 'AI RCA' },
+  { value: 'aiRca_editor', label: 'AI RCA Editor', description: 'Read and write AI RCA data', category: 'AI RCA' },
+  { value: 'aiRca_owner', label: 'AI RCA Owner', description: 'Full AI RCA control', category: 'AI RCA' },
+  
+  // Pattern Detector roles
+  { value: 'patternDetector_reader', label: 'Pattern Reader', description: 'Read pattern data', category: 'Pattern Detector' },
+  { value: 'patternDetector_editor', label: 'Pattern Editor', description: 'Read and write pattern data', category: 'Pattern Detector' },
+  { value: 'patternDetector_owner', label: 'Pattern Owner', description: 'Full pattern control', category: 'Pattern Detector' },
+  
+  // Playbook Recommender roles
+  { value: 'playbookRecommender_reader', label: 'Recommender Reader', description: 'Read recommendation data', category: 'Playbook Recommender' },
+  { value: 'playbookRecommender_editor', label: 'Recommender Editor', description: 'Read and write recommendation data', category: 'Playbook Recommender' },
+  { value: 'playbookRecommender_owner', label: 'Recommender Owner', description: 'Full recommendation control', category: 'Playbook Recommender' },
+  
+  // Customer RCA Summary roles
+  { value: 'customerRcaSummary_reader', label: 'Customer RCA Reader', description: 'Read customer RCA data', category: 'Customer RCA' },
+  { value: 'customerRcaSummary_editor', label: 'Customer RCA Editor', description: 'Read and write customer RCA data', category: 'Customer RCA' },
+  { value: 'customerRcaSummary_owner', label: 'Customer RCA Owner', description: 'Full customer RCA control', category: 'Customer RCA' },
+  
+  // Alert Correlation roles
+  { value: 'alertCorrelation_reader', label: 'Correlation Reader', description: 'Read correlation data', category: 'Alert Correlation' },
+  { value: 'alertCorrelation_editor', label: 'Correlation Editor', description: 'Read and write correlation data', category: 'Alert Correlation' },
+  { value: 'alertCorrelation_owner', label: 'Correlation Owner', description: 'Full correlation control', category: 'Alert Correlation' },
+  
+  // Compliance & Audit roles
+  { value: 'complianceAudit_reader', label: 'Compliance Reader', description: 'Read compliance data', category: 'Compliance & Audit' },
+  { value: 'complianceAudit_editor', label: 'Compliance Editor', description: 'Read and write compliance data', category: 'Compliance & Audit' },
+  { value: 'complianceAudit_owner', label: 'Compliance Owner', description: 'Full compliance control', category: 'Compliance & Audit' },
+  
+  // Chatbot roles
+  { value: 'chatbot_reader', label: 'Chatbot Reader', description: 'Read chatbot data', category: 'Chatbot' },
+  { value: 'chatbot_editor', label: 'Chatbot Editor', description: 'Read and write chatbot data', category: 'Chatbot' },
+  { value: 'chatbot_owner', label: 'Chatbot Owner', description: 'Full chatbot control', category: 'Chatbot' },
+  
+  // User Management roles
+  { value: 'userManagement_reader', label: 'User Mgmt Reader', description: 'Read user management data', category: 'User Management' },
+  { value: 'userManagement_editor', label: 'User Mgmt Editor', description: 'Read and write user management data', category: 'User Management' },
+  { value: 'userManagement_owner', label: 'User Mgmt Owner', description: 'Full user management control', category: 'User Management' }
 ];
 
 // Summary data - matching RCA Dashboard structure
@@ -219,21 +278,6 @@ const getRoleColor = (role) => {
   }
 };
 
-const getDefaultPermission = (userRole, moduleKey) => {
-  switch (userRole) {
-    case 'admin':
-      return 'both';
-    case 'moderator':
-      if (['dashboard', 'tickets', 'ai-rca'].includes(moduleKey)) return 'both';
-      if (['pattern-detector', 'playbook'].includes(moduleKey)) return 'read';
-      return 'none';
-    case 'user':
-      if (['dashboard', 'tickets', 'ai-rca'].includes(moduleKey)) return 'read';
-      return 'none';
-    default:
-      return 'none';
-  }
-};
 
 // Header Component
 const Header = () => (
@@ -255,21 +299,21 @@ const Filters = ({ searchTerm, setSearchTerm, onClearFilters, onAddUser }) => {
   const hasFilters = searchTerm.trim() !== '';
   
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1">
-          <div className="relative">
-            <LuSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              type="text"
-              placeholder="Search users by name or email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+  <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+    <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex-1">
+        <div className="relative">
+          <LuSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            type="text"
+            placeholder="Search users by name or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
         </div>
-        <div className="flex items-center space-x-3">
+      </div>
+      <div className="flex items-center space-x-3">
           {hasFilters && (
             <Button 
               onClick={onClearFilters}
@@ -280,17 +324,17 @@ const Filters = ({ searchTerm, setSearchTerm, onClearFilters, onAddUser }) => {
               <span>Clear Filters</span>
             </Button>
           )}
-          <Button 
-            onClick={onAddUser}
-            className="flex items-center space-x-2 bg-lime-600 hover:bg-lime-700 text-white"
-          >
-            <LuUserPlus className="w-4 h-4" />
-            <span>Add User</span>
-          </Button>
-        </div>
+        <Button 
+          onClick={onAddUser}
+          className="flex items-center space-x-2 bg-lime-600 hover:bg-lime-700 text-white"
+        >
+          <LuUserPlus className="w-4 h-4" />
+          <span>Add User</span>
+        </Button>
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 // Dropdown Menu Component
@@ -322,7 +366,7 @@ const ActionDropdown = ({ user, isOpen, onToggle, onAction }) => (
             onClick={() => onAction('toggle-status', user)}
             className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
           >
-            {user.status === 'Active' ? (
+            {user.status === 'active' ? (
               <>
                 <LuLock className="w-4 h-4 mr-3" />
                 Deactivate
@@ -409,7 +453,7 @@ const UserTable = ({ users, onDropdownToggle, onDropdownAction, openDropdown, is
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(user.status)}`}>
-                  {user.status}
+                  {user.status === 'active' ? 'Active' : 'Inactive'}
                 </span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
@@ -485,26 +529,6 @@ const EmptyState = ({ searchTerm, onClearFilters, onAddUser }) => (
   </div>
 );
 
-// Permission Module Component
-const PermissionModule = ({ module, userRole, defaultPermission }) => (
-  <div className="border border-gray-200 rounded-lg p-4">
-    <h4 className="text-sm font-medium text-gray-900 mb-3">{module.name}</h4>
-    <div className="flex items-center space-x-6">
-      {['none', 'read', 'write', 'both'].map((permission) => (
-        <label key={permission} className="flex items-center space-x-2">
-          <input 
-            type="radio" 
-            name={module.key} 
-            value={permission} 
-            className="rounded border-gray-300 text-lime-600 focus:ring-lime-500" 
-            defaultChecked={permission === defaultPermission}
-          />
-          <span className="text-sm text-gray-700 capitalize">{permission}</span>
-        </label>
-      ))}
-    </div>
-  </div>
-);
 
 
 const UserManagement = () => {
@@ -531,6 +555,9 @@ const UserManagement = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [managingUser, setManagingUser] = useState(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [userRoles, setUserRoles] = useState([]);
+  const [selectedRoles, setSelectedRoles] = useState([]);
+  const [isUpdatingRoles, setIsUpdatingRoles] = useState(false);
   
   // Form state for user creation
   const [formData, setFormData] = useState({
@@ -539,7 +566,7 @@ const UserManagement = () => {
     firstName: '',
     lastName: '',
     phone: '',
-    roles: ['user'] // Default to user role
+    roles: ['viewer'] // Default to viewer role
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState({});
@@ -564,7 +591,7 @@ const UserManagement = () => {
   useEffect(() => {
     setFormData(prev => ({
       ...prev,
-      roles: prev.roles || ['user']
+      roles: prev.roles || ['viewer']
     }));
   }, []);
 
@@ -573,15 +600,15 @@ const UserManagement = () => {
     if (!initialLoadDoneRef.current && isConnected && isInitialLoad) {
       console.log('🚀 Component mounted, requesting initial data...');
       const initialQuery = {
-        page: 1,
-        limit: 10,
+      page: 1,
+      limit: 10,
         query: '',
-        sortBy: 'createdAt',
-        sortOrder: 'desc'
+      sortBy: 'createdAt',
+      sortOrder: 'desc'
       };
       lastQueryRef.current = JSON.stringify(initialQuery);
       requestUserData(initialQuery);
-      requestUserStatistics();
+    requestUserStatistics();
       initialLoadDoneRef.current = true;
     }
   }, [isConnected, isInitialLoad, requestUserData, requestUserStatistics]);
@@ -659,7 +686,8 @@ const UserManagement = () => {
       password: '',
       firstName: '',
       lastName: '',
-      phone: ''
+      phone: '',
+      roles: ['viewer'] // Always set viewer role for new users
     });
     setFormErrors({});
     setEditingUser(null);
@@ -688,15 +716,7 @@ const UserManagement = () => {
     }
   };
 
-  const handleRoleChange = (e) => {
-    const selectedRole = e.target.value;
-    setFormData(prev => ({
-      ...prev,
-      roles: (prev.roles || []).includes(selectedRole)
-        ? (prev.roles || []).filter(role => role !== selectedRole)
-        : [...(prev.roles || []), selectedRole]
-    }));
-  };
+  // Role change handler removed - users will automatically get 'viewer' role
 
   const validateForm = () => {
     const errors = {};
@@ -713,9 +733,7 @@ const UserManagement = () => {
       errors.password = 'Password must be at least 6 characters';
     }
     
-    if (!formData.roles || !Array.isArray(formData.roles) || formData.roles.length === 0) {
-      errors.roles = 'At least one role must be selected';
-    }
+    // Role validation removed - users automatically get 'viewer' role
     
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -731,11 +749,17 @@ const UserManagement = () => {
     setIsSubmitting(true);
     
     try {
+      console.log('🔍 Frontend: Starting user creation...');
+      console.log('   Form data:', formData);
+      
       const result = await userService.createUser(formData);
       
       // Debug: Log the full result to see what we're getting
-      console.log('User creation result:', result);
-      console.log('OTP Data:', result.otpData);
+      console.log('🔍 Frontend: User creation result:');
+      console.log('   Success:', result.success);
+      console.log('   Message:', result.message);
+      console.log('   OTP Data:', result.otpData);
+      console.log('   Full result:', result);
       
       // Close modal and refresh data
       handleCloseModals();
@@ -750,11 +774,22 @@ const UserManagement = () => {
       lastQueryRef.current = JSON.stringify(refreshQuery);
       requestUserData(refreshQuery);
       
-      // Show success message
+      // Handle OTP verification
       if (result.otpData) {
         console.log('User created successfully and verification OTP sent');
-        // You might want to show a toast notification here
-        alert('User created successfully! A verification OTP has been sent to the user\'s email.');
+        console.log('   OTP Data:', result.otpData);
+        
+        // Set up OTP verification modal with the created user
+        setOtpData({
+          email: result.data.email,
+          otp: '',
+          deviceId: result.otpData.deviceId,
+          preAuthSessionId: result.otpData.preAuthSessionId
+        });
+        setVerifyingUser(result.data);
+        setShowOTPModal(true);
+        
+        console.log('✅ OTP verification modal triggered for new user');
       } else {
         console.log('User created successfully (verification OTP could not be sent)');
         alert('User created successfully, but verification OTP could not be sent. Please contact the user directly.');
@@ -785,7 +820,81 @@ const UserManagement = () => {
 
   const handleManagePermissions = (user) => {
     setManagingUser(user);
+    setUserRoles(user.roles || []);
+    setSelectedRoles(user.roles || []);
     setShowPermissionModal(true);
+  };
+
+  const handleRoleToggle = (roleValue) => {
+    setSelectedRoles(prev => {
+      if (prev.includes(roleValue)) {
+        return prev.filter(role => role !== roleValue);
+      } else {
+        return [...prev, roleValue];
+      }
+    });
+  };
+
+  const handleSaveRoles = async () => {
+    if (!managingUser) return;
+    
+    setIsUpdatingRoles(true);
+    try {
+      // Debug: Log the user object to see what we're working with
+      console.log('🔍 Managing User Object:', managingUser);
+      console.log('🔍 User ID being sent:', managingUser._id);
+      console.log('🔍 User SuperTokens ID:', managingUser.supertokensUserId);
+      
+      // Ensure we're using the MongoDB ObjectId, not SuperTokens ID
+      const userId = managingUser._id;
+      if (!userId) {
+        throw new Error('User ID not found in user object');
+      }
+      
+      // Validate that we have a MongoDB ObjectId (24 character hex string)
+      if (typeof userId !== 'string' || userId.length !== 24 || !/^[0-9a-fA-F]{24}$/.test(userId)) {
+        console.error('❌ Invalid MongoDB ObjectId:', userId);
+        throw new Error('Invalid user ID format. Expected MongoDB ObjectId.');
+      }
+      
+      // Determine roles to add and remove
+      const rolesToAdd = selectedRoles.filter(role => !userRoles.includes(role));
+      const rolesToRemove = userRoles.filter(role => !selectedRoles.includes(role));
+      
+      // Remove roles first
+      if (rolesToRemove.length > 0) {
+        const currentRoles = selectedRoles.filter(role => !rolesToRemove.includes(role));
+        console.log('🔄 Updating roles with ID:', userId, 'Roles:', currentRoles);
+        await userService.updateUserRoles(userId, currentRoles);
+      }
+      
+      // Add new roles
+      if (rolesToAdd.length > 0) {
+        console.log('➕ Adding roles with ID:', userId, 'Roles:', rolesToAdd);
+        await userService.addUserRoles(userId, rolesToAdd);
+      }
+      
+      // Refresh user data
+      const refreshQuery = {
+        page: pagination.page || 1,
+        limit: pagination.limit || 10,
+        query: searchTerm,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      };
+      lastQueryRef.current = JSON.stringify(refreshQuery);
+      requestUserData(refreshQuery);
+      
+      // Close modal
+      handleCloseModals();
+      
+      alert('User roles updated successfully!');
+    } catch (error) {
+      console.error('Error updating user roles:', error);
+      alert(`Failed to update user roles: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setIsUpdatingRoles(false);
+    }
   };
 
   const handleDeleteUser = async (userId) => {
@@ -813,9 +922,73 @@ const UserManagement = () => {
     }
   };
 
-  const handleToggleUserStatus = (userId) => {
-    // TODO: Implement API call to toggle user status
-    console.log('Toggle user status:', userId);
+  const handleToggleUserStatus = async (userId) => {
+    try {
+      console.log('🔍 Frontend: Starting user status toggle...');
+      console.log('   User ID:', userId);
+      console.log('   Available users:', users.length);
+      
+      // Find the user to get current status
+      const user = users.find(u => u._id === userId);
+      if (!user) {
+        console.error('❌ User not found in frontend users array:', userId);
+        console.log('   Available user IDs:', users.map(u => u._id));
+        alert('User not found');
+        return;
+      }
+      
+      const currentStatus = user.status;
+      const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      
+      console.log('🔍 Frontend: User details:');
+      console.log('   User name:', user.name);
+      console.log('   User email:', user.email);
+      console.log('   Current status:', currentStatus);
+      console.log('   New status:', newStatus);
+      console.log('   SuperTokens ID:', user.supertokensUserId);
+      
+      // Show loading state
+      setIsSubmitting(true);
+      console.log('🔄 Frontend: Calling API to update user status...');
+      
+      // Call API to update status
+      const result = await userService.updateUserStatus(userId, newStatus);
+      
+      console.log('🔍 Frontend: API response received:');
+      console.log('   Success:', result.success);
+      console.log('   Message:', result.message);
+      console.log('   Full result:', result);
+      
+      if (result.success) {
+        console.log('✅ Frontend: User status updated successfully');
+        alert(`User status updated to ${newStatus}`);
+        
+        // Refresh user data to show updated status
+        console.log('🔄 Frontend: Refreshing user data...');
+        const refreshQuery = {
+          page: pagination.page || 1,
+          limit: pagination.limit || 10,
+          query: searchTerm,
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        };
+        lastQueryRef.current = JSON.stringify(refreshQuery);
+        requestUserData(refreshQuery);
+        console.log('✅ Frontend: User data refresh initiated');
+      } else {
+        console.error('❌ Frontend: Failed to update user status:', result.error);
+        alert(`Failed to update user status: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('❌ Frontend: Error toggling user status:');
+      console.error('   Error message:', error.message);
+      console.error('   Error stack:', error.stack);
+      console.error('   Full error:', error);
+      alert('Error updating user status. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+      console.log('✅ Frontend: Status toggle process completed');
+    }
   };
 
   const handleClearFilters = () => {
@@ -907,7 +1080,7 @@ const UserManagement = () => {
       );
       
       if (result.success) {
-        alert('User email verified successfully!');
+        alert(`User email verified successfully! ${verifyingUser?.name ? `${verifyingUser.name}'s` : 'The user\'s'} email is now verified.`);
         setShowOTPModal(false);
         setOtpData({ email: '', otp: '', deviceId: null, preAuthSessionId: null });
         setVerifyingUser(null);
@@ -1001,10 +1174,13 @@ const UserManagement = () => {
     setManagingUser(null);
     setVerifyingUser(null);
     setOpenDropdown(null);
-    setFormData({ email: '', password: '', firstName: '', lastName: '', phone: '', roles: ['user'] });
+    setFormData({ email: '', password: '', firstName: '', lastName: '', phone: '', roles: ['viewer'] });
     setFormErrors({});
     setOtpData({ email: '', otp: '', deviceId: null, preAuthSessionId: null });
     setOtpErrors({});
+    setUserRoles([]);
+    setSelectedRoles([]);
+    setIsUpdatingRoles(false);
   };
 
   // Dropdown handlers
@@ -1130,14 +1306,14 @@ const UserManagement = () => {
               </div>
             )}
             
-            <UserTable 
-              users={users}
-              onDropdownToggle={handleDropdownToggle}
-              onDropdownAction={handleDropdownAction}
-              openDropdown={openDropdown}
-              isOTPSubmitting={isOTPSubmitting}
-              handleSendOTP={handleSendOTP}
-            />
+          <UserTable 
+            users={users}
+            onDropdownToggle={handleDropdownToggle}
+            onDropdownAction={handleDropdownAction}
+            openDropdown={openDropdown}
+            isOTPSubmitting={isOTPSubmitting}
+            handleSendOTP={handleSendOTP}
+          />
           </div>
           
           {/* Pagination Controls - matching RCA Dashboard */}
@@ -1306,28 +1482,7 @@ const UserManagement = () => {
                 />
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Roles *
-                </label>
-                <div className="space-y-2">
-                  {['admin', 'user'].map(role => (
-                    <label key={role} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        value={role}
-                        checked={(formData.roles || ['user']).includes(role)}
-                        onChange={handleRoleChange}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700 capitalize">{role}</span>
-                    </label>
-                  ))}
-                </div>
-                {formErrors.roles && (
-                  <p className="text-sm text-red-600 mt-1">{formErrors.roles}</p>
-                )}
-              </div>
+              {/* Role selection removed - users automatically get 'viewer' role */}
               
               <div className="flex justify-end space-x-3 pt-4">
                 <Button
@@ -1389,7 +1544,7 @@ const UserManagement = () => {
                 </label>
                 <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(viewingUser.status)}`}>
-                    {viewingUser.status}
+                    {viewingUser.status === 'active' ? 'Active' : 'Inactive'}
                   </span>
                 </div>
               </div>
@@ -1437,11 +1592,11 @@ const UserManagement = () => {
         </div>
       )}
 
-      {/* Permission Management Modal */}
+      {/* Role Management Modal */}
       {showPermissionModal && managingUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4">
-            <h2 className="text-xl font-bold mb-4">Manage Permissions - {managingUser.name}</h2>
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-4">Manage Roles - {managingUser.name}</h2>
             
             {/* User Info */}
             <div className="mb-6 p-4 bg-gray-50 rounded-lg">
@@ -1454,40 +1609,67 @@ const UserManagement = () => {
                 <div>
                   <h3 className="text-lg font-medium text-gray-900">{managingUser.name}</h3>
                   <p className="text-sm text-gray-600">{managingUser.email}</p>
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(managingUser.role)}`}>
-                    {managingUser.role}
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {userRoles.map(role => (
+                      <span key={role} className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                        {availableRoles.find(r => r.value === role)?.label || role}
                   </span>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Permissions */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Module Permissions</h3>
-              {permissionModules.map((module) => (
-                <PermissionModule
-                  key={module.key}
-                  module={module}
-                  userRole={managingUser.role}
-                  defaultPermission={getDefaultPermission(managingUser.role, module.key)}
-                />
+            {/* Role Selection */}
+            <div className="space-y-6">
+              <h3 className="text-lg font-medium text-gray-900">Assign Roles</h3>
+              
+              {/* Group roles by category */}
+              {Object.entries(
+                availableRoles.reduce((acc, role) => {
+                  if (!acc[role.category]) acc[role.category] = [];
+                  acc[role.category].push(role);
+                  return acc;
+                }, {})
+              ).map(([category, roles]) => (
+                <div key={category} className="border border-gray-200 rounded-lg p-4">
+                  <h4 className="text-md font-medium text-gray-800 mb-3">{category}</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {roles.map((role) => (
+                      <label key={role.value} className="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedRoles.includes(role.value)}
+                          onChange={() => handleRoleToggle(role.value)}
+                          className="mt-1 rounded border-gray-300 text-lime-600 focus:ring-lime-500"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-900">{role.label}</div>
+                          <div className="text-xs text-gray-500 mt-1">{role.description}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
 
-            <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+            <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 mt-6">
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleCloseModals}
+                disabled={isUpdatingRoles}
               >
                 Cancel
               </Button>
               <Button 
                 type="button" 
-                className="bg-purple-600 hover:bg-purple-700 text-white"
-                onClick={handleCloseModals}
+                className="bg-lime-600 hover:bg-lime-700 text-white"
+                onClick={handleSaveRoles}
+                disabled={isUpdatingRoles}
               >
-                Save Permissions
+                {isUpdatingRoles ? 'Updating...' : 'Save Roles'}
               </Button>
             </div>
           </div>
@@ -1508,7 +1690,10 @@ const UserManagement = () => {
                 An OTP has been sent to <strong>{verifyingUser?.email}</strong>
               </p>
               <p className="text-xs text-gray-500">
-                Please enter the 6-digit code to verify the user's email address.
+                {verifyingUser?.name ? 
+                  `Please enter the 6-digit code to verify ${verifyingUser.name}'s email address.` :
+                  'Please enter the 6-digit code to verify the user\'s email address.'
+                }
               </p>
             </div>
 
