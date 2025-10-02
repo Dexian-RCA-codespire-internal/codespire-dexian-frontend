@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8081/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8081/api/v1',
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' }
 })
@@ -29,6 +29,7 @@ export { aiService } from './services/aiService.js'
 export { notificationService } from './services/notificationService.js'
 export { auditService } from './services/auditService.js'
 export { playbookService } from './services/playbookService.js'
+export { autoSuggestionService } from './services/autoSuggestionService.js'
 
 // Legacy export for backward compatibility
 export { getTickets, transformTicketToRCACase } from './rcaService.js'

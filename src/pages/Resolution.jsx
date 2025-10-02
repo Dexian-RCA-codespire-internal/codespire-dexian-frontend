@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
-import { Button } from '../components/ui/button'
-import { Input } from '../components/ui/input'
-import { Textarea } from '../components/ui/textarea'
-import { Badge } from '../components/ui/badge'
+import { Button } from '../components/ui/Button'
+import { Input } from '../components/ui/Input'
+import { Textarea } from '../components/ui/Textarea'
+import { Badge } from '../components/ui/Badge'
 import { Checkbox } from '../components/ui/checkbox'
 import { RCAWorkflow } from '../components/RCA'
 import { FiUpload, FiImage, FiFileText, FiFile, FiUser, FiPlus, FiClock, FiMoreHorizontal, FiSearch, FiCheckCircle, FiX, FiExternalLink, FiDownload } from 'react-icons/fi'
@@ -88,51 +88,26 @@ const Resolution = () => {
       step: 1,
       title: 'Problem Definition',
       aiGuidance: 'What specific problem or incident occurred? Please describe the symptoms observed.',
-      aiSuggestions: [
-        'Payment gateway timeouts during peak traffic',
-        'User authentication failures after deployment',
-        'Database connection pool exhaustion'
-      ]
     },
     {
       step: 2,
       title: 'Timeline & Context',
-      aiGuidance: 'When did this issue first occur? What events preceded it?',
-      aiSuggestions: [
-        'Started after recent deployment at 2:30 PM',
-        'Coincided with traffic spike during marketing campaign',
-        'Followed database maintenance window'
-      ]
+      aiGuidance: 'When did this issue first occur? What events preceded it?'
     },
     {
       step: 3,
       title: 'Impact Assessment',
-      aiGuidance: 'What was the business and technical impact of this issue?',
-      aiSuggestions: [
-        '50% increase in failed transactions',
-        'Customer support tickets increased by 200%',
-        'Revenue loss of $15K during outage'
-      ]
+      aiGuidance: 'What was the business and technical impact of this issue?'
     },
     {
       step: 4,
       title: 'Investigation Findings',
-      aiGuidance: 'What data have you gathered? What patterns or clues were discovered?',
-      aiSuggestions: [
-        'Database CPU spiked to 95% during incident',
-        'Error logs show connection timeout exceptions',
-        'Monitoring alerts triggered for response time SLA'
-      ]
+      aiGuidance: 'What data have you gathered? What patterns or clues were discovered?'
     },
     {
       step: 5,
       title: 'Root Cause Analysis',
-      aiGuidance: 'Based on your investigation, what is the underlying root cause?',
-      aiSuggestions: [
-        'Inefficient database query causing resource contention',
-        'Missing connection pool configuration limits',
-        'Inadequate load balancing for traffic spikes'
-      ]
+      aiGuidance: 'Based on your investigation, what is the underlying root cause?'
     }
   ]
 
@@ -186,7 +161,6 @@ const Resolution = () => {
           onResponseChange={setResolutionResponse}
           onNext={handleRcaNext}
           onPrevious={handleRcaPrevious}
-          aiSuggestions={getCurrentStepData().aiSuggestions}
           similarCases={similarCases}
           nextButtonText={rcaStep === 5 ? "Complete RCA →" : "Next Step →"}
           showPrevious={rcaStep > 1}

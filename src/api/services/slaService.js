@@ -23,7 +23,7 @@ export const slaService = {
       
       console.log('📡 SLA API call params:', apiParams); // Debug log
       
-      const response = await api.get('/v1/sla', { params: apiParams });
+      const response = await api.get('/sla', { params: apiParams });
       return response.data;
     } catch (error) {
       console.error('❌ SLA API call failed:', error.message);
@@ -33,13 +33,13 @@ export const slaService = {
 
   // Get SLA statistics from backend
   getSLAStats: async () => {
-    const response = await api.get('/v1/sla/stats');
+    const response = await api.get('/sla/stats');
     return response.data;
   },
 
   // Get SLA record by ticket ID
   getSLAByTicketId: async (ticketId, source = 'ServiceNow') => {
-    const response = await api.get(`/v1/sla/ticket/${ticketId}`, {
+    const response = await api.get(`/sla/ticket/${ticketId}`, {
       params: { source }
     });
     return response.data;
@@ -47,7 +47,7 @@ export const slaService = {
 
   // Delete SLA record by ticket ID
   deleteSLAByTicketId: async (ticketId, source = 'ServiceNow') => {
-    const response = await api.delete(`/v1/sla/ticket/${ticketId}`, {
+    const response = await api.delete(`/sla/ticket/${ticketId}`, {
       params: { source }
     });
     return response.data;

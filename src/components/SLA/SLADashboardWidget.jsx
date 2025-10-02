@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { FiClock, FiAlertTriangle, FiCheckCircle, FiAlertCircle, FiTrendingUp, FiActivity, FiWifi } from 'react-icons/fi'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
-import { Badge } from '../ui/badge'
+import { Badge } from '../ui/Badge'
 import { slaService } from '../../api/services/slaService'
 import { useSLAWebSocket } from '../../hooks/useSLAWebSocket'
 import { 
