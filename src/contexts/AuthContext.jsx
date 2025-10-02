@@ -69,8 +69,8 @@ export const AuthProvider = ({ children }) => {
       console.log('❌ [DEBUG] Auth state cleared, redirecting to login...');
       
       // Redirect to login page
-      if (window.location.pathname !== '/auth/login') {
-        window.location.href = '/auth/login';
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login?expired=true';
       }
     };
 

@@ -26,6 +26,7 @@ import VerifyPasswordResetOTP from '../pages/Auth/VerifyPasswordResetOTP.jsx'
 import ResetPasswordWithOTP from '../pages/Auth/ResetPasswordWithOTP.jsx'
 import VerifyOTP from '../pages/Auth/VerifyOTP.jsx'
 import VerifyMagicLink from '../pages/Auth/VerifyMagicLink.jsx'
+import EmailVerificationSuccess from '../pages/Auth/EmailVerificationSuccess.jsx'
 
 export default function RoutesIndex() {
   return (
@@ -39,6 +40,7 @@ export default function RoutesIndex() {
       <Route path="/reset-password-with-otp" element={<ResetPasswordWithOTP />} />
       <Route path="/verify-otp" element={<VerifyOTP />} />
       <Route path="/verify-magic-link" element={<VerifyMagicLink />} />
+      <Route path="/verify-email" element={<EmailVerificationSuccess />} />
       
       {/* Handle SuperTokens auth redirects */}
       <Route path="/auth" element={<ResetPassword />} />

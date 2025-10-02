@@ -20,7 +20,7 @@ export const initSuperTokens = () => {
       apiDomain: import.meta.env.VITE_API_URL || 'http://localhost:8081',
       websiteDomain: import.meta.env.VITE_FRONTEND_URL || 'http://localhost:3001',
       apiBasePath: '/auth',
-      websiteBasePath: '/auth'
+      websiteBasePath: '/'
     },
     getRedirectionURL: async (context) => {
       if (context.action === "TO_AUTH") {
@@ -153,7 +153,15 @@ export const initSuperTokens = () => {
         ...original.location,
         setHref: (href) => {
           console.log('🔗 SuperTokens redirect:', href);
-          window.location.href = href;
+          
+          // Fix redirect URLs that point to /auth/login
+          if (href.includes('/auth/login')) {
+            const fixedHref = href.replace('/auth/login', '/login');
+            console.log('🔧 Fixed redirect URL:', fixedHref);
+            window.location.href = fixedHref;
+          } else {
+            window.location.href = href;
+          }
         }
       }
     }),
