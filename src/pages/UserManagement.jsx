@@ -19,118 +19,24 @@ import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card, CardContent } from '../components/ui/card';
+import { userService } from '../api/services/userService.js';
 
-// Mock data
-const mockUsers = [
-  {
-    id: 1,
-    name: 'John Doe',
-    email: 'john.doe@company.com',
-    role: 'Admin',
-    status: 'Active',
-    lastLogin: '2024-01-15 10:30:00',
-    createdAt: '2024-01-01'
-  },
-  {
-    id: 2,
-    name: 'Jane Smith',
-    email: 'jane.smith@company.com',
-    role: 'User',
-    status: 'Active',
-    lastLogin: '2024-01-14 15:45:00',
-    createdAt: '2024-01-02'
-  },
-  {
-    id: 3,
-    name: 'Mike Johnson',
-    email: 'mike.johnson@company.com',
-    role: 'User',
-    status: 'Inactive',
-    lastLogin: '2024-01-10 09:15:00',
-    createdAt: '2024-01-03'
-  },
-  {
-    id: 4,
-    name: 'Sarah Wilson',
-    email: 'sarah.wilson@company.com',
-    role: 'Moderator',
-    status: 'Active',
-    lastLogin: '2024-01-15 14:20:00',
-    createdAt: '2024-01-04'
-  },
-  {
-    id: 5,
-    name: 'David Brown',
-    email: 'david.brown@company.com',
-    role: 'Admin',
-    status: 'Active',
-    lastLogin: '2024-01-16 08:45:00',
-    createdAt: '2024-01-05'
-  },
-  {
-    id: 6,
-    name: 'Emily Davis',
-    email: 'emily.davis@company.com',
-    role: 'User',
-    status: 'Active',
-    lastLogin: '2024-01-15 16:30:00',
-    createdAt: '2024-01-06'
-  },
-  {
-    id: 7,
-    name: 'Robert Miller',
-    email: 'robert.miller@company.com',
-    role: 'Moderator',
-    status: 'Inactive',
-    lastLogin: '2024-01-12 11:20:00',
-    createdAt: '2024-01-07'
-  },
-  {
-    id: 8,
-    name: 'Lisa Garcia',
-    email: 'lisa.garcia@company.com',
-    role: 'User',
-    status: 'Active',
-    lastLogin: '2024-01-16 09:15:00',
-    createdAt: '2024-01-08'
-  },
-  {
-    id: 9,
-    name: 'Michael Rodriguez',
-    email: 'michael.rodriguez@company.com',
-    role: 'User',
-    status: 'Inactive',
-    lastLogin: '2024-01-08 14:45:00',
-    createdAt: '2024-01-09'
-  },
-  {
-    id: 10,
-    name: 'Jennifer Martinez',
-    email: 'jennifer.martinez@company.com',
-    role: 'Moderator',
-    status: 'Active',
-    lastLogin: '2024-01-15 13:30:00',
-    createdAt: '2024-01-10'
-  },
-  {
-    id: 11,
-    name: 'Christopher Lee',
-    email: 'christopher.lee@company.com',
-    role: 'Admin',
-    status: 'Active',
-    lastLogin: '2024-01-16 07:20:00',
-    createdAt: '2024-01-11'
-  },
-  {
-    id: 12,
-    name: 'Amanda Taylor',
-    email: 'amanda.taylor@company.com',
-    role: 'User',
-    status: 'Active',
-    lastLogin: '2024-01-14 12:10:00',
-    createdAt: '2024-01-12'
-  }
-];
+// Helper function to transform API user data to component format
+const transformUserData = (apiUser) => ({
+  id: apiUser._id || apiUser.id,
+  name: apiUser.name || apiUser.fullName || `${apiUser.firstName || ''} ${apiUser.lastName || ''}`.trim(),
+  email: apiUser.email,
+  role: apiUser.role || 'user',
+  status: apiUser.status === 'active' || apiUser.isEmailVerified ? 'Active' : 'Inactive',
+  lastLogin: apiUser.lastLogin || 'Never',
+  createdAt: apiUser.createdAt ? new Date(apiUser.createdAt).toLocaleDateString() : 'Unknown',
+  permissions: apiUser.permissions || [],
+  phone: apiUser.phone || '',
+  firstName: apiUser.firstName || apiUser.name?.split(' ')[0] || '',
+  lastName: apiUser.lastName || apiUser.name?.split(' ').slice(1).join(' ') || '',
+  supertokensUserId: apiUser.supertokensUserId,
+  isEmailVerified: apiUser.isEmailVerified || false
+});
 
 // Permission modules configuration
 const permissionModules = [
@@ -469,6 +375,7 @@ const UserManagement = () => {
   // State management
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -478,6 +385,7 @@ const UserManagement = () => {
   const [managingUser, setManagingUser] = useState(null);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null); // Track which dropdown is open
+  const [submitting, setSubmitting] = useState(false);
   
   // Pagination state - matching RCA Dashboard structure
   const [pagination, setPagination] = useState({
@@ -490,43 +398,55 @@ const UserManagement = () => {
   });
 
   // Load users data
-  useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setUsers(mockUsers);
-      // Update pagination state to match RCA Dashboard
-      setPagination({
-        page: 1,
-        limit: 10,
-        total: mockUsers.length,
-        totalPages: Math.ceil(mockUsers.length / 10),
-        hasNext: mockUsers.length > 10,
-        hasPrev: false
-      });
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params = {
+        page: pagination.page,
+        limit: pagination.limit
+      };
+      
+      // Add search and filter parameters
+      if (searchTerm) params.search = searchTerm;
+      if (selectedRole !== 'all') params.role = selectedRole;
+      
+      const response = await userService.getAllUsers(params);
+      
+      // Transform API data to component format
+      const transformedUsers = response.users ? response.users.map(transformUserData) : [];
+      setUsers(transformedUsers);
+      
+      // Update pagination from API response
+      setPagination(prev => ({
+        ...prev,
+        total: response.total || transformedUsers.length,
+        totalPages: response.totalPages || Math.ceil((response.total || transformedUsers.length) / prev.limit),
+        hasNext: response.hasNext || false,
+        hasPrev: response.hasPrev || false
+      }));
+      
+    } catch (err) {
+      console.error('Error loading users:', err);
+      setError(err.response?.data?.message || 'Failed to load users');
+      setUsers([]);
+    } finally {
       setLoading(false);
-    }, 1000);
-  }, []);
+    }
+  };
 
-  // Filter users based on search and role
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = selectedRole === 'all' || user.role.toLowerCase() === selectedRole.toLowerCase();
-    return matchesSearch && matchesRole;
-  });
-
-  // Update pagination when filters change
+  // Initial load and when dependencies change
   useEffect(() => {
-    const totalPages = Math.ceil(filteredUsers.length / pagination.limit);
-    setPagination(prev => ({
-      ...prev,
-      page: 1, // Reset to first page when filters change
-      total: filteredUsers.length,
-      totalPages: totalPages,
-      hasNext: totalPages > 1,
-      hasPrev: false
-    }));
-  }, [searchTerm, selectedRole, filteredUsers.length, pagination.limit]);
+    loadUsers();
+  }, [pagination.page, pagination.limit, searchTerm, selectedRole]);
+
+  // Reset to first page when search or role filter changes
+  useEffect(() => {
+    if (pagination.page !== 1) {
+      setPagination(prev => ({ ...prev, page: 1 }));
+    }
+  }, [searchTerm, selectedRole]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -545,10 +465,8 @@ const UserManagement = () => {
     };
   }, [openDropdown]);
 
-  // Pagination calculations
-  const startIndex = (pagination.page - 1) * pagination.limit;
-  const endIndex = startIndex + pagination.limit;
-  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+  // Use users directly since pagination is handled by the API
+  const paginatedUsers = users;
 
   // Event handlers
   const handleAddUser = () => setShowAddUserModal(true);
@@ -568,18 +486,57 @@ const UserManagement = () => {
     setShowPermissionModal(true);
   };
 
-  const handleDeleteUser = (userId) => {
+  const handleDeleteUser = async (userId) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
-      setUsers(users.filter(user => user.id !== userId));
+      try {
+        const result = await userService.deleteUser(userId);
+        // Reload users after deletion
+        await loadUsers();
+        
+        // Show success message (including simulated ones)
+        if (result.message) {
+          alert(result.message);
+        }
+      } catch (err) {
+        console.error('Error deleting user:', err);
+        alert(err.response?.data?.message || 'Failed to delete user');
+      }
     }
   };
 
-  const handleToggleUserStatus = (userId) => {
-    setUsers(users.map(user => 
-      user.id === userId 
-        ? { ...user, status: user.status === 'Active' ? 'Inactive' : 'Active' }
-        : user
-    ));
+  const handleToggleUserStatus = async (userId) => {
+    try {
+      const user = users.find(u => u.id === userId);
+      const newStatus = user.status === 'Active' ? 'inactive' : 'active';
+      
+      const result = await userService.updateUserStatus(userId, newStatus);
+      // Reload users after status change
+      await loadUsers();
+      
+      // Show success message (including simulated ones)
+      if (result.message) {
+        alert(result.message);
+      }
+    } catch (err) {
+      console.error('Error updating user status:', err);
+      alert(err.response?.data?.message || 'Failed to update user status');
+    }
+  };
+
+  const handleUpdateUserRole = async (userId, newRole) => {
+    try {
+      const result = await userService.updateUserRole(userId, newRole);
+      // Reload users after role change
+      await loadUsers();
+      
+      // Show success message (including simulated ones)
+      if (result.message) {
+        alert(result.message);
+      }
+    } catch (err) {
+      console.error('Error updating user role:', err);
+      alert(err.response?.data?.message || 'Failed to update user role');
+    }
   };
 
   const handleClearFilters = () => {
@@ -587,25 +544,80 @@ const UserManagement = () => {
     setSelectedRole('all');
   };
 
+  // Form submission handlers
+  const handleCreateUser = async (formData) => {
+    try {
+      setSubmitting(true);
+      const result = await userService.createUser(formData);
+      await loadUsers();
+      handleCloseModals();
+      
+      // Show success message (including simulated ones)
+      if (result.message) {
+        alert(result.message);
+      }
+    } catch (err) {
+      console.error('Error creating user:', err);
+      alert(err.response?.data?.message || 'Failed to create user');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdateUser = async (userId, formData) => {
+    try {
+      setSubmitting(true);
+      const result = await userService.updateUser(userId, formData);
+      await loadUsers();
+      handleCloseModals();
+      
+      // Show success message (including simulated ones)
+      if (result.message) {
+        alert(result.message);
+      }
+    } catch (err) {
+      console.error('Error updating user:', err);
+      alert(err.response?.data?.message || 'Failed to update user');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const userData = {
+      fullName: formData.get('fullName'),
+      email: formData.get('email'),
+      role: formData.get('role'),
+      phone: formData.get('phone') || '',
+      firstName: formData.get('firstName') || '',
+      lastName: formData.get('lastName') || '',
+      password: formData.get('password') || '',
+      useMagicLink: formData.get('useMagicLink') === 'on',
+      permissions: [] // Will be handled separately in permission modal
+    };
+
+    if (editingUser) {
+      await handleUpdateUser(editingUser.id, userData);
+    } else {
+      await handleCreateUser(userData);
+    }
+  };
+
   // Pagination handlers - matching RCA Dashboard
   const handlePageChange = (newPage) => {
     setPagination(prev => ({
       ...prev,
-      page: newPage,
-      hasNext: newPage < prev.totalPages,
-      hasPrev: newPage > 1
+      page: newPage
     }));
   };
 
   const handleLimitChange = (newLimit) => {
-    const totalPages = Math.ceil(filteredUsers.length / newLimit);
     setPagination(prev => ({
       ...prev,
       page: 1,
-      limit: newLimit,
-      totalPages: totalPages,
-      hasNext: totalPages > 1,
-      hasPrev: false
+      limit: newLimit
     }));
   };
 
@@ -644,11 +656,35 @@ const UserManagement = () => {
     }
   };
 
-  // Loading state
-  if (loading) {
+  // Error state
+  if (error && !loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-lime-500"></div>
+      <div className="p-6">
+        <Header />
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="text-red-600 mb-4">
+              <LuUserX className="w-12 h-12 mx-auto mb-2" />
+              <h3 className="text-lg font-medium">Error Loading Users</h3>
+              <p className="text-sm text-gray-600 mt-2">{error}</p>
+            </div>
+            <Button onClick={loadUsers} className="bg-lime-600 hover:bg-lime-700 text-white">
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state
+  if (loading && users.length === 0) {
+    return (
+      <div className="p-6">
+        <Header />
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-lime-500"></div>
+        </div>
       </div>
     );
   }
@@ -681,7 +717,7 @@ const UserManagement = () => {
         onAddUser={handleAddUser}
       />
 
-      {filteredUsers.length > 0 ? (
+      {users.length > 0 ? (
         <>
           <UserTable 
             users={paginatedUsers}
@@ -776,37 +812,85 @@ const UserManagement = () => {
             <h2 className="text-xl font-bold mb-4">
               {editingUser ? 'Edit User' : 'Add New User'}
             </h2>
-            <form className="space-y-4">
+            <form onSubmit={handleFormSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Full Name
+                  Full Name *
                 </label>
                 <Input
                   type="text"
+                  name="fullName"
                   defaultValue={editingUser?.name || ''}
                   placeholder="Enter full name"
+                  required
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
+                  Email *
                 </label>
                 <Input
                   type="email"
+                  name="email"
                   defaultValue={editingUser?.email || ''}
                   placeholder="Enter email address"
+                  required
+                />
+              </div>
+              {!editingUser && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Password
+                  </label>
+                  <Input
+                    type="password"
+                    name="password"
+                    placeholder="Enter password (optional - magic link will be used if not provided)"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    If left empty, a magic link will be sent to the user's email
+                  </p>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone
+                </label>
+                <Input
+                  type="tel"
+                  name="phone"
+                  defaultValue={editingUser?.phone || ''}
+                  placeholder="Enter phone number"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Role
+                  Role *
                 </label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-lime-500">
+                <select 
+                  name="role"
+                  defaultValue={editingUser?.role?.toLowerCase() || 'user'}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-lime-500"
+                  required
+                >
                   <option value="user">User</option>
                   <option value="moderator">Moderator</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
+              {!editingUser && (
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    name="useMagicLink"
+                    defaultChecked={true}
+                    className="rounded border-gray-300 text-lime-600 focus:ring-lime-500"
+                  />
+                  <label className="ml-2 text-sm text-gray-700">
+                    Send magic link for first login
+                  </label>
+                </div>
+              )}
               <div className="flex justify-end space-x-3 pt-4">
                 <Button
                   type="button"
@@ -815,11 +899,16 @@ const UserManagement = () => {
                     setShowAddUserModal(false);
                     setEditingUser(null);
                   }}
+                  disabled={submitting}
                 >
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-lime-600 hover:bg-lime-700 text-white">
-                  {editingUser ? 'Update User' : 'Add User'}
+                <Button 
+                  type="submit" 
+                  className="bg-lime-600 hover:bg-lime-700 text-white"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Saving...' : (editingUser ? 'Update User' : 'Add User')}
                 </Button>
               </div>
             </form>

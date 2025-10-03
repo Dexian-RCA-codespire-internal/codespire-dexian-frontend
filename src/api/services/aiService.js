@@ -162,7 +162,7 @@ export const aiService = {
 
     // Search AI guidance in playbook triggers
     searchGuidanceInTriggers: async ({ playbookIds, guidanceQuestion }) => {
-      const response = await api.post('/v1/ai/playbook-recommender/search-guidance', {
+      const response = await api.post('/ai/playbook-recommender/search-guidance', {
         playbookIds,
         guidanceQuestion
       });

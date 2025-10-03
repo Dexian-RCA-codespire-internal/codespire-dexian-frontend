@@ -92,7 +92,7 @@ export const playbookService = {
       if (options.filters?.priority) params.priority = options.filters.priority
       if (options.filters?.tags) params.tags = options.filters.tags.join(',')
 
-      const response = await api.get('playbooks/search/vector', { params })
+      const response = await api.get('/playbooks/search/vector', { params })
       return response.data
     } catch (error) {
       console.error('Error searching playbooks by vector:', error)

@@ -3,7 +3,7 @@ import { Button, Input, Card, CardContent } from '../../components/ui'
 import { MdLock, MdVisibility, MdVisibilityOff, MdArrowBack } from 'react-icons/md'
 import { useNavigate } from 'react-router-dom'
 import { AlertCircle, CheckCircle } from 'lucide-react'
-import api from '../../api'
+import { useAuth } from '../../contexts/AuthContext'
 
 export default function ResetPasswordWithOTP() {
   const [newPassword, setNewPassword] = useState('')
@@ -17,6 +17,7 @@ export default function ResetPasswordWithOTP() {
   const [otp, setOtp] = useState('')
   
   const navigate = useNavigate()
+  const { consumePasswordlessCode } = useAuth()
 
   useEffect(() => {
     // Get email and OTP from localStorage
@@ -97,13 +98,10 @@ export default function ResetPasswordWithOTP() {
     setError('')
 
     try {
-      const response = await api.post('/v1/auth/reset-password-with-otp', {
-        email: email,
-        otp: otp,
-        newPassword: newPassword
-      })
+      // Use SuperTokens passwordless code consumption for password reset
+      const result = await consumePasswordlessCode(otp, newPassword)
       
-      if (response.data.success) {
+      if (result.status === 'OK') {
         setSuccess(true)
         // Clear stored data
         localStorage.removeItem('resetEmail')

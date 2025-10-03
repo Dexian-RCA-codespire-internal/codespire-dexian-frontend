@@ -3,7 +3,7 @@ import { Button, Input, Card, CardContent } from '../../components/ui'
 import { MdArrowBack, MdRefresh } from 'react-icons/md'
 import { useNavigate } from 'react-router-dom'
 import { AlertCircle, CheckCircle, Mail } from 'lucide-react'
-import api from '../../api'
+import { useAuth } from '../../contexts/AuthContext'
 
 export default function VerifyPasswordResetOTP() {
   const [otp, setOtp] = useState('')
@@ -13,6 +13,7 @@ export default function VerifyPasswordResetOTP() {
   const [email, setEmail] = useState('')
   
   const navigate = useNavigate()
+  const { verifyOTP, sendOTP } = useAuth()
 
   useEffect(() => {
     // Get email from localStorage
@@ -49,12 +50,10 @@ export default function VerifyPasswordResetOTP() {
     setError('')
 
     try {
-      const response = await api.post('/v1/auth/verify-password-reset-otp', {
-        email: email,
-        otp: otp
-      })
+      // Use SuperTokens verifyOTP method
+      const result = await verifyOTP(email, otp)
       
-      if (response.data.success) {
+      if (result.status === 'OK') {
         setSuccess(true)
         // Store OTP for the next step
         localStorage.setItem('verifiedOTP', otp)
@@ -63,12 +62,11 @@ export default function VerifyPasswordResetOTP() {
           navigate('/reset-password-with-otp')
         }, 1500)
       } else {
-        setError(response.data.message || 'Invalid OTP. Please try again.')
+        setError(result.message || 'Invalid OTP. Please try again.')
       }
     } catch (err) {
       console.error('OTP verification error:', err)
-      const errorMessage = err.response?.data?.message || 'An error occurred. Please try again.'
-      setError(errorMessage)
+      setError('An error occurred. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -79,23 +77,21 @@ export default function VerifyPasswordResetOTP() {
     setError('')
 
     try {
-      const response = await api.post('/v1/auth/forgot-password', {
-        email: email
-      })
+      // Use SuperTokens sendOTP method
+      const result = await sendOTP(email)
       
-      if (response.data.success) {
+      if (result.status === 'OK') {
         setError('')
         // Show success message briefly
         const originalError = error
         setError('OTP sent successfully!')
         setTimeout(() => setError(originalError), 3000)
       } else {
-        setError(response.data.message || 'Failed to resend OTP. Please try again.')
+        setError(result.message || 'Failed to resend OTP. Please try again.')
       }
     } catch (err) {
       console.error('Resend OTP error:', err)
-      const errorMessage = err.response?.data?.message || 'Failed to resend OTP. Please try again.'
-      setError(errorMessage)
+      setError('Failed to resend OTP. Please try again.')
     } finally {
       setIsLoading(false)
     }
