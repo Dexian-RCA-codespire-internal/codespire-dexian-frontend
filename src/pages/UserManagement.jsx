@@ -26,118 +26,8 @@ import { Input } from '../components/ui/Input';
 import { Card, CardContent } from '../components/ui/card';
 import useUserWebSocket from '../hooks/useUserWebSocket';
 import { userService } from '../api/services/userService';
+import { useToast } from '../contexts/ToastContext';
 
-// Mock data
-const mockUsers = [
-  {
-    id: 1,
-    name: 'John Doe',
-    email: 'john.doe@company.com',
-    role: 'Admin',
-    status: 'Active',
-    lastLogin: '2024-01-15 10:30:00',
-    createdAt: '2024-01-01'
-  },
-  {
-    id: 2,
-    name: 'Jane Smith',
-    email: 'jane.smith@company.com',
-    role: 'User',
-    status: 'Active',
-    lastLogin: '2024-01-14 15:45:00',
-    createdAt: '2024-01-02'
-  },
-  {
-    id: 3,
-    name: 'Mike Johnson',
-    email: 'mike.johnson@company.com',
-    role: 'User',
-    status: 'Inactive',
-    lastLogin: '2024-01-10 09:15:00',
-    createdAt: '2024-01-03'
-  },
-  {
-    id: 4,
-    name: 'Sarah Wilson',
-    email: 'sarah.wilson@company.com',
-    role: 'Moderator',
-    status: 'Active',
-    lastLogin: '2024-01-15 14:20:00',
-    createdAt: '2024-01-04'
-  },
-  {
-    id: 5,
-    name: 'David Brown',
-    email: 'david.brown@company.com',
-    role: 'Admin',
-    status: 'Active',
-    lastLogin: '2024-01-16 08:45:00',
-    createdAt: '2024-01-05'
-  },
-  {
-    id: 6,
-    name: 'Emily Davis',
-    email: 'emily.davis@company.com',
-    role: 'User',
-    status: 'Active',
-    lastLogin: '2024-01-15 16:30:00',
-    createdAt: '2024-01-06'
-  },
-  {
-    id: 7,
-    name: 'Robert Miller',
-    email: 'robert.miller@company.com',
-    role: 'Moderator',
-    status: 'Inactive',
-    lastLogin: '2024-01-12 11:20:00',
-    createdAt: '2024-01-07'
-  },
-  {
-    id: 8,
-    name: 'Lisa Garcia',
-    email: 'lisa.garcia@company.com',
-    role: 'User',
-    status: 'Active',
-    lastLogin: '2024-01-16 09:15:00',
-    createdAt: '2024-01-08'
-  },
-  {
-    id: 9,
-    name: 'Michael Rodriguez',
-    email: 'michael.rodriguez@company.com',
-    role: 'User',
-    status: 'Inactive',
-    lastLogin: '2024-01-08 14:45:00',
-    createdAt: '2024-01-09'
-  },
-  {
-    id: 10,
-    name: 'Jennifer Martinez',
-    email: 'jennifer.martinez@company.com',
-    role: 'Moderator',
-    status: 'Active',
-    lastLogin: '2024-01-15 13:30:00',
-    createdAt: '2024-01-10'
-  },
-  {
-    id: 11,
-    name: 'Christopher Lee',
-    email: 'christopher.lee@company.com',
-    role: 'Admin',
-    status: 'Active',
-    lastLogin: '2024-01-16 07:20:00',
-    createdAt: '2024-01-11'
-  },
-  {
-    id: 12,
-    name: 'Amanda Taylor',
-    email: 'amanda.taylor@company.com',
-    role: 'User',
-    status: 'Active',
-    lastLogin: '2024-01-14 12:10:00',
-    createdAt: '2024-01-12'
-  }
-];
 
 // Available roles configuration
 const availableRoles = [
@@ -218,7 +108,6 @@ const getSummaryData = (statistics) => {
   const inactiveUsers = stats.inactiveUsers || 0;
   const recentUsers = stats.recentUsers || 0;
 
-  console.log('📊 Statistics data:', stats); // Debug log
 
   return [
     {
@@ -383,7 +272,7 @@ const ActionDropdown = ({ user, isOpen, onToggle, onAction }) => (
             className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
           >
             <LuShield className="w-4 h-4 mr-3" />
-            Permission
+            Roles
           </button>
           <button
             onClick={() => onAction('delete', user)}
@@ -532,6 +421,8 @@ const EmptyState = ({ searchTerm, onClearFilters, onAddUser }) => (
 
 
 const UserManagement = () => {
+  const { success, error: showError, warning, info } = useToast();
+  
   // WebSocket hook for real-time user data
   const {
     users,
@@ -598,7 +489,6 @@ const UserManagement = () => {
   // Load users data on component mount - only once
   useEffect(() => {
     if (!initialLoadDoneRef.current && isConnected && isInitialLoad) {
-      console.log('🚀 Component mounted, requesting initial data...');
       const initialQuery = {
       page: 1,
       limit: 10,
@@ -611,15 +501,14 @@ const UserManagement = () => {
     requestUserStatistics();
       initialLoadDoneRef.current = true;
     }
-  }, [isConnected, isInitialLoad, requestUserData, requestUserStatistics]);
+  }, [isConnected, isInitialLoad]); // Removed requestUserData and requestUserStatistics from dependencies
 
   // Request statistics when connection is re-established (not on initial connection)
   useEffect(() => {
     if (isConnected && initialLoadDoneRef.current) {
-      console.log('🔌 WebSocket reconnected, refreshing statistics...');
       requestUserStatistics();
     }
-  }, [isConnected, requestUserStatistics]);
+  }, [isConnected]); // Removed requestUserStatistics from dependencies
 
   // Debounced search - prevents abrupt refreshes
   useEffect(() => {
@@ -647,7 +536,6 @@ const UserManagement = () => {
         // Only fetch if query actually changed
         const queryString = JSON.stringify(newQuery);
         if (queryString !== lastQueryRef.current) {
-          console.log('🔍 Search term changed, fetching users...');
           lastQueryRef.current = queryString;
           requestUserData(newQuery);
         }
@@ -660,7 +548,7 @@ const UserManagement = () => {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [searchTerm, isConnected, isInitialLoad, pagination.limit, requestUserData]);
+  }, [searchTerm, isConnected, isInitialLoad, pagination.limit]); // Removed requestUserData from dependencies
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -749,17 +637,9 @@ const UserManagement = () => {
     setIsSubmitting(true);
     
     try {
-      console.log('🔍 Frontend: Starting user creation...');
-      console.log('   Form data:', formData);
       
       const result = await userService.createUser(formData);
       
-      // Debug: Log the full result to see what we're getting
-      console.log('🔍 Frontend: User creation result:');
-      console.log('   Success:', result.success);
-      console.log('   Message:', result.message);
-      console.log('   OTP Data:', result.otpData);
-      console.log('   Full result:', result);
       
       // Close modal and refresh data
       handleCloseModals();
@@ -776,8 +656,6 @@ const UserManagement = () => {
       
       // Handle OTP verification
       if (result.otpData) {
-        console.log('User created successfully and verification OTP sent');
-        console.log('   OTP Data:', result.otpData);
         
         // Set up OTP verification modal with the created user
         setOtpData({
@@ -789,10 +667,8 @@ const UserManagement = () => {
         setVerifyingUser(result.data);
         setShowOTPModal(true);
         
-        console.log('✅ OTP verification modal triggered for new user');
       } else {
-        console.log('User created successfully (verification OTP could not be sent)');
-        alert('User created successfully, but verification OTP could not be sent. Please contact the user directly.');
+        warning('User created successfully, but verification OTP could not be sent. Please contact the user directly.');
       }
       
     } catch (error) {
@@ -840,10 +716,6 @@ const UserManagement = () => {
     
     setIsUpdatingRoles(true);
     try {
-      // Debug: Log the user object to see what we're working with
-      console.log('🔍 Managing User Object:', managingUser);
-      console.log('🔍 User ID being sent:', managingUser._id);
-      console.log('🔍 User SuperTokens ID:', managingUser.supertokensUserId);
       
       // Ensure we're using the MongoDB ObjectId, not SuperTokens ID
       const userId = managingUser._id;
@@ -864,13 +736,11 @@ const UserManagement = () => {
       // Remove roles first
       if (rolesToRemove.length > 0) {
         const currentRoles = selectedRoles.filter(role => !rolesToRemove.includes(role));
-        console.log('🔄 Updating roles with ID:', userId, 'Roles:', currentRoles);
         await userService.updateUserRoles(userId, currentRoles);
       }
       
       // Add new roles
       if (rolesToAdd.length > 0) {
-        console.log('➕ Adding roles with ID:', userId, 'Roles:', rolesToAdd);
         await userService.addUserRoles(userId, rolesToAdd);
       }
       
@@ -888,10 +758,10 @@ const UserManagement = () => {
       // Close modal
       handleCloseModals();
       
-      alert('User roles updated successfully!');
+      success('User roles updated successfully!');
     } catch (error) {
       console.error('Error updating user roles:', error);
-      alert(`Failed to update user roles: ${error.response?.data?.error || error.message}`);
+      showError(`Failed to update user roles: ${error.response?.data?.error || error.message}`);
     } finally {
       setIsUpdatingRoles(false);
     }
@@ -903,7 +773,6 @@ const UserManagement = () => {
         const result = await userService.deleteUser(userId);
         
         if (result.success) {
-          console.log('✅ User deleted successfully');
           // Refresh user list with current filters
           const refreshQuery = {
             page: pagination.page || 1,
@@ -916,55 +785,38 @@ const UserManagement = () => {
           requestUserData(refreshQuery);
         }
       } catch (error) {
-        console.error('❌ Error deleting user:', error);
-        alert(`Failed to delete user: ${error.response?.data?.error || error.message}`);
+        console.error('Error deleting user:', error);
+        showError(`Failed to delete user: ${error.response?.data?.error || error.message}`);
       }
     }
   };
 
   const handleToggleUserStatus = async (userId) => {
     try {
-      console.log('🔍 Frontend: Starting user status toggle...');
-      console.log('   User ID:', userId);
-      console.log('   Available users:', users.length);
       
       // Find the user to get current status
       const user = users.find(u => u._id === userId);
       if (!user) {
-        console.error('❌ User not found in frontend users array:', userId);
-        console.log('   Available user IDs:', users.map(u => u._id));
-        alert('User not found');
+        console.error(' User not found in frontend users array:', userId);
+        showError('User not found');
         return;
       }
       
       const currentStatus = user.status;
       const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
       
-      console.log('🔍 Frontend: User details:');
-      console.log('   User name:', user.name);
-      console.log('   User email:', user.email);
-      console.log('   Current status:', currentStatus);
-      console.log('   New status:', newStatus);
-      console.log('   SuperTokens ID:', user.supertokensUserId);
       
       // Show loading state
       setIsSubmitting(true);
-      console.log('🔄 Frontend: Calling API to update user status...');
       
       // Call API to update status
       const result = await userService.updateUserStatus(userId, newStatus);
       
-      console.log('🔍 Frontend: API response received:');
-      console.log('   Success:', result.success);
-      console.log('   Message:', result.message);
-      console.log('   Full result:', result);
       
       if (result.success) {
-        console.log('✅ Frontend: User status updated successfully');
-        alert(`User status updated to ${newStatus}`);
+        success(`User status updated to ${newStatus}`);
         
         // Refresh user data to show updated status
-        console.log('🔄 Frontend: Refreshing user data...');
         const refreshQuery = {
           page: pagination.page || 1,
           limit: pagination.limit || 10,
@@ -974,20 +826,18 @@ const UserManagement = () => {
         };
         lastQueryRef.current = JSON.stringify(refreshQuery);
         requestUserData(refreshQuery);
-        console.log('✅ Frontend: User data refresh initiated');
       } else {
-        console.error('❌ Frontend: Failed to update user status:', result.error);
-        alert(`Failed to update user status: ${result.error}`);
+        console.error(' Frontend: Failed to update user status:', result.error);
+        showError(`Failed to update user status: ${result.error}`);
       }
     } catch (error) {
-      console.error('❌ Frontend: Error toggling user status:');
+      console.error(' Frontend: Error toggling user status:');
       console.error('   Error message:', error.message);
       console.error('   Error stack:', error.stack);
       console.error('   Full error:', error);
-      alert('Error updating user status. Please try again.');
+      showError('Error updating user status. Please try again.');
     } finally {
       setIsSubmitting(false);
-      console.log('✅ Frontend: Status toggle process completed');
     }
   };
 
@@ -1020,13 +870,13 @@ const UserManagement = () => {
         });
         setVerifyingUser(user);
         setShowOTPModal(true);
-        alert('OTP sent successfully to user\'s email!');
+        success('OTP sent successfully to user\'s email!');
       } else {
-        alert(`Failed to send OTP: ${result.message}`);
+        showError(`Failed to send OTP: ${result.message}`);
       }
     } catch (error) {
       console.error('Error sending OTP:', error);
-      alert('Error sending OTP. Please try again.');
+      showError('Error sending OTP. Please try again.');
     } finally {
       setIsOTPSubmitting(false);
     }
@@ -1080,7 +930,7 @@ const UserManagement = () => {
       );
       
       if (result.success) {
-        alert(`User email verified successfully! ${verifyingUser?.name ? `${verifyingUser.name}'s` : 'The user\'s'} email is now verified.`);
+        success(`User email verified successfully! ${verifyingUser?.name ? `${verifyingUser.name}'s` : 'The user\'s'} email is now verified.`);
         setShowOTPModal(false);
         setOtpData({ email: '', otp: '', deviceId: null, preAuthSessionId: null });
         setVerifyingUser(null);
@@ -1095,11 +945,11 @@ const UserManagement = () => {
         lastQueryRef.current = JSON.stringify(refreshQuery);
         requestUserData(refreshQuery);
       } else {
-        alert(`Verification failed: ${result.message}`);
+        showError(`Verification failed: ${result.message}`);
       }
     } catch (error) {
       console.error('Error verifying OTP:', error);
-      alert('Error verifying OTP. Please try again.');
+      showError('Error verifying OTP. Please try again.');
     } finally {
       setIsOTPSubmitting(false);
     }
@@ -1120,13 +970,13 @@ const UserManagement = () => {
           deviceId: result.deviceId,
           preAuthSessionId: result.preAuthSessionId
         }));
-        alert('OTP resent successfully!');
+        success('OTP resent successfully!');
       } else {
-        alert(`Failed to resend OTP: ${result.message}`);
+        showError(`Failed to resend OTP: ${result.message}`);
       }
     } catch (error) {
       console.error('Error resending OTP:', error);
-      alert('Error resending OTP. Please try again.');
+      showError('Error resending OTP. Please try again.');
     } finally {
       setIsOTPSubmitting(false);
     }
@@ -1239,7 +1089,6 @@ const UserManagement = () => {
             ))
           ) : (
             getSummaryData(statistics).map((item, index) => {
-              console.log('📊 Rendering summary card:', item.title, item.value); // Debug log
               return (
               <Card key={index} className={`${item.bgColor} ${item.borderColor} shadow-sm hover:shadow-md transition-shadow duration-200`}>
                 <CardContent className="p-6">
@@ -1530,16 +1379,6 @@ const UserManagement = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Role
-                </label>
-                <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(viewingUser.role)}`}>
-                    {viewingUser.role}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Status
                 </label>
                 <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">
@@ -1553,7 +1392,7 @@ const UserManagement = () => {
                   Last Login
                 </label>
                 <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-900">
-                  {viewingUser.lastLogin}
+                  {viewingUser.lastLoginAt ? new Date(viewingUser.lastLoginAt).toLocaleString() : 'Never'}
                 </div>
               </div>
               <div>

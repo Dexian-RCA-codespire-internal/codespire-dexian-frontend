@@ -33,6 +33,7 @@ const useUserWebSocket = (backendUrl) => {
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
+  const pingIntervalRef = useRef(null);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -45,7 +46,10 @@ const useUserWebSocket = (backendUrl) => {
         socketRef.current = io(backendUrl, {
           transports: ['websocket', 'polling'],
           timeout: 10000,
-          forceNew: true
+          forceNew: true,
+          pingTimeout: 60000,
+          pingInterval: 25000,
+          upgradeTimeout: 10000
         });
 
         // Connection event handlers
@@ -57,11 +61,15 @@ const useUserWebSocket = (backendUrl) => {
           
           // Join users room for targeted updates
           socketRef.current.emit('join_room', 'users');
+          
+          // Start periodic ping to keep connection alive
+          startPeriodicPing();
         });
 
         socketRef.current.on('disconnect', (reason) => {
           console.log('❌ User WebSocket disconnected:', reason);
           setIsConnected(false);
+          stopPeriodicPing();
           
           // Attempt reconnection if not manually disconnected
           if (reason !== 'io client disconnect') {
@@ -154,6 +162,19 @@ const useUserWebSocket = (backendUrl) => {
           console.log('🏓 Received pong from server');
         });
 
+        // Handle idle warnings and disconnections
+        socketRef.current.on('idle_warning', (data) => {
+          console.log(`⚠️ Server warning: Connection idle for ${data.idleTime}s`);
+          addNotification(`Connection idle for ${data.idleTime}s`, 'warning');
+        });
+
+        socketRef.current.on('idle_disconnect', (data) => {
+          console.log(`🔌 Server disconnected due to inactivity: ${data.reason}`);
+          addNotification('Connection closed due to inactivity', 'error');
+          setIsConnected(false);
+          attemptReconnection();
+        });
+
       } catch (error) {
         console.error('❌ Failed to initialize user WebSocket:', error);
         setError('Failed to connect to server');
@@ -166,6 +187,7 @@ const useUserWebSocket = (backendUrl) => {
 
     // Cleanup on unmount
     return () => {
+      stopPeriodicPing();
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
@@ -175,6 +197,24 @@ const useUserWebSocket = (backendUrl) => {
       }
     };
   }, [backendUrl]);
+
+  // Periodic ping functions
+  const startPeriodicPing = () => {
+    stopPeriodicPing(); // Clear any existing interval
+    pingIntervalRef.current = setInterval(() => {
+      if (socketRef.current && isConnected) {
+        console.log('🏓 Sending ping to server');
+        socketRef.current.emit('ping');
+      }
+    }, 30000); // Ping every 30 seconds
+  };
+
+  const stopPeriodicPing = () => {
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = null;
+    }
+  };
 
   // Reconnection logic
   const attemptReconnection = () => {
