@@ -28,6 +28,7 @@ import ResetPasswordWithOTP from '../pages/Auth/ResetPasswordWithOTP.jsx'
 import VerifyOTP from '../pages/Auth/VerifyOTP.jsx'
 import VerifyMagicLink from '../pages/Auth/VerifyMagicLink.jsx'
 import RCACompletion from '../pages/RCACompletion.jsx'
+import EmailVerificationSuccess from '../pages/Auth/EmailVerificationSuccess.jsx'
 
 export default function RoutesIndex() {
   return (
@@ -40,11 +41,12 @@ export default function RoutesIndex() {
       <Route path="/verify-password-reset-otp" element={<VerifyPasswordResetOTP />} />
       <Route path="/reset-password-with-otp" element={<ResetPasswordWithOTP />} />
       <Route path="/verify-otp" element={<VerifyOTP />} />
-      <Route path="/verify-magic-link/:token" element={<VerifyMagicLink />} />
+      <Route path="/verify-magic-link" element={<VerifyMagicLink />} />
+      <Route path="/verify-email" element={<EmailVerificationSuccess />} />
       
       {/* Handle SuperTokens auth redirects */}
-      <Route path="/auth" element={<Login />} />
-      <Route path="/auth/*" element={<Login />} />
+      <Route path="/auth" element={<ResetPassword />} />
+      <Route path="/auth/*" element={<ResetPassword />} />
       
       {/* Protected routes - wrapped with SessionAuth */}
       <Route path="/" element={
@@ -53,6 +55,7 @@ export default function RoutesIndex() {
         </SessionAuth>
       }>
         <Route index element={<Dashboard />} />
+        <Route path="dashboard" element={<Dashboard />} />
         <Route path="rca-dashboard" element={<RCADashboard />} />
         <Route path="sla" element={<SLAWrapper />} />
         <Route path="complaint/:ticketId" element={<Complaint />} />

@@ -92,7 +92,7 @@ export const playbookService = {
       if (options.filters?.priority) params.priority = options.filters.priority
       if (options.filters?.tags) params.tags = options.filters.tags.join(',')
 
-      const response = await api.get('/v1/playbooks/search/vector', { params })
+      const response = await api.get('/playbooks/search/vector', { params })
       return response.data
     } catch (error) {
       console.error('Error searching playbooks by vector:', error)
@@ -110,7 +110,7 @@ export const playbookService = {
       if (options.filters?.priority) params.priority = options.filters.priority
       if (options.filters?.tags) params.tags = options.filters.tags.join(',')
 
-      const response = await api.get('/v1/playbooks/search/hybrid', { params })
+      const response = await api.get('/playbooks/search/hybrid', { params })
       return response.data
     } catch (error) {
       console.error('Error performing hybrid playbook search:', error)
@@ -121,7 +121,7 @@ export const playbookService = {
   // Increment usage count for a playbook
   async incrementUsage(playbookId) {
     try {
-      const response = await api.post(`/v1/playbooks/${playbookId}/increment-usage`)
+      const response = await api.post(`/playbooks/${playbookId}/increment-usage`)
       return response.data
     } catch (error) {
       console.error('Error incrementing playbook usage:', error)

@@ -11,6 +11,13 @@ api.interceptors.response.use(
   err => {
     const msg = err?.response?.data?.message || err.message
     console.error('API error:', msg)
+    
+    // Don't automatically redirect on 401 errors - let the app handle it
+    if (err.response?.status === 401) {
+      console.log('🔒 401 error detected, but not redirecting automatically');
+      // The session management will handle this
+    }
+    
     return Promise.reject(err)
   }
 )
@@ -30,6 +37,8 @@ export { notificationService } from './services/notificationService.js'
 export { auditService } from './services/auditService.js'
 export { playbookService } from './services/playbookService.js'
 export { autoSuggestionService } from './services/autoSuggestionService.js'
+export { userService } from './services/userService.js'
+export { emailVerificationService } from './services/emailVerificationService.js'
 
 // Legacy export for backward compatibility
 export { getTickets, transformTicketToRCACase } from './rcaService.js'

@@ -4,10 +4,11 @@ import { Mail, Lock, User, Eye, EyeOff, Phone, ChevronDown, Search, AlertCircle,
 import { Link, useNavigate } from 'react-router-dom'
 import { COUNTRY_CODES, searchCountries } from '../../constants/countryCodes'
 import { validateRegistrationForm, getPasswordStrength, getPasswordRequirements } from '../../utils/validation'
-import EmailPassword from 'supertokens-auth-react/recipe/emailpassword'
+import { useAuth } from '../../contexts/AuthContext'
 
 export default function Register() {
   const navigate = useNavigate()
+  const { register, isAuthenticated } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [formData, setFormData] = useState({
@@ -27,6 +28,14 @@ export default function Register() {
   const [showCountryDropdown, setShowCountryDropdown] = useState(false)
   const [countrySearch, setCountrySearch] = useState('')
   const dropdownRef = useRef(null)
+
+  // Redirect if already authenticated (but only check once to avoid multiple redirects)
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('✅ User is authenticated, redirecting to dashboard');
+      navigate('/dashboard')
+    }
+  }, [isAuthenticated, navigate])
 
   // Clear error function
   const clearError = () => {
@@ -125,85 +134,48 @@ export default function Register() {
     setIsLoading(true)
 
     try {
-      // Use SuperTokens EmailPassword.signUp with additional fields
-      const response = await EmailPassword.signUp({
-        formFields: [{
-          id: "email",
-          value: formData.email.trim()
-        }, {
-          id: "password",
-          value: formData.password
-        }, {
-          id: "firstName",
-          value: formData.firstName.trim()
-        }, {
-          id: "lastName",
-          value: formData.lastName.trim()
-        }, {
-          id: "phone",
-          value: `${selectedCountry.code}${formData.phone}`
-        }]
-      })
+      // Use SuperTokens registration via AuthContext
+      const userData = {
+        email: formData.email.trim(),
+        password: formData.password,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        phone: `${selectedCountry.code}${formData.phone}`
+      }
 
-      console.log('✅ SuperTokens signUp response:', response)
+      const response = await register(userData)
+      console.log('✅ Registration response:', response)
 
-      if (response.status === "OK") {
-        // After successful registration, generate email verification token
-        try {
-          const verifyResponse = await fetch('http://localhost:8081/api/v1/auth/generate-email-verification-token', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              email: formData.email.trim()
-            })
-          })
-
-          const verifyData = await verifyResponse.json()
-          console.log('✅ Email verification token generated:', verifyData)
-
-          if (verifyResponse.ok && verifyData.success) {
-            // Store the verification token
-            localStorage.setItem('verificationToken', verifyData.token)
-            
-            // Navigate to OTP verification
-            navigate('/verify-otp', { 
-              state: { 
-                email: formData.email,
-                fromRegistration: true,
-                verificationToken: verifyData.token
-              } 
-            })
-          } else {
-            setError(verifyData.message || 'Failed to send verification email')
+      if (response.success) {
+        console.log('✅ Registration successful')
+        
+        // Navigate to login page with success message
+        navigate('/login', {
+          state: {
+            message: 'Registration successful! Please check your email for verification instructions, then log in.',
+            email: formData.email
           }
-        } catch (err) {
-          console.error('Failed to generate verification token:', err)
-          setError('Registration successful but failed to send verification email')
-        }
+        })
       } else {
-        // Handle different response statuses
-        if (response.status === "FIELD_ERROR") {
-          const fieldErrors = response.formFields
-          if (fieldErrors) {
-            const errors = {}
-            fieldErrors.forEach(field => {
-              if (field.id === "email") errors.email = field.error
-              if (field.id === "password") errors.password = field.error
-            })
-            setValidationErrors(errors)
-          }
-        } else if (response.status === "SIGN_UP_NOT_ALLOWED") {
-          setError('Registration is not allowed at this time')
+        // Handle different error types
+        if (response.status === 'EMAIL_ALREADY_EXISTS_ERROR') {
+          setError('An account with this email already exists')
+        } else if (response.formFields) {
+          // Handle field errors from SuperTokens
+          const fieldErrors = {}
+          response.formFields.forEach(field => {
+            if (field.error) {
+              fieldErrors[field.id] = [field.error]
+            }
+          })
+          setValidationErrors(fieldErrors)
         } else {
-          setError('Registration failed. Please try again.')
+          setError(response.message || 'Registration failed. Please try again.')
         }
       }
-    } catch (err) {
-      console.error('SuperTokens signUp error:', err)
-      setError('Registration failed. Please try again.')
+    } catch (error) {
+      console.error('Registration error:', error)
+      setError('An unexpected error occurred. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -224,7 +196,7 @@ export default function Register() {
                 alt="Dexian Logo" 
                 className="w-10 h-10 sm:w-12 sm:h-12 object-contain"
               />
-              <span className="text-xl sm:text-2xl font-bold text-blue-600">Dexian</span>
+              <span className="text-xl sm:text-2xl font-bold text-[#2b8f88]">Dexian</span>
             </div>
           </div>
           
@@ -328,7 +300,7 @@ export default function Register() {
                       onClick={() => setShowCountryDropdown(!showCountryDropdown)}
                       className="flex items-center px-2 sm:px-3 h-10 sm:h-12 border border-gray-200 border-r-0 rounded-l-lg bg-gray-50 hover:bg-gray-100 focus:outline-none"
                     >
-                      <span className="text-base sm:text-lg mr-1 sm:mr-2">{selectedCountry.flag}</span>
+                      <span className="text-base sm:text-lg mr-1 sm:mr-2 flag-emoji">{selectedCountry.flag}</span>
                       <span className="text-xs sm:text-sm font-medium text-gray-700">{selectedCountry.dialCode}</span>
                       <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4 ml-1 text-gray-500" />
                     </button>
@@ -359,7 +331,7 @@ export default function Register() {
                               onClick={() => handleCountrySelect(country)}
                               className="w-full flex items-center px-2 sm:px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50"
                             >
-                              <span className="text-base sm:text-lg mr-2 sm:mr-3">{country.flag}</span>
+                              <span className="text-base sm:text-lg mr-2 sm:mr-3 flag-emoji">{country.flag}</span>
                               <span className="text-xs sm:text-sm font-medium text-gray-700 mr-1 sm:mr-2">{country.dialCode}</span>
                               <span className="text-xs sm:text-sm text-gray-600 truncate">{country.name}</span>
                             </button>
