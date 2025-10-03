@@ -113,6 +113,22 @@ class SessionService {
         return false;
       }
 
+      // Check if cookies are actually present (manual cookie deletion detection)
+      const hasSessionCookies = () => {
+        const cookies = document.cookie.split(';').map(c => c.trim());
+        const sessionCookieNames = ['sAccessToken', 'sRefreshToken', 'sIdRefreshToken', 'sFrontToken'];
+        return sessionCookieNames.some(cookieName => 
+          cookies.some(cookie => cookie.startsWith(cookieName + '='))
+        );
+      };
+      
+      if (!hasSessionCookies()) {
+        console.log('❌ Session cookies missing - user manually deleted cookies');
+        this.isSessionValid = false;
+        this.notifyListeners('sessionInvalid', { reason: 'cookies_missing' });
+        return false;
+      }
+
       // Try to get session status from backend using the lightweight endpoint
       try {
         const response = await api.get('/users/session/status');
@@ -147,19 +163,25 @@ class SessionService {
           return false;
         }
         
-        // For other errors, don't immediately invalidate the session
-        // Just log the error and assume session is still valid
-        console.warn('⚠️ Backend session validation failed, but keeping session valid');
-        this.isSessionValid = true;
-        return true;
+        // For other errors, be strict - assume session is invalid
+        console.warn('⚠️ Backend session validation failed - assuming session is invalid');
+        this.isSessionValid = false;
+        this.notifyListeners('sessionInvalid', { 
+          reason: 'backend_error',
+          message: apiError.message
+        });
+        return false;
       }
       
     } catch (error) {
       console.error('❌ Session validation error:', error);
-      // Don't immediately invalidate session on error - just log it
-      console.warn('⚠️ Session validation error, but keeping session valid');
-      this.isSessionValid = true;
-      return true;
+      // On any error, assume session is invalid
+      this.isSessionValid = false;
+      this.notifyListeners('sessionInvalid', { 
+        reason: 'validation_error',
+        message: error.message
+      });
+      return false;
     }
   }
 
@@ -408,6 +430,23 @@ class SessionService {
    */
   async handleVisibilityChange() {
     if (document.visibilityState === 'visible') {
+      // Check if current page is a public auth page that doesn't need session validation
+      const isPublicAuthPage = () => {
+        const path = window.location.pathname;
+        return path.includes('/login') || 
+               path.includes('/register') || 
+               path.includes('/forgot-password') || 
+               path.includes('/reset-password') || 
+               path.includes('/verify-') ||
+               path.includes('/auth/');
+      };
+
+      // Skip session validation for public auth pages
+      if (isPublicAuthPage()) {
+        console.log('🔓 Public auth page detected, skipping session validation on tab focus');
+        return;
+      }
+
       console.log('👁️ Tab became visible - checking session');
       // Only validate if we haven't validated recently (within last 5 minutes)
       const now = Date.now();
@@ -424,6 +463,23 @@ class SessionService {
    * Handle window focus
    */
   async handleWindowFocus() {
+    // Check if current page is a public auth page that doesn't need session validation
+    const isPublicAuthPage = () => {
+      const path = window.location.pathname;
+      return path.includes('/login') || 
+             path.includes('/register') || 
+             path.includes('/forgot-password') || 
+             path.includes('/reset-password') || 
+             path.includes('/verify-') ||
+             path.includes('/auth/');
+    };
+
+    // Skip session validation for public auth pages
+    if (isPublicAuthPage()) {
+      console.log('🔓 Public auth page detected, skipping session validation on window focus');
+      return;
+    }
+
     console.log('🎯 Window focused - checking session');
     // Only validate if we haven't validated recently (within last 5 minutes)
     const now = Date.now();

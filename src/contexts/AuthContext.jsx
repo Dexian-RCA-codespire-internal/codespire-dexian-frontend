@@ -23,108 +23,126 @@ export const AuthProvider = ({ children }) => {
 
   // Check authentication status on app start and set up session monitoring
   useEffect(() => {
-    initializeAuth();
-    
-    // Set up session service event listeners
-    const handleSessionExpired = async (data) => {
-      console.log('🔒 Session expired in AuthContext:', data);
-      await clearAuthStateWithCleanup();
+    // Check if current page is a public auth page that doesn't need session monitoring
+    const isPublicAuthPage = () => {
+      const path = window.location.pathname;
+      return path.includes('/login') || 
+             path.includes('/register') || 
+             path.includes('/forgot-password') || 
+             path.includes('/reset-password') || 
+             path.includes('/verify-') ||
+             path.includes('/auth/');
     };
 
-    const handleSessionRefreshed = (data) => {
-      console.log('✅ Session refreshed in AuthContext:', data);
-      if (data.sessionInfo && data.sessionInfo.user) {
-        // Normalize user data with fallbacks
-        const userData = {
-          id: data.sessionInfo.user.userId || data.sessionInfo.session?.userId,
-          email: data.sessionInfo.user.email || 'No email',
-          name: data.sessionInfo.user.name || 'User',
-          firstName: data.sessionInfo.user.firstName || '',
-          lastName: data.sessionInfo.user.lastName || '',
-          phone: data.sessionInfo.user.phone || 'No phone',
-          role: data.sessionInfo.user.role || 'admin',
-          roles: data.sessionInfo.user.roles || ['admin'],
-          isEmailVerified: data.sessionInfo.user.isEmailVerified || false,
-          status: data.sessionInfo.user.status || 'active',
-          isActive: data.sessionInfo.user.isActive !== false,
-          lastLoginAt: data.sessionInfo.user.lastLoginAt,
-          preferences: data.sessionInfo.user.preferences || {}
-        };
+    // Only initialize auth and set up monitoring for non-public pages
+    if (!isPublicAuthPage()) {
+      initializeAuth();
+      
+      // Set up session service event listeners
+      const handleSessionExpired = async (data) => {
+        console.log('🔒 Session expired in AuthContext:', data);
+        await clearAuthStateWithCleanup();
+      };
+
+      const handleSessionRefreshed = (data) => {
+        console.log('✅ Session refreshed in AuthContext:', data);
+        if (data.sessionInfo && data.sessionInfo.user) {
+          // Normalize user data with fallbacks
+          const userData = {
+            id: data.sessionInfo.user.userId || data.sessionInfo.session?.userId,
+            email: data.sessionInfo.user.email || 'No email',
+            name: data.sessionInfo.user.name || 'User',
+            firstName: data.sessionInfo.user.firstName || '',
+            lastName: data.sessionInfo.user.lastName || '',
+            phone: data.sessionInfo.user.phone || 'No phone',
+            role: data.sessionInfo.user.role || 'admin',
+            roles: data.sessionInfo.user.roles || ['admin'],
+            isEmailVerified: data.sessionInfo.user.isEmailVerified || false,
+            status: data.sessionInfo.user.status || 'active',
+            isActive: data.sessionInfo.user.isActive !== false,
+            lastLoginAt: data.sessionInfo.user.lastLoginAt,
+            preferences: data.sessionInfo.user.preferences || {}
+          };
+          
+          setSessionInfo(data.sessionInfo);
+          setUser(userData);
+        }
+      };
+
+      const handleSessionInvalid = async (data) => {
+        console.log('❌ [DEBUG] Session invalid in AuthContext:', data);
+        console.log('❌ [DEBUG] Current user state before logout:', {
+          isAuthenticated,
+          user: user?.email,
+          sessionInfo: !!sessionInfo
+        });
         
-        setSessionInfo(data.sessionInfo);
-        setUser(userData);
-      }
-    };
+        await clearAuthStateWithCleanup();
+        
+        console.log('❌ [DEBUG] Auth state cleared, redirecting to login...');
+        
+        // Redirect to login page
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login?expired=true';
+        }
+      };
 
-    const handleSessionInvalid = async (data) => {
-      console.log('❌ [DEBUG] Session invalid in AuthContext:', data);
-      console.log('❌ [DEBUG] Current user state before logout:', {
-        isAuthenticated,
-        user: user?.email,
-        sessionInfo: !!sessionInfo
-      });
-      
-      await clearAuthStateWithCleanup();
-      
-      console.log('❌ [DEBUG] Auth state cleared, redirecting to login...');
-      
-      // Redirect to login page
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login?expired=true';
-      }
-    };
+      const handleLogout = async (data) => {
+        console.log('🚪 Logout in AuthContext:', data);
+        await clearAuthStateWithCleanup();
+      };
 
-    const handleLogout = async (data) => {
-      console.log('🚪 Logout in AuthContext:', data);
-      await clearAuthStateWithCleanup();
-    };
+      // Set up cookie monitoring event listeners
+      const handleSessionCookiesMissing = async (data) => {
+        console.log('🍪 Session cookies missing in AuthContext:', data);
+        await clearAuthStateWithCleanup();
+        // Redirect to login if not already there
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login?expired=true';
+        }
+      };
 
-    // Set up cookie monitoring event listeners
-    const handleSessionCookiesMissing = async (data) => {
-      console.log('🍪 Session cookies missing in AuthContext:', data);
-      await clearAuthStateWithCleanup();
-      // Redirect to login if not already there
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login?expired=true';
-      }
-    };
+      const handleSessionCookiesValid = (data) => {
+        console.log('✅ Session cookies valid in AuthContext:', data);
+        // Cookies are valid, ensure we're authenticated
+        if (!isAuthenticated) {
+          initializeAuth();
+        }
+      };
 
-    const handleSessionCookiesValid = (data) => {
-      console.log('✅ Session cookies valid in AuthContext:', data);
-      // Cookies are valid, ensure we're authenticated
-      if (!isAuthenticated) {
-        initializeAuth();
-      }
-    };
+      const handleCookiesCleaned = async (data) => {
+        console.log('🧹 Cookies cleaned in AuthContext:', data);
+        await clearAuthStateWithCleanup();
+      };
 
-    const handleCookiesCleaned = async (data) => {
-      console.log('🧹 Cookies cleaned in AuthContext:', data);
-      await clearAuthStateWithCleanup();
-    };
+      // Add event listeners
+      sessionService.addEventListener('sessionExpired', handleSessionExpired);
+      sessionService.addEventListener('sessionRefreshed', handleSessionRefreshed);
+      sessionService.addEventListener('sessionInvalid', handleSessionInvalid);
+      sessionService.addEventListener('logout', handleLogout);
 
-    // Add event listeners
-    sessionService.addEventListener('sessionExpired', handleSessionExpired);
-    sessionService.addEventListener('sessionRefreshed', handleSessionRefreshed);
-    sessionService.addEventListener('sessionInvalid', handleSessionInvalid);
-    sessionService.addEventListener('logout', handleLogout);
+      // Add cookie monitoring event listeners
+      cookieMonitorService.addEventListener('sessionCookiesMissing', handleSessionCookiesMissing);
+      cookieMonitorService.addEventListener('sessionCookiesValid', handleSessionCookiesValid);
+      cookieMonitorService.addEventListener('cookiesCleaned', handleCookiesCleaned);
 
-    // Add cookie monitoring event listeners
-    cookieMonitorService.addEventListener('sessionCookiesMissing', handleSessionCookiesMissing);
-    cookieMonitorService.addEventListener('sessionCookiesValid', handleSessionCookiesValid);
-    cookieMonitorService.addEventListener('cookiesCleaned', handleCookiesCleaned);
+      return () => {
+        // Remove event listeners
+        sessionService.removeEventListener('sessionExpired', handleSessionExpired);
+        sessionService.removeEventListener('sessionRefreshed', handleSessionRefreshed);
+        sessionService.removeEventListener('sessionInvalid', handleSessionInvalid);
+        sessionService.removeEventListener('logout', handleLogout);
 
-    return () => {
-      // Remove event listeners
-      sessionService.removeEventListener('sessionExpired', handleSessionExpired);
-      sessionService.removeEventListener('sessionRefreshed', handleSessionRefreshed);
-      sessionService.removeEventListener('sessionInvalid', handleSessionInvalid);
-      sessionService.removeEventListener('logout', handleLogout);
-
-      // Remove cookie monitoring event listeners
-      cookieMonitorService.removeEventListener('sessionCookiesMissing', handleSessionCookiesMissing);
-      cookieMonitorService.removeEventListener('sessionCookiesValid', handleSessionCookiesValid);
-      cookieMonitorService.removeEventListener('cookiesCleaned', handleCookiesCleaned);
-    };
+        // Remove cookie monitoring event listeners
+        cookieMonitorService.removeEventListener('sessionCookiesMissing', handleSessionCookiesMissing);
+        cookieMonitorService.removeEventListener('sessionCookiesValid', handleSessionCookiesValid);
+        cookieMonitorService.removeEventListener('cookiesCleaned', handleCookiesCleaned);
+      };
+    } else {
+      // For public auth pages, just set loading to false without initializing auth
+      console.log('🔓 Public auth page detected, skipping auth initialization');
+      setIsLoading(false);
+    }
   }, []);
 
   const clearAuthState = () => {
@@ -262,50 +280,13 @@ export const AuthProvider = ({ children }) => {
               setIsAuthenticated(true);
               console.log('✅ Auth initialized successfully:', userData.email);
             } else {
-              console.log('⚠️ No session info available, but session exists - using fallback');
-              // Create fallback user data when session exists but no detailed info
-              const fallbackUserData = {
-                id: 'authenticated-user',
-                email: 'Authenticated User',
-                name: 'User',
-                firstName: '',
-                lastName: '',
-                phone: 'No phone',
-                role: 'admin',
-                roles: ['admin'],
-                isEmailVerified: false,
-                status: 'active',
-                isActive: true,
-                lastLoginAt: new Date(),
-                preferences: {}
-              };
-              
-              setUser(fallbackUserData);
-              setIsAuthenticated(true);
-              console.log('✅ Auth initialized with fallback data');
+              console.log('❌ No session info available - session validation failed');
+              await clearAuthStateWithCleanup();
             }
           } catch (sessionError) {
-            console.warn('⚠️ Error getting session info, but session exists:', sessionError.message);
-            // Session exists but can't get details - use fallback
-            const fallbackUserData = {
-              id: 'authenticated-user',
-              email: 'Authenticated User',
-              name: 'User',
-              firstName: '',
-              lastName: '',
-              phone: 'No phone',
-              role: 'admin',
-              roles: ['admin'],
-              isEmailVerified: false,
-              status: 'active',
-              isActive: true,
-              lastLoginAt: new Date(),
-              preferences: {}
-            };
-            
-            setUser(fallbackUserData);
-            setIsAuthenticated(true);
-            console.log('✅ Auth initialized with fallback data after error');
+            console.warn('⚠️ Error getting session info:', sessionError.message);
+            console.log('❌ Session error - clearing auth state');
+            await clearAuthStateWithCleanup();
           }
         } else {
           console.log('❌ Session validation failed, clearing auth state');
@@ -334,6 +315,21 @@ export const AuthProvider = ({ children }) => {
         if (isAuthenticated) {
           await clearAuthStateWithCleanup();
         }
+        return false;
+      }
+      
+      // Check if cookies are actually present (manual cookie deletion detection)
+      const hasSessionCookies = () => {
+        const cookies = document.cookie.split(';').map(c => c.trim());
+        const sessionCookieNames = ['sAccessToken', 'sRefreshToken', 'sIdRefreshToken', 'sFrontToken'];
+        return sessionCookieNames.some(cookieName => 
+          cookies.some(cookie => cookie.startsWith(cookieName + '='))
+        );
+      };
+      
+      if (!hasSessionCookies()) {
+        console.log('❌ Session cookies missing - user manually deleted cookies');
+        await clearAuthStateWithCleanup();
         return false;
       }
       
@@ -371,9 +367,9 @@ export const AuthProvider = ({ children }) => {
             console.log('🔒 Session was explicitly revoked, logging out');
             return false;
           }
-          // For other validation failures, be more lenient
-          console.warn('⚠️ Backend validation failed, but keeping session valid');
-          return true;
+          // For other validation failures, be strict - logout user
+          console.warn('⚠️ Backend validation failed, logging out user');
+          return false;
         }
       } catch (apiError) {
         clearTimeout(timeoutId);
@@ -384,20 +380,20 @@ export const AuthProvider = ({ children }) => {
           sessionRevoked: apiError.response?.data?.sessionRevoked
         });
         
-        // Check if it's a 401 error with sessionRevoked flag
-        if (apiError.response?.status === 401 && apiError.response?.data?.sessionRevoked) {
-          console.log('🔒 401 error with sessionRevoked flag, logging out');
+        // Check if it's a 401 error (unauthorized) - this usually means session is invalid
+        if (apiError.response?.status === 401) {
+          console.log('🔒 401 Unauthorized - session is invalid, logging out');
           return false;
         }
         
-        // For other errors, be more lenient
-        console.warn('⚠️ Backend error, but keeping session valid');
-        return true;
+        // For other errors, be strict - assume session is invalid
+        console.warn('⚠️ Backend error - assuming session is invalid, logging out');
+        return false;
       }
     } catch (error) {
       console.error('❌ Session validation error:', error);
-      // Don't logout on errors - assume session is valid
-      return true; // Changed from false to true
+      // On any error, assume session is invalid and logout
+      return false;
     }
   };
 
@@ -517,6 +513,82 @@ export const AuthProvider = ({ children }) => {
       throw error;
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const forceLogout = async () => {
+    console.log('🚪 Force logout initiated...');
+    
+    try {
+      // First, try to revoke session on backend
+      try {
+        const response = await fetch('http://localhost:8081/api/v1/users/logout', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          console.log('✅ Backend logout successful');
+        } else {
+          console.warn('⚠️ Backend logout failed, continuing with frontend cleanup');
+        }
+      } catch (backendError) {
+        console.warn('⚠️ Backend logout error:', backendError.message);
+      }
+      
+      // Clear auth state
+      await clearAuthStateWithCleanup();
+      
+      // NUCLEAR APPROACH: Clear ALL storage
+      try {
+        // Clear ALL cookies
+        const allCookies = document.cookie.split(';');
+        allCookies.forEach(cookie => {
+          const eqPos = cookie.indexOf('=');
+          const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+          
+          // Clear with multiple domain/path combinations
+          const domains = ['', 'localhost', '.localhost', '127.0.0.1', '.127.0.0.1', window.location.hostname, '.' + window.location.hostname];
+          const paths = ['/', '/auth', '/api'];
+          
+          domains.forEach(domain => {
+            paths.forEach(path => {
+              let cookieString = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=${path}`;
+              if (domain) {
+                cookieString += `;domain=${domain}`;
+              }
+              document.cookie = cookieString;
+            });
+          });
+        });
+        
+        // Clear ALL localStorage
+        const allLocalStorageKeys = Object.keys(localStorage);
+        allLocalStorageKeys.forEach(key => {
+          localStorage.removeItem(key);
+        });
+        
+        // Clear ALL sessionStorage
+        const allSessionStorageKeys = Object.keys(sessionStorage);
+        allSessionStorageKeys.forEach(key => {
+          sessionStorage.removeItem(key);
+        });
+        
+        console.log('✅ Nuclear storage cleanup completed');
+      } catch (error) {
+        console.warn('⚠️ Error during nuclear storage cleanup:', error.message);
+      }
+      
+      // Redirect to login page
+      window.location.href = '/login?logout=true';
+      
+    } catch (error) {
+      console.error('❌ Error during force logout:', error);
+      // Even if there's an error, redirect to login
+      window.location.href = '/login?logout=true';
     }
   };
 
@@ -698,6 +770,7 @@ export const AuthProvider = ({ children }) => {
     // Authentication methods
     login,
     logout,
+    forceLogout,
     register,
     
     // Email verification methods

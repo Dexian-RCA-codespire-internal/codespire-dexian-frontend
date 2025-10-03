@@ -29,9 +29,10 @@ export default function Register() {
   const [countrySearch, setCountrySearch] = useState('')
   const dropdownRef = useRef(null)
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (but only check once to avoid multiple redirects)
   useEffect(() => {
     if (isAuthenticated) {
+      console.log('✅ User is authenticated, redirecting to dashboard');
       navigate('/dashboard')
     }
   }, [isAuthenticated, navigate])
@@ -195,7 +196,7 @@ export default function Register() {
                 alt="Dexian Logo" 
                 className="w-10 h-10 sm:w-12 sm:h-12 object-contain"
               />
-              <span className="text-xl sm:text-2xl font-bold text-blue-600">Dexian</span>
+              <span className="text-xl sm:text-2xl font-bold text-[#2b8f88]">Dexian</span>
             </div>
           </div>
           

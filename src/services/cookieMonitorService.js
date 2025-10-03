@@ -42,6 +42,23 @@ class CookieMonitorService {
     // Listen for visibility change to check session when tab becomes active (more aggressive)
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
+        // Check if current page is a public auth page that doesn't need session validation
+        const isPublicAuthPage = () => {
+          const path = window.location.pathname;
+          return path.includes('/login') || 
+                 path.includes('/register') || 
+                 path.includes('/forgot-password') || 
+                 path.includes('/reset-password') || 
+                 path.includes('/verify-') ||
+                 path.includes('/auth/');
+        };
+
+        // Skip session validation for public auth pages
+        if (isPublicAuthPage()) {
+          console.log('🔓 Public auth page detected, skipping session check on tab focus');
+          return;
+        }
+
         console.log('👁️ Tab became visible - force checking session');
         // Immediate check for session removal
         this.forceSessionCheck();
@@ -50,6 +67,23 @@ class CookieMonitorService {
 
     // Listen for focus events to check session (more aggressive)
     window.addEventListener('focus', () => {
+      // Check if current page is a public auth page that doesn't need session validation
+      const isPublicAuthPage = () => {
+        const path = window.location.pathname;
+        return path.includes('/login') || 
+               path.includes('/register') || 
+               path.includes('/forgot-password') || 
+               path.includes('/reset-password') || 
+               path.includes('/verify-') ||
+               path.includes('/auth/');
+      };
+
+      // Skip session validation for public auth pages
+      if (isPublicAuthPage()) {
+        console.log('🔓 Public auth page detected, skipping session check on window focus');
+        return;
+      }
+
       console.log('🎯 Window focused - force checking session');
       // Immediate check for session removal
       this.forceSessionCheck();
@@ -134,6 +168,24 @@ class CookieMonitorService {
         });
         return false;
       } else {
+        // Check if cookies are actually present (manual cookie deletion detection)
+        const hasSessionCookies = () => {
+          const cookies = document.cookie.split(';').map(c => c.trim());
+          const sessionCookieNames = ['sAccessToken', 'sRefreshToken', 'sIdRefreshToken', 'sFrontToken'];
+          return sessionCookieNames.some(cookieName => 
+            cookies.some(cookie => cookie.startsWith(cookieName + '='))
+          );
+        };
+        
+        if (!hasSessionCookies()) {
+          console.log('🚫 Session cookies missing on page load - user manually deleted cookies');
+          await this.cleanupFrontendCookies();
+          this.dispatchEvent('sessionCookiesMissing', { 
+            reason: 'cookies_missing_on_page_load',
+            timestamp: new Date().toISOString()
+          });
+          return false;
+        }
         console.log('✅ SuperTokens session found on page load - verifying with backend...');
         
         // Immediately check with backend to see if session is revoked

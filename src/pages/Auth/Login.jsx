@@ -169,7 +169,7 @@ export default function Login() {
                 alt="Dexian Logo" 
                 className="w-12 h-12 object-contain"
               />
-              <span className="text-2xl font-bold text-blue-600">Dexian</span>
+              <span className="text-2xl font-bold text-[#2b8f88]">Dexian</span>
             </div>
           </div>
           
@@ -274,15 +274,8 @@ export default function Login() {
               {/* Remember Me and Forgot Password */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <Checkbox
-                    id="remember"
-                    checked={rememberMe}
-                    onCheckedChange={setRememberMe}
-                    className="mr-2"
-                  />
-                  <label htmlFor="remember" className="text-sm text-gray-700">
-                    Remember me
-                  </label>
+                 
+             
                 </div>
                 <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
                   Forgot Password?
