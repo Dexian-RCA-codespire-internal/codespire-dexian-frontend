@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import webSocketService from '../services/websocketService';
 import { transformTicketToRCACase } from '../api/rcaService';
+import { useToast } from '../contexts/ToastContext';
+import { webSocketManager } from '../utils/websocketManager';
 
 /**
  * WebSocket-only hook that completely eliminates REST API calls
@@ -10,13 +12,13 @@ import { transformTicketToRCACase } from '../api/rcaService';
 export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
+  const { success, error, info, warning } = useToast();
   
   // Data state
   const [tickets, setTickets] = useState([]);
   const [newTickets, setNewTickets] = useState([]);
   const [pollingStatus, setPollingStatus] = useState(null);
   const [lastPollingEvent, setLastPollingEvent] = useState(null);
-  const [notifications, setNotifications] = useState([]);
   
   // Pagination state
   const [pagination, setPagination] = useState({
@@ -51,9 +53,11 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
   
   // Store handlers in refs to prevent re-creation
   const handlersRef = useRef({});
+  const isMountedRef = useRef(true);
   
   // Create stable event handlers using useCallback
   const handleConnection = useCallback((data) => {
+    if (!isMountedRef.current) return;
     setIsConnected(data.connected);
     if (data.connected) {
       setConnectionError(null);
@@ -64,6 +68,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
   }, []);
 
   const handleConnectionError = useCallback((error) => {
+    if (!isMountedRef.current) return;
     setConnectionError(error.message || 'Connection failed');
     setIsConnected(false);
   }, []);
@@ -175,25 +180,28 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
   }, []);
 
   /**
-   * Add notification
+   * Add notification using toast system
    */
   const addNotification = useCallback((notificationData) => {
-    const notification = {
-      id: Date.now() + Math.random(),
-      message: notificationData.message,
-      type: notificationData.notificationType || 'info',
-      timestamp: notificationData.timestamp || new Date().toISOString()
-    };
-
-    setNotifications(prevNotifications => [notification, ...prevNotifications]);
-
-    // Remove notification after 10 seconds
-    setTimeout(() => {
-      setNotifications(prevNotifications => 
-        prevNotifications.filter(n => n.id !== notification.id)
-      );
-    }, 10000);
-  }, []);
+    const type = notificationData.notificationType || 'info';
+    const message = notificationData.message;
+    
+    // Map notification types to toast functions
+    switch (type) {
+      case 'success':
+        success(message);
+        break;
+      case 'error':
+        error(message);
+        break;
+      case 'warning':
+        warning(message);
+        break;
+      default:
+        info(message);
+        break;
+    }
+  }, [success, error, warning, info]);
 
   // Create handleNotification callback after addNotification is defined
   const handleNotification = useCallback((data) => {
@@ -204,21 +212,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
     addNotification(data);
   }, [addNotification]);
 
-  /**
-   * Remove notification
-   */
-  const removeNotification = useCallback((notificationId) => {
-    setNotifications(prevNotifications => 
-      prevNotifications.filter(n => n.id !== notificationId)
-    );
-  }, []);
-
-  /**
-   * Clear all notifications
-   */
-  const clearNotifications = useCallback(() => {
-    setNotifications([]);
-  }, []);
+  // Note: removeNotification and clearNotifications are now handled by the ToastContainer component
 
   /**
    * Clear page cache
@@ -354,21 +348,38 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
 
   // Setup WebSocket connection and event listeners
   useEffect(() => {
-    // Connect to WebSocket
-    webSocketService.connect(serverUrl);
+    isMountedRef.current = true;
+    
+    // Register this component as a subscriber
+    const componentId = Math.random().toString(36).substr(2, 9);
+    webSocketManager.subscribe(componentId);
+    
+    // Only initialize connection if not already done
+    const shouldInitialize = webSocketManager.init(serverUrl);
+    if (shouldInitialize) {
+      console.log('🔌 Initializing WebSocket connection for:', serverUrl);
+      webSocketService.connect(serverUrl);
+    } else {
+      console.log('🔌 Using existing WebSocket connection');
+      // Set current connection state from existing connection
+      setIsConnected(webSocketService.getConnectionStatus());
+    }
 
     // Connection status handlers (now defined above with useCallback)
 
     const handleReconnection = (data) => {
+      if (!isMountedRef.current) return;
       console.log(`🔄 WebSocket reconnected after ${data.attemptNumber} attempts`);
       setConnectionError(null);
     };
 
     const handleReconnectionError = (error) => {
+      if (!isMountedRef.current) return;
       setConnectionError(error.message || 'Reconnection failed');
     };
 
     const handleReconnectionFailed = () => {
+      if (!isMountedRef.current) return;
       setConnectionError('Failed to reconnect after maximum attempts');
     };
 
@@ -376,6 +387,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
 
     // Polling status handler
     const handlePollingStatus = (data) => {
+      if (!isMountedRef.current) return;
       console.log('🔍 Received polling status event:', data);
       
       // The backend sends data in format: { type: 'polling_status', status: actualData, timestamp: '...' }
@@ -395,6 +407,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
 
     // Paginated data handlers (WebSocket responses)
     const handlePaginatedDataResponse = (data) => {
+      if (!isMountedRef.current) return;
       if (data.success) {
         const transformedData = data.data.map(ticket => transformTicketToRCACase(ticket));
         setTickets(transformedData);
@@ -451,6 +464,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
     };
 
     const handlePaginatedDataError = (data) => {
+      if (!isMountedRef.current) return;
       console.error('❌ Paginated data error via WebSocket:', data);
       setIsLoading(false);
       setIsInitialLoad(false);
@@ -469,6 +483,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
 
     // Data statistics handlers (WebSocket responses)
     const handleDataStatisticsResponse = (data) => {
+      if (!isMountedRef.current) return;
       if (data.success) {
         setDataStatistics(data.data);
         console.log('✅ Received statistics via WebSocket:', data.data);
@@ -476,6 +491,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
     };
 
     const handleDataStatisticsError = (data) => {
+      if (!isMountedRef.current) return;
       console.error('❌ Data statistics error via WebSocket:', data);
       addNotification({
         message: `Failed to load statistics: ${data.error}`,
@@ -486,15 +502,18 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
 
     // Sync event handlers
     const handleSyncStarted = (data) => {
+      if (!isMountedRef.current) return;
       setSyncState(prev => ({ ...prev, isSyncInProgress: true }));
     };
 
     const handleInitialSyncBatch = (data) => {
+      if (!isMountedRef.current) return;
       console.log(`📦 Processing initial sync batch ${data.batchNumber}/${data.totalBatches}`);
       addTicketsBatch(data.batch);
     };
 
     const handleInitialSyncComplete = (data) => {
+      if (!isMountedRef.current) return;
       setSyncState(prev => ({
         ...prev,
         isInitialSyncComplete: true,
@@ -509,11 +528,13 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
     };
 
     const handleIncrementalSyncBatch = (data) => {
+      if (!isMountedRef.current) return;
       console.log('📦 Processing incremental sync batch');
       addTicketsBatch(data.batch);
     };
 
     const handleIncrementalSyncComplete = (data) => {
+      if (!isMountedRef.current) return;
       setSyncState(prev => ({
         ...prev,
         isSyncInProgress: false,
@@ -530,6 +551,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
     };
 
     const handleSyncError = (data) => {
+      if (!isMountedRef.current) return;
       setSyncState(prev => ({ ...prev, isSyncInProgress: false }));
       addNotification({
         message: `Sync error: ${data.message}`,
@@ -560,6 +582,11 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
 
     // Cleanup function
     return () => {
+      isMountedRef.current = false;
+      
+      // Unregister this component
+      webSocketManager.unsubscribe(componentId);
+      
       webSocketService.off('connection', handleConnection);
       webSocketService.off('connection_error', handleConnectionError);
       webSocketService.off('reconnection', handleReconnection);
@@ -583,8 +610,11 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
       requestTimeouts.current.forEach(timeoutId => clearTimeout(timeoutId));
       requestTimeouts.current.clear();
       
-      // Disconnect when component unmounts
-      webSocketService.disconnect();
+      // Only disconnect if no other components are using the connection
+      if (webSocketManager.cleanup()) {
+        console.log('🔌 Disconnecting WebSocket - no more subscribers');
+        webSocketService.disconnect();
+      }
     };
   }, [serverUrl, handleConnection, handleConnectionError, handleTicketUpdate, handleNotification]);
 
@@ -756,10 +786,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
     isInitialLoad,
     dataStatistics,
     
-    // Notifications
-    notifications,
-    removeNotification,
-    clearNotifications,
+    // Toast notifications are now handled via ToastContext
     
     // Sync state and controls
     syncState,

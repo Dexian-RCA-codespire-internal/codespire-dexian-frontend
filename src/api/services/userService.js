@@ -6,7 +6,7 @@ export const userService = {
   createUser: async (userData) => {
     try {
       console.log('Creating user with data:', userData);
-      const response = await api.post('/api/v1/users', {
+      const response = await api.post('/users', {
         email: userData.email,
         password: userData.password || 'TempPassword123!', // Default password if not provided
         firstName: userData.firstName || userData.fullName?.split(' ')[0] || '',
@@ -127,7 +127,7 @@ export const userService = {
       if (params.status) queryParams.append('status', params.status);
 
       const queryString = queryParams.toString();
-      const url = queryString ? `/api/v1/users?${queryString}` : '/api/v1/users';
+      const url = queryString ? `/users?${queryString}` : '/users';
       
       console.log('Getting all users with params:', params, 'URL:', url);
       const response = await api.get(url);

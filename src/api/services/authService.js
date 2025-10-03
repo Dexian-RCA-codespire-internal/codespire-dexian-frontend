@@ -6,7 +6,7 @@ import Session from 'supertokens-auth-react/recipe/session';
 import api from '../index.js';
 
 // API Base URLs
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api/v1';
 
 // Authentication API services using SuperTokens
 export const authService = {
@@ -444,8 +444,8 @@ export const authService = {
         };
       }
 
-      // Call the lightweight session status endpoint
-      const response = await api.get('/api/v1/users/session/status');
+      // Call the lightweight session status endpoint (using simple version for debugging)
+      const response = await api.get('/users/session/status/simple');
       
       console.log('✅ Session status check successful:', response.data);
       
@@ -482,7 +482,7 @@ export const authService = {
       }
 
       // Get comprehensive session info from backend
-      const response = await api.get('/api/v1/users/session/info');
+      const response = await api.get('/users/session/info');
       
       console.log('✅ Session data retrieved from backend:', response.data);
       
@@ -528,7 +528,7 @@ export const authService = {
    */
   getUserProfile: async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/users/profile`, {
+      const response = await fetch(`${API_BASE_URL}/users/profile`, {
         method: 'GET',
         credentials: 'include'
       });

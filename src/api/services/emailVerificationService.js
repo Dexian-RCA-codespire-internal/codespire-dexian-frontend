@@ -6,7 +6,7 @@ export const emailVerificationService = {
   sendOTP: async (email) => {
     try {
       console.log('Sending OTP for email verification:', email);
-      const response = await api.post('/api/v1/email-verification/send-otp', {
+      const response = await api.post('/email-verification/send-otp', {
         email: email
       });
       console.log('Send OTP response:', response.data);
@@ -21,7 +21,7 @@ export const emailVerificationService = {
   verifyOTP: async (email, otp, deviceId, preAuthSessionId) => {
     try {
       console.log('Verifying OTP for email:', email);
-      const response = await api.post('/api/v1/email-verification/verify-otp', {
+      const response = await api.post('/email-verification/verify-otp', {
         email: email,
         otp: otp,
         deviceId: deviceId,
@@ -52,7 +52,7 @@ export const emailVerificationService = {
   resendVerification: async (email, method = 'otp') => {
     try {
       console.log('Resending verification for email:', email, 'method:', method);
-      const response = await api.post('/api/v1/email-verification/resend', {
+      const response = await api.post('/email-verification/resend', {
         email: email,
         method: method // 'otp' or 'magic_link'
       });
@@ -68,7 +68,7 @@ export const emailVerificationService = {
   verifyMagicLink: async (token) => {
     try {
       console.log('Verifying magic link token:', token);
-      const response = await api.post('/api/v1/email-verification/verify-magic-link', {
+      const response = await api.post('/email-verification/verify-magic-link', {
         token: token
       });
       console.log('Verify magic link response:', response.data);

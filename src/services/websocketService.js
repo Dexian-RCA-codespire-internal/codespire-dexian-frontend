@@ -21,6 +21,14 @@ class WebSocketService {
       return;
     }
 
+    // If we have an existing socket but it's not connected, clean it up first
+    if (this.socket && !this.isConnected) {
+      console.log('Cleaning up existing disconnected socket');
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
+    }
+
     console.log(`🔌 Connecting to WebSocket server: ${serverUrl}`);
     
     this.socket = io(serverUrl, {
@@ -29,7 +37,8 @@ class WebSocketService {
       reconnection: true,
       reconnectionAttempts: this.maxReconnectAttempts,
       reconnectionDelay: this.reconnectDelay,
-      timeout: 20000
+      timeout: 20000,
+      forceNew: false // Reuse existing connection if possible
     });
 
     this.setupEventHandlers();

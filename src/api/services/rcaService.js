@@ -113,5 +113,18 @@ export const rcaService = {
   deleteRCACaseAttachment: async ({ caseId, attachmentId }) => {
     const response = await api.delete(`/rca/cases/${caseId}/attachments/${attachmentId}`);
     return response.data;
+  },
+
+  // Stream RCA generation
+  streamRCAGeneration: async ({ ticketData, rcaFields, socketId }) => {
+    const response = await api.post('/rca/stream', {
+      ticketData,
+      rcaFields
+    }, {
+      headers: {
+        'x-socket-id': socketId
+      }
+    });
+    return response.data;
   }
 };

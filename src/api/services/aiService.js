@@ -158,6 +158,15 @@ export const aiService = {
         feedback
       });
       return response.data;
+    },
+
+    // Search AI guidance in playbook triggers
+    searchGuidanceInTriggers: async ({ playbookIds, guidanceQuestion }) => {
+      const response = await api.post('/ai/playbook-recommender/search-guidance', {
+        playbookIds,
+        guidanceQuestion
+      });
+      return response.data;
     }
   },
 
@@ -188,6 +197,60 @@ export const aiService = {
     // Get performance predictions
     getPerformancePredictions: async ({ systemId, timeRange = '7d' } = {}) => {
       const response = await api.get(`/ai/analytics/performance-predictions?systemId=${systemId}&timeRange=${timeRange}`);
+      return response.data;
+    }
+  },
+
+  // Problem Statement Generation
+  problemStatement: {
+    // Generate AI-powered problem statement
+    generate: async (ticketData) => {
+      const response = await api.post('/problem-statement/generate', ticketData);
+      return response.data;
+    }
+  },
+
+  // Timeline Context Generation
+  timelineContext: {
+    // Generate AI-powered timeline and context description
+    generate: async (data) => {
+      const response = await api.post('/timeline-context/generate', data);
+      return response.data;
+    }
+  },
+
+  // Impact Assessment
+  impactAssessment: {
+    // Analyze impact assessment based on problem statement and timeline context
+    analyze: async (data) => {
+      const response = await api.post('/impact-assessment/analyze', data);
+      return response.data;
+    }
+  },
+
+  // Text Enhancement
+  textEnhancement: {
+    // Enhance text using AI
+    enhance: async (data) => {
+      const response = await api.post('/text-enhancement/enhance', data);
+      return response.data;
+    }
+  },
+
+  // Root Cause Analysis
+  rootCauseAnalysis: {
+    // Analyze root causes for a ticket
+    analyze: async (data) => {
+      const response = await api.post('/rca-root-cause/analyze', data);
+      return response.data;
+    }
+  },
+
+  // Solution Generation
+  solutionGeneration: {
+    // Generate solutions for a ticket
+    generate: async (data) => {
+      const response = await api.post('/solution-generation/generate', data);
       return response.data;
     }
   }

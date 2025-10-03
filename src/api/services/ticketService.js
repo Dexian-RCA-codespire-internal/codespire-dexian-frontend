@@ -12,61 +12,61 @@ export const ticketService = {
       ...(params.source && { source: params.source }),
       ...(params.search && { search: params.search })
     };
-    const response = await api.get('/api/v1/tickets', { params: apiParams });
+    const response = await api.get('/tickets', { params: apiParams });
     return response.data;
   },
 
   // Fetch single ticket by ID
   getTicketById: async (ticketId) => {
-    const response = await api.get(`/api/v1/tickets/${ticketId}`);
+    const response = await api.get(`/tickets/${ticketId}`);
     return response.data;
   },
 
   // Create new ticket
   createTicket: async (ticketData) => {
-    const response = await api.post('/api/v1/tickets', ticketData);
+    const response = await api.post('/tickets', ticketData);
     return response.data;
   },
 
   // Update ticket
   updateTicket: async ({ ticketId, ticketData }) => {
-    const response = await api.put(`/api/v1/tickets/${ticketId}`, ticketData);
+    const response = await api.put(`/tickets/${ticketId}`, ticketData);
     return response.data;
   },
 
   // Delete ticket
   deleteTicket: async (ticketId) => {
-    const response = await api.delete(`/api/v1/tickets/${ticketId}`);
+    const response = await api.delete(`/tickets/${ticketId}`);
     return response.data;
   },
 
   // Update ticket status
   updateTicketStatus: async ({ ticketId, status, notes }) => {
-    const response = await api.patch(`/api/v1/tickets/${ticketId}/status`, { status, notes });
+    const response = await api.patch(`/tickets/${ticketId}/status`, { status, notes });
     return response.data;
   },
 
   // Assign ticket to user
   assignTicket: async ({ ticketId, assignedTo }) => {
-    const response = await api.patch(`/api/v1/tickets/${ticketId}/assign`, { assignedTo });
+    const response = await api.patch(`/tickets/${ticketId}/assign`, { assignedTo });
     return response.data;
   },
 
   // Get ticket comments
   getTicketComments: async (ticketId) => {
-    const response = await api.get(`/api/v1/tickets/${ticketId}/comments`);
+    const response = await api.get(`/tickets/${ticketId}/comments`);
     return response.data;
   },
 
   // Add comment to ticket
   addTicketComment: async ({ ticketId, comment }) => {
-    const response = await api.post(`/api/v1/tickets/${ticketId}/comments`, { comment });
+    const response = await api.post(`/tickets/${ticketId}/comments`, { comment });
     return response.data;
   },
 
   // Get ticket attachments
   getTicketAttachments: async (ticketId) => {
-    const response = await api.get(`/api/v1/tickets/${ticketId}/attachments`);
+    const response = await api.get(`/tickets/${ticketId}/attachments`);
     return response.data;
   },
 
@@ -74,7 +74,7 @@ export const ticketService = {
   uploadTicketAttachment: async ({ ticketId, file }) => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post(`/api/v1/tickets/${ticketId}/attachments`, formData, {
+    const response = await api.post(`/tickets/${ticketId}/attachments`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
     return response.data;
@@ -82,19 +82,19 @@ export const ticketService = {
 
   // Delete ticket attachment
   deleteTicketAttachment: async ({ ticketId, attachmentId }) => {
-    const response = await api.delete(`/api/v1/tickets/${ticketId}/attachments/${attachmentId}`);
+    const response = await api.delete(`/tickets/${ticketId}/attachments/${attachmentId}`);
     return response.data;
   },
 
   // Get ticket statistics
   getTicketStats: async () => {
-    const response = await api.get('/api/v1/tickets/stats');
+    const response = await api.get('/tickets/stats');
     return response.data;
   },
 
   // Search tickets
   searchTickets: async (query) => {
-    const response = await api.get(`/api/v1/tickets/search?q=${encodeURIComponent(query)}`);
+    const response = await api.get(`/tickets/search?q=${encodeURIComponent(query)}`);
     return response.data;
   },
 
@@ -106,32 +106,32 @@ export const ticketService = {
       ...(params.status && { status: params.status }),
       ...(params.priority && { priority: params.priority })
     };
-    const response = await api.get(`/api/v1/tickets/source/${source}`, { params: apiParams });
+    const response = await api.get(`/tickets/source/${source}`, { params: apiParams });
     return response.data;
   },
 
   // Sync tickets from external source
   syncTicketsFromSource: async (source) => {
-    const response = await api.post(`/api/v1/tickets/sync/${source}`);
+    const response = await api.post(`/tickets/sync/${source}`);
     return response.data;
   },
 
   // Get ticket timeline
   getTicketTimeline: async (ticketId) => {
-    const response = await api.get(`/api/v1/tickets/${ticketId}/timeline`);
+    const response = await api.get(`/tickets/${ticketId}/timeline`);
     return response.data;
   },
 
   // Bulk update tickets
   bulkUpdateTickets: async ({ ticketIds, updateData }) => {
-    const response = await api.patch('/api/v1/tickets/bulk-update', { ticketIds, updateData });
+    const response = await api.patch('/tickets/bulk-update', { ticketIds, updateData });
     return response.data;
   },
 
   // Export tickets
   exportTickets: async (filters = {}) => {
     const params = new URLSearchParams(filters);
-    const response = await api.get(`/api/v1/tickets/export?${params}`, {
+    const response = await api.get(`/tickets/export?${params}`, {
       responseType: 'blob'
     });
     return response.data;
@@ -139,16 +139,31 @@ export const ticketService = {
 
   // Get similar tickets
   getSimilarTickets: async (ticketData) => {
-    const response = await api.post('/api/v1/ticket-similarity/similar', ticketData);
+    const response = await api.post('/ticket-similarity/similar', ticketData);
     return response.data;
   },
 
   // Get AI suggestions based on similar tickets
   getAISuggestions: async (similarTickets, currentTicket) => {
-    const response = await api.post('/api/v1/ticket-similarity/suggestions', {
+    const response = await api.post('/ticket-similarity/suggestions', {
       similarTickets,
       currentTicket
     });
+    return response.data;
+  },
+
+  // Resolve ticket with root cause analysis
+  resolveTicket: async ({ rootCause, ticket }) => {
+    const response = await api.post('/tickets/resolve', {
+      rootCause,
+      ticket
+    });
+    return response.data;
+  },
+
+  // Update ticket with RCA step data
+  updateTicketSteps: async ({ ticketId, stepData }) => {
+    const response = await api.put(`/tickets/${ticketId}`, stepData);
     return response.data;
   }
 };

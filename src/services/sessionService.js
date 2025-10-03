@@ -115,7 +115,7 @@ class SessionService {
 
       // Try to get session status from backend using the lightweight endpoint
       try {
-        const response = await api.get('/api/v1/users/session/status');
+        const response = await api.get('/users/session/status');
         if (response.data.success && response.data.data.isValid) {
           this.sessionInfo = response.data.data;
           this.isSessionValid = true;
@@ -180,7 +180,7 @@ class SessionService {
 
       // Use backend session refresh endpoint
       try {
-        const response = await api.post('/api/v1/users/session/refresh');
+        const response = await api.post('/users/session/refresh');
         if (response.data.success) {
           console.log('✅ Session refreshed successfully');
           this.sessionInfo = response.data.data.userData;
@@ -244,7 +244,7 @@ class SessionService {
       // Try to get detailed session info from backend
       try {
         console.log('🔍 [DEBUG] Calling backend session info endpoint...');
-        const response = await api.get('/api/v1/users/session/info');
+        const response = await api.get('/users/session/info');
         
         console.log('🔍 [DEBUG] Backend response:', {
           status: response.status,

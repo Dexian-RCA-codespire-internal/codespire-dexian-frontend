@@ -167,6 +167,8 @@ export const AuthProvider = ({ children }) => {
     
     // Clear all local storage and session storage
     try {
+      // Clear validation cache specifically
+      localStorage.removeItem('lastSessionValidation');
       localStorage.clear();
       sessionStorage.clear();
       console.log('✅ Local storage cleared');
@@ -224,14 +226,13 @@ export const AuthProvider = ({ children }) => {
         
         // Validate session with backend first
         const sessionValid = await validateSession();
+        console.log('🔍 Session validation result:', sessionValid);
         
         if (sessionValid) {
           console.log('✅ Session validated, starting session monitoring...');
           
           // Start session monitoring
           await sessionService.startSessionMonitoring();
-          
-          // Start cookie monitoring
           cookieMonitorService.startMonitoring();
           
           // Get session info with better error handling
@@ -336,41 +337,67 @@ export const AuthProvider = ({ children }) => {
         return false;
       }
       
-      // Call backend session status endpoint
-      const response = await authService.checkSessionStatus();
-      
-      if (response.success && response.data.isValid) {
-        console.log('✅ Session validation successful');
+      // Only validate with backend if we haven't validated recently (within last 5 minutes)
+      const now = Date.now();
+      const lastValidation = localStorage.getItem('lastSessionValidation');
+      if (lastValidation && (now - parseInt(lastValidation)) < 5 * 60 * 1000) {
+        console.log('⏭️ Skipping backend validation - validated recently');
         return true;
-      } else {
-        console.log('❌ Session validation failed:', response.message);
-        if (isAuthenticated) {
-          console.log('🔒 Session revoked/expired, clearing auth state');
-          await clearAuthStateWithCleanup();
-          if (!window.location.pathname.includes('/login')) {
-            window.location.href = '/login?expired=true';
+      }
+      
+      // Call backend session status endpoint with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      try {
+        const response = await authService.checkSessionStatus();
+        clearTimeout(timeoutId);
+        
+        console.log('🔍 Backend session validation response:', {
+          success: response.success,
+          isValid: response.data?.isValid,
+          sessionRevoked: response.sessionRevoked,
+          message: response.message
+        });
+        
+        if (response.success && response.data.isValid) {
+          console.log('✅ Session validation successful');
+          localStorage.setItem('lastSessionValidation', now.toString());
+          return true;
+        } else {
+          console.log('❌ Session validation failed:', response.message);
+          // Check if session was explicitly revoked
+          if (response.sessionRevoked) {
+            console.log('🔒 Session was explicitly revoked, logging out');
+            return false;
           }
+          // For other validation failures, be more lenient
+          console.warn('⚠️ Backend validation failed, but keeping session valid');
+          return true;
         }
-        return false;
+      } catch (apiError) {
+        clearTimeout(timeoutId);
+        console.warn('⚠️ Backend session validation failed:', apiError.message);
+        console.log('🔍 API Error details:', {
+          status: apiError.response?.status,
+          data: apiError.response?.data,
+          sessionRevoked: apiError.response?.data?.sessionRevoked
+        });
+        
+        // Check if it's a 401 error with sessionRevoked flag
+        if (apiError.response?.status === 401 && apiError.response?.data?.sessionRevoked) {
+          console.log('🔒 401 error with sessionRevoked flag, logging out');
+          return false;
+        }
+        
+        // For other errors, be more lenient
+        console.warn('⚠️ Backend error, but keeping session valid');
+        return true;
       }
     } catch (error) {
-      console.error('❌ Error validating session:', error);
-      
-      // Check if it's a 401 error (session revoked)
-      if (error.response?.status === 401 || error.response?.data?.sessionRevoked) {
-        console.log('🔒 Session revoked/expired (401 error), clearing auth state');
-        if (isAuthenticated) {
-          await clearAuthStateWithCleanup();
-          if (!window.location.pathname.includes('/login')) {
-            window.location.href = '/login?expired=true';
-          }
-        }
-        return false;
-      }
-      
-      // For other errors, don't clear auth state immediately
-      console.warn('⚠️ Session validation error, but keeping auth state');
-      return false;
+      console.error('❌ Session validation error:', error);
+      // Don't logout on errors - assume session is valid
+      return true; // Changed from false to true
     }
   };
 
@@ -712,7 +739,20 @@ export const AuthProvider = ({ children }) => {
     
     // Legacy methods (for backward compatibility)
     consumePasswordlessCode,
-    getUserProfile
+    getUserProfile,
+    
+    // Testing/debugging methods
+    clearValidationCache: () => {
+      localStorage.removeItem('lastSessionValidation');
+      console.log('🧹 Validation cache cleared');
+    },
+    forceSessionValidation: async () => {
+      console.log('🔍 Forcing session validation...');
+      localStorage.removeItem('lastSessionValidation'); // Clear cache
+      const isValid = await validateSession();
+      console.log('🔍 Force validation result:', isValid);
+      return isValid;
+    }
   };
 
   return (

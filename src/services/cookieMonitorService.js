@@ -5,7 +5,7 @@ class CookieMonitorService {
     this.monitoringInterval = null;
     this.isMonitoring = false;
     this.eventListeners = new Map();
-    this.checkInterval = 10000; // Check every 10 seconds (more aggressive for session removal detection)
+    this.checkInterval = 60000; // Check every 60 seconds (less aggressive)
     this.debugMode = true; // Set to true for debugging (enable by default)
     
     // Set up SuperTokens event listeners
@@ -134,7 +134,41 @@ class CookieMonitorService {
         });
         return false;
       } else {
-        console.log('✅ SuperTokens session found on page load - keeping cookies');
+        console.log('✅ SuperTokens session found on page load - verifying with backend...');
+        
+        // Immediately check with backend to see if session is revoked
+        try {
+          const response = await fetch('http://localhost:8081/api/v1/users/session/status', {
+            method: 'GET',
+            credentials: 'include'
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (!data.success || !data.data?.isValid || data.sessionRevoked) {
+              console.log('🚫 Backend says session is revoked on page load - clearing cookies');
+              await this.cleanupFrontendCookies();
+              this.dispatchEvent('sessionCookiesMissing', { 
+                reason: 'session_revoked_on_page_load',
+                timestamp: new Date().toISOString()
+              });
+              return false;
+            }
+          } else if (response.status === 401) {
+            console.log('🚫 Backend returned 401 on page load - session revoked');
+            await this.cleanupFrontendCookies();
+            this.dispatchEvent('sessionCookiesMissing', { 
+              reason: 'backend_401_on_page_load',
+              timestamp: new Date().toISOString()
+            });
+            return false;
+          }
+        } catch (error) {
+          console.log('⚠️ Could not verify session with backend on page load:', error.message);
+          // Continue with SuperTokens session if backend check fails
+        }
+        
+        console.log('✅ Session verified on page load - keeping cookies');
         this.dispatchEvent('sessionCookiesValid', { 
           sessionHandle: 'valid-session',
           userId: 'valid-user',
@@ -213,8 +247,8 @@ class CookieMonitorService {
         console.log('🔍 [DEBUG] Session exists according to SuperTokens - double-checking with backend...');
         
         try {
-          // Make a quick backend call to verify session
-          const response = await fetch('/api/v1/users/session/active', {
+          // Make a quick backend call to verify session using the correct endpoint
+          const response = await fetch('http://localhost:8081/api/v1/users/session/status', {
             method: 'GET',
             credentials: 'include'
           });
@@ -223,25 +257,34 @@ class CookieMonitorService {
             const data = await response.json();
             console.log('🔍 [DEBUG] Backend session check:', {
               success: data.success,
-              mongoCount: data.data?.sessionCount?.mongo || 0,
-              superTokensCount: data.data?.sessionCount?.superTokens || 0
+              isValid: data.data?.isValid,
+              sessionRevoked: data.sessionRevoked
             });
             
-            // If MongoDB shows no active sessions, session might be revoked
-            if (data.data?.sessionCount?.mongo === 0) {
-              console.log('⚠️ [DEBUG] Backend shows no MongoDB active sessions - session might be revoked');
+            // If backend says session is invalid or revoked
+            if (!data.success || !data.data?.isValid || data.sessionRevoked) {
+              console.log('⚠️ [DEBUG] Backend says session is invalid/revoked - clearing cookies');
               await this.cleanupFrontendCookies();
               this.dispatchEvent('sessionCookiesMissing', { 
-                reason: 'no_mongo_sessions',
+                reason: 'session_revoked_by_backend',
                 timestamp: new Date().toISOString()
               });
               return false;
             }
+          } else if (response.status === 401) {
+            console.log('⚠️ [DEBUG] Backend returned 401 - session revoked');
+            await this.cleanupFrontendCookies();
+            this.dispatchEvent('sessionCookiesMissing', { 
+              reason: 'backend_401_unauthorized',
+              timestamp: new Date().toISOString()
+            });
+            return false;
           } else {
             console.log('⚠️ [DEBUG] Backend session check failed:', response.status);
           }
         } catch (backendError) {
           console.log('⚠️ [DEBUG] Backend session check error:', backendError.message);
+          // Don't clear cookies on network errors
         }
       }
       

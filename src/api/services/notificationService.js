@@ -3,7 +3,7 @@ import api from '../index.js';
 // Notification API services
 export const notificationService = {
   // Get all notifications
-  getNotifications: async ({ page = 1, limit = 20, unreadOnly = false } = {}) => {
+  getNotifications: async ({ page = 1, limit = 10, unreadOnly = false } = {}) => {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
@@ -28,6 +28,12 @@ export const notificationService = {
   // Mark all notifications as read
   markAllAsRead: async () => {
     const response = await api.patch('/notifications/mark-all-read');
+    return response.data;
+  },
+
+  // Get unread notifications count
+  getUnreadCount: async () => {
+    const response = await api.get('/notifications/unread-count');
     return response.data;
   },
 
