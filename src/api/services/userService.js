@@ -4,19 +4,19 @@ import api from '../index.js';
 export const userService = {
   // Get paginated users with filtering
   getUsers: async (params = {}) => {
-    const response = await api.get('/v1/users', { params });
+    const response = await api.get('/users', { params });
     return response.data;
   },
 
   // Get user statistics
   getUserStats: async (params = {}) => {
-    const response = await api.get('/v1/users/stats', { params });
+    const response = await api.get('/users/stats', { params });
     return response.data;
   },
 
   // Get user by ID
   getUserById: async (userId) => {
-    const response = await api.get(`/v1/users/${userId}`);
+    const response = await api.get(`/users/${userId}`);
     return response.data;
   },
 
@@ -24,7 +24,7 @@ export const userService = {
   createUser: async (userData) => {
     console.log('🔍 Frontend API: Creating user with data:', userData);
     try {
-      const response = await api.post('/v1/users', userData);
+      const response = await api.post('/users', userData);
       console.log('🔍 Frontend API: Response received:', response.data);
       return response.data;
     } catch (error) {
@@ -40,16 +40,16 @@ export const userService = {
     console.log('🔍 Frontend API: Updating user status...');
     console.log('   User ID:', userId);
     console.log('   Status:', status);
-    console.log('   API endpoint:', `/v1/users/${userId}/status`);
+    console.log('   API endpoint:', `/users/${userId}/status`);
     
     try {
-      const response = await api.put(`/v1/users/${userId}/status`, { status });
-      console.log('🔍 Frontend API: Response received:');
+      const response = await api.put(`/users/${userId}/status`, { status });
+      console.log('Frontend API: Response received:');
       console.log('   Status code:', response.status);
       console.log('   Response data:', response.data);
       return response.data;
     } catch (error) {
-      console.error('❌ Frontend API: Error updating user status:');
+      console.error(' Frontend API: Error updating user status:');
       console.error('   Error message:', error.message);
       console.error('   Error response:', error.response?.data);
       console.error('   Error status:', error.response?.status);
@@ -59,31 +59,31 @@ export const userService = {
 
   // Update user roles
   updateUserRoles: async (userId, roles) => {
-    const response = await api.put(`/v1/users/${userId}/roles`, { roles });
+    const response = await api.put(`/users/${userId}/roles`, { roles });
     return response.data;
   },
 
   // Delete user
   deleteUser: async (userId) => {
-    const response = await api.delete(`/v1/users/${userId}`);
+    const response = await api.delete(`/users/${userId}`);
     return response.data;
   },
 
   // Get user permissions
   getUserPermissions: async (userId) => {
-    const response = await api.get(`/v1/users/${userId}/permissions`);
+    const response = await api.get(`/users/${userId}/permissions`);
     return response.data;
   },
 
   // Send OTP to user email for verification
   sendUserOTP: async (email) => {
-    const response = await api.post('/v1/users/send-otp', { email });
+    const response = await api.post('/users/send-otp', { email });
     return response.data;
   },
 
   // Verify OTP code for user email verification
   verifyUserOTP: async (email, otp, deviceId = null, preAuthSessionId = null) => {
-    const response = await api.post('/v1/users/verify-otp', {
+    const response = await api.post('/users/verify-otp', {
       email,
       otp,
       deviceId,
@@ -94,7 +94,7 @@ export const userService = {
 
   // Resend OTP code to user email
   resendUserOTP: async (email, deviceId = null, preAuthSessionId = null) => {
-    const response = await api.post('/v1/users/resend-otp', {
+    const response = await api.post('/users/resend-otp', {
       email,
       deviceId,
       preAuthSessionId
@@ -104,7 +104,7 @@ export const userService = {
 
   // Add additional roles to user
   addUserRoles: async (userId, roles) => {
-    const response = await api.post(`/v1/users/${userId}/roles/add`, { roles });
+    const response = await api.post(`/users/${userId}/roles/add`, { roles });
     return response.data;
   }
 };

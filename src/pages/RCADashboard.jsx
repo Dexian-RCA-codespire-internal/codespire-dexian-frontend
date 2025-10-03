@@ -9,16 +9,11 @@ import { Checkbox } from '../components/ui/checkbox'
 import { FiSearch, FiCheck, FiAlertTriangle, FiClipboard, FiChevronDown, FiCreditCard, FiChevronLeft, FiChevronRight, FiWifi, FiWifiOff, FiLoader, FiInfo } from 'react-icons/fi'
 import { transformTicketToRCACase } from '../api/rcaService'
 import useWebSocketOnly from '../hooks/useWebSocketOnly'
-import { useAuth } from '../contexts/AuthContext'
-import { permissionService } from '../api/services/permissionService'
-
+import { usePermission } from '../hooks/usePermission'
 
 
 const RCADashboard = () => {
   const navigate = useNavigate()
-  const { user } = useAuth()
-  const [hasTicketWritePermission, setHasTicketWritePermission] = useState(false)
-  const [permissionLoading, setPermissionLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [showFilterDropdown, setShowFilterDropdown] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -34,6 +29,9 @@ const RCADashboard = () => {
   })
   const filterDropdownRef = useRef(null)
   const infoPopupRef = useRef(null)
+
+  // Check if user has permission to write tickets (resolve them)
+  const { hasPermission: canResolveTickets, loading: permissionLoading } = usePermission('tickets:write')
 
   // WebSocket-only hook for all data operations (NO REST API calls)
   const {
@@ -58,43 +56,6 @@ const RCADashboard = () => {
     goToPage: wsGoToPage,
     changePageSize: wsChangePageSize
   } = useWebSocketOnly(import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081')
-
-  // Check user permissions from MongoDB on component mount
-  useEffect(() => {
-    const checkPermissions = async () => {
-      try {
-        console.log('🔍 [RCADashboard] Starting permission check from MongoDB...');
-        console.log('   User object:', user);
-        console.log('   User roles:', user?.roles);
-        console.log('   User ID:', user?._id);
-        
-        setPermissionLoading(true);
-        const hasPermission = await permissionService.hasPermission('tickets:write');
-        
-        console.log('🔍 [RCADashboard] Permission check result:');
-        console.log('   Permission: tickets:write');
-        console.log('   Has permission:', hasPermission);
-        
-        setHasTicketWritePermission(hasPermission);
-      } catch (error) {
-        console.error('❌ [RCADashboard] Error checking ticket write permission:', error);
-        console.error('   Error details:', error.response?.data || error.message);
-        setHasTicketWritePermission(false);
-      } finally {
-        setPermissionLoading(false);
-        console.log('🔍 [RCADashboard] Permission check completed');
-      }
-    };
-
-    if (user) {
-      console.log('🔍 [RCADashboard] User found, checking permissions from MongoDB...');
-      checkPermissions();
-    } else {
-      console.log('🔍 [RCADashboard] No user found, setting permission to false');
-      setHasTicketWritePermission(false);
-      setPermissionLoading(false);
-    }
-  }, [user]);
 
   // Handle click outside to close filter dropdown and info popup
   useEffect(() => {
@@ -1019,11 +980,6 @@ const RCADashboard = () => {
                             {highlightText(case_.source, searchTerm)}
                           </span>
                         </td>
-<<<<<<< HEAD
-                        <td className="px-8 py-4 whitespace-nowrap text-sm font-medium align-middle">
-                          <div className="flex items-center space-x-2 mr-8">
-                            {hasTicketWritePermission && (
-=======
                         <td className="px-4 py-4 whitespace-nowrap align-middle">
                           <div className="flex items-center space-x-2">
                             <div className="flex-1">
@@ -1059,8 +1015,7 @@ const RCADashboard = () => {
                               >
                                 Resolved
                               </Button>
-                            ) : (
->>>>>>> origin/release-0.4.0
+                            ) : canResolveTickets ? (
                               <Button 
                                 size="sm" 
                                 className="bg-green-600 hover:bg-green-700 text-white"
@@ -1068,12 +1023,12 @@ const RCADashboard = () => {
                               >
                                 Resolve
                               </Button>
+                            ) : (
+                              <span className="text-sm text-gray-500 px-3 py-1">
+                                No permission
+                              </span>
                             )}
-<<<<<<< HEAD
-                            <Button 
-=======
                             {/* <Button 
->>>>>>> origin/release-0.4.0
                               variant="outline" 
                               size="sm"
                               onClick={() => navigate(`/complaint/${case_.id}`)}
@@ -1156,10 +1111,6 @@ const RCADashboard = () => {
 
                       {/* Action Buttons */}
                       <div className="flex items-center justify-end">
-<<<<<<< HEAD
-                        <div className="flex items-center space-x-2">
-                          {hasTicketWritePermission && (
-=======
                         <div className="flex items-center space-x-1">
                           {progress.percentage === 100 ? (
                             <Button 
@@ -1169,8 +1120,7 @@ const RCADashboard = () => {
                             >
                               Resolved
                             </Button>
-                          ) : (
->>>>>>> origin/release-0.4.0
+                          ) : canResolveTickets ? (
                             <Button 
                               size="sm" 
                               className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1"
@@ -1178,12 +1128,12 @@ const RCADashboard = () => {
                             >
                               Resolve
                             </Button>
+                          ) : (
+                            <span className="text-xs text-gray-500 px-3 py-1">
+                              No permission
+                            </span>
                           )}
-<<<<<<< HEAD
-                          <Button 
-=======
                           {/* <Button 
->>>>>>> origin/release-0.4.0
                             variant="outline" 
                             size="sm"
                             onClick={() => navigate(`/complaint/${case_.id}`)}

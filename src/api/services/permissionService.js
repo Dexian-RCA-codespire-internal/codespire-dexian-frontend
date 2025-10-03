@@ -8,18 +8,18 @@ export const permissionService = {
    */
   getCurrentUserPermissions: async () => {
     try {
-      console.log('🔍 [PermissionService] Getting current user permissions from MongoDB...');
-      console.log('   API endpoint: /v1/rbac/debug/current-user');
+      console.log(' [PermissionService] Getting current user permissions from MongoDB...');
+      console.log('   API endpoint: /rbac/debug/current-user');
       
-      const response = await api.get('/v1/rbac/debug/current-user');
+      const response = await api.get('/rbac/debug/current-user');
       
-      console.log('🔍 [PermissionService] MongoDB permissions response:');
+      console.log(' [PermissionService] MongoDB permissions response:');
       console.log('   Status:', response.status);
       console.log('   Data:', response.data);
       
       return response.data;
     } catch (error) {
-      console.error('❌ [PermissionService] Error getting current user permissions:', error);
+      console.error(' [PermissionService] Error getting current user permissions:', error);
       console.error('   Error:', error);
       console.error('   Response:', error.response?.data);
       console.error('   Status:', error.response?.status);

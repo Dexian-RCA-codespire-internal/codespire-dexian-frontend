@@ -27,6 +27,7 @@ import { Card, CardContent } from '../components/ui/card';
 import useUserWebSocket from '../hooks/useUserWebSocket';
 import { userService } from '../api/services/userService';
 import { useToast } from '../contexts/ToastContext';
+import ConfirmationModal from '../components/ui/ConfirmationModal';
 
 
 // Available roles configuration
@@ -423,6 +424,11 @@ const EmptyState = ({ searchTerm, onClearFilters, onAddUser }) => (
 const UserManagement = () => {
   const { success, error: showError, warning, info } = useToast();
   
+  // Confirmation modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
   // WebSocket hook for real-time user data
   const {
     users,
@@ -436,7 +442,7 @@ const UserManagement = () => {
     requestUserData,
     requestUserStatistics,
     clearNotifications
-  } = useUserWebSocket(import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081');
+  } = useUserWebSocket(import.meta.env.VITE_BACKEND_URL);
 
   // Local state management
   const [searchTerm, setSearchTerm] = useState('');
@@ -767,28 +773,50 @@ const UserManagement = () => {
     }
   };
 
-  const handleDeleteUser = async (userId) => {
-    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      try {
-        const result = await userService.deleteUser(userId);
+  const handleDeleteUser = (userId) => {
+    const user = users.find(u => u._id === userId);
+    setUserToDelete(user);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      const result = await userService.deleteUser(userToDelete._id);
+      
+      if (result.success) {
+        // Show success toast
+        success(`User "${userToDelete.name || userToDelete.email}" deleted successfully!`);
         
-        if (result.success) {
-          // Refresh user list with current filters
-          const refreshQuery = {
-            page: pagination.page || 1,
-            limit: pagination.limit || 10,
-            query: searchTerm,
-            sortBy: 'createdAt',
-            sortOrder: 'desc'
-          };
-          lastQueryRef.current = JSON.stringify(refreshQuery);
-          requestUserData(refreshQuery);
-        }
-      } catch (error) {
-        console.error('Error deleting user:', error);
-        showError(`Failed to delete user: ${error.response?.data?.error || error.message}`);
+        // Refresh user list with current filters
+        const refreshQuery = {
+          page: pagination.page || 1,
+          limit: pagination.limit || 10,
+          query: searchTerm,
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        };
+        lastQueryRef.current = JSON.stringify(refreshQuery);
+        requestUserData(refreshQuery);
+        
+        // Close modal
+        setShowDeleteModal(false);
+        setUserToDelete(null);
       }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      showError(`Failed to delete user: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setIsDeleting(false);
     }
+  };
+
+  const cancelDeleteUser = () => {
+    setShowDeleteModal(false);
+    setUserToDelete(null);
+    setIsDeleting(false);
   };
 
   const handleToggleUserStatus = async (userId) => {
@@ -1591,6 +1619,19 @@ const UserManagement = () => {
           </div>
         </div>
       )}
+
+      {/* Confirmation Modal for User Deletion */}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={cancelDeleteUser}
+        onConfirm={confirmDeleteUser}
+        title="Delete User"
+        message={`Are you sure you want to delete "${userToDelete?.name || userToDelete?.email}"? This action cannot be undone.`}
+        confirmText="Delete User"
+        cancelText="Cancel"
+        type="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 };
