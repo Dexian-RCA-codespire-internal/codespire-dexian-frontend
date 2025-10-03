@@ -94,6 +94,31 @@ import PlaybookRecommender from '../../PlaybookRecommender'
         setHasGeneratedSolutions(true)
         console.log('Solutions generated successfully:', result)
         
+        // Automatically populate the first solution in the textarea
+        if (result.solutions.length > 0) {
+          const firstSolution = result.solutions[0];
+          const solutionSummary = `${firstSolution.title}
+
+Description: ${firstSolution.description}
+
+Implementation Steps:
+${firstSolution.steps.map((step, index) => 
+  `${index + 1}. ${step.title} (${step.duration})
+   - ${step.description}
+   - Responsible: ${step.responsible}`
+).join('\n\n')}
+
+Expected Outcome: ${firstSolution.expectedOutcome}
+
+Risk Level: ${firstSolution.riskLevel}
+Timeframe: ${firstSolution.timeframe}
+Confidence: ${firstSolution.confidence}%`;
+
+          onResponseChange(solutionSummary);
+          setSelectedSolution(firstSolution);
+          console.log('Automatically populated first solution in textarea');
+        }
+        
         // Store corrective actions in stepData for persistence
         const correctiveActionsData = {
           generatedSolutions: result,
@@ -218,6 +243,31 @@ Confidence: ${solution.confidence}%`
       setGeneratedSolutions(result);
       setHasGeneratedSolutions(true);
       console.log('Solutions generated from playbooks:', result);
+      
+      // Automatically populate the first solution in the textarea
+      if (result.solutions.length > 0) {
+        const firstSolution = result.solutions[0];
+        const solutionSummary = `${firstSolution.title}
+
+Description: ${firstSolution.description}
+
+Implementation Steps:
+${firstSolution.steps.map((step, index) => 
+  `${index + 1}. ${step.title} (${step.duration})
+   - ${step.description}
+   - Responsible: ${step.responsible}`
+).join('\n\n')}
+
+Expected Outcome: ${firstSolution.expectedOutcome}
+
+Risk Level: ${firstSolution.riskLevel}
+Timeframe: ${firstSolution.timeframe}
+Confidence: ${firstSolution.confidence}%`;
+
+        onResponseChange(solutionSummary);
+        setSelectedSolution(firstSolution);
+        console.log('Automatically populated first solution in textarea');
+      }
       
       // Store corrective actions in stepData for persistence
       const correctiveActionsData = {
@@ -482,44 +532,7 @@ Confidence: ${solution.confidence}%`
       </div>
 
       {/* Action Categories (kept as reference) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-          <h4 className="text-sm font-medium text-green-900 mb-2 flex items-center gap-2">
-            <BsLightning className="w-4 h-4" />
-            Immediate Actions
-          </h4>
-          <ul className="text-sm text-green-700 space-y-1">
-            <li>• Apply hotfixes</li>
-            <li>• Restart services</li>
-            <li>• Clear caches</li>
-            <li>• Rollback changes</li>
-          </ul>
-        </div>
-        <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-          <h4 className="text-sm font-medium text-yellow-900 mb-2 flex items-center gap-2">
-            <BsClock className="w-4 h-4" />
-            Preventive Measures
-          </h4>
-          <ul className="text-sm text-yellow-700 space-y-1">
-            <li>• Update monitoring</li>
-            <li>• Improve testing</li>
-            <li>• Add validations</li>
-            <li>• Enhance documentation</li>
-          </ul>
-        </div>
-        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <h4 className="text-sm font-medium text-blue-900 mb-2 flex items-center gap-2">
-            <FiTrendingUp className="w-4 h-4" />
-            Long-term Improvements
-          </h4>
-          <ul className="text-sm text-blue-700 space-y-1">
-            <li>• Architecture changes</li>
-            <li>• Process improvements</li>
-            <li>• Training programs</li>
-            <li>• Tool upgrades</li>
-          </ul>
-        </div>
-      </div>
+
 
       {/* Playbook Recommender - Moved to bottom of main content */}
       <div className="mt-8">
