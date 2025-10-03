@@ -3,17 +3,22 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { Skeleton } from './ui/skeleton'
+import { Checkbox } from './ui/checkbox'
+import PlaybookDetailModal from './ui/PlaybookDetailModal'
 import { FiBookOpen, FiExternalLink, FiRefreshCw, FiAlertCircle, FiCheckCircle, FiClock } from 'react-icons/fi'
 import { playbookService } from '../api/services/playbookService'
 import { aiService } from '../api/services/aiService'
+import { solutionGenerationService } from '../api/services/solutionGenerationService'
 
-const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult }) => {
+const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult, onLoadingChange }) => {
   const [playbooks, setPlaybooks] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [lastSearched, setLastSearched] = useState(null)
-  const [aiGuidanceResults, setAiGuidanceResults] = useState([])
   const [guidanceLoading, setGuidanceLoading] = useState(false)
+  const [selectedPlaybook, setSelectedPlaybook] = useState(null)
+  const [showPlaybookModal, setShowPlaybookModal] = useState(false)
+  const [selectedPlaybooks, setSelectedPlaybooks] = useState(new Set())
 
   // Generate search query from ticket data using short description and description
   const generateSearchQuery = (ticket) => {
@@ -248,13 +253,130 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult 
     }
   }
 
-  // Handle playbook usage increment
-  const handlePlaybookClick = async (playbookId) => {
+  // Handle playbook click to open modal
+  const handlePlaybookClick = (playbook) => {
+    setSelectedPlaybook(playbook)
+    setShowPlaybookModal(true)
+    
+    // Also increment usage
+    if (playbook.playbook_id) {
+      playbookService.incrementUsage(playbook.playbook_id).catch(err => {
+        console.warn('⚠️ Failed to increment playbook usage:', err)
+      })
+    }
+  }
+
+  // Handle modal close
+  const handleCloseModal = () => {
+    setShowPlaybookModal(false)
+    setSelectedPlaybook(null)
+  }
+
+  // Handle checkbox selection
+  const handlePlaybookSelection = (playbookId, isSelected) => {
+    setSelectedPlaybooks(prev => {
+      const newSet = new Set(prev)
+      if (isSelected) {
+        newSet.add(playbookId)
+      } else {
+        newSet.delete(playbookId)
+      }
+      return newSet
+    })
+  }
+
+  // Handle regenerate based on selected playbooks
+  const handleRegenerateBasedOnPlaybooks = async () => {
+    if (selectedPlaybooks.size === 0) return
+
     try {
-      await playbookService.incrementUsage(playbookId)
-      console.log('✅ Playbook usage incremented:', playbookId)
+      setGuidanceLoading(true)
+      setError(null)
+      
+      // Notify parent component about loading state
+      if (onLoadingChange) {
+        onLoadingChange(true)
+      }
+      
+      console.log('🔄 Regenerating solution based on selected playbooks:', Array.from(selectedPlaybooks))
+      
+      // Get selected playbook data
+      const selectedPlaybookData = playbooks.filter(p => 
+        selectedPlaybooks.has(p.playbook_id || p._id)
+      )
+      
+      console.log('📋 Selected playbook data:', selectedPlaybookData)
+      
+      // Extract playbook IDs
+      const playbookIds = selectedPlaybookData.map(p => p.playbook_id || p._id)
+      
+      // Prepare the request payload for solution generation
+      const requestPayload = {
+        currentTicket: {
+          category: ticketData.category || "Inquiry / Help",
+          description: ticketData.description || "",
+          short_description: ticketData.short_description || "",
+          enhanced_problem: ticketData.enhanced_problem || ticketData.description || "",
+          impact: ticketData.impact || ["3 - Low"],
+          priority: ticketData.priority || "5 - Planning",
+          urgency: ticketData.urgency || "3 - Low",
+          issueType: ticketData.issueType || "software",
+          severity: ticketData.severity || "sev2",
+          businessImpactCategory: ticketData.businessImpactCategory || "operational_downtime",
+          impactLevel: ticketData.impactLevel || "sev3",
+          departmentAffected: ticketData.departmentAffected || "it_operations",
+          problemStatement: ticketData.problemStatement || ticketData.description || "",
+          impactAssessment: ticketData.impactAssessment || "Technical/operational impact assessment focusing on system availability and infrastructure",
+          rootCauseAnalysis: ticketData.rootCauseAnalysis || "Root cause analysis completed. Found potential causes with confidence scores."
+        },
+        similarTickets: [], // Empty array as per the API example
+        playbooks: selectedPlaybookData
+      }
+      
+      console.log('🎯 Calling solution generation API with payload:', requestPayload)
+      
+      // Call solution generation service
+      const response = await solutionGenerationService.generateSolution(requestPayload)
+      
+      console.log('✅ Solution generation response:', response)
+      
+      if (response.success && response.solutions && response.solutions.length > 0) {
+        // Send the result to the parent component (like CorrectiveActionsStep does)
+        if (onGuidanceResult) {
+          onGuidanceResult(response)
+        }
+        
+        // Increment usage for all selected playbooks
+        for (const playbookId of playbookIds) {
+          try {
+            await playbookService.incrementUsage(playbookId)
+            console.log('✅ Playbook usage incremented for:', playbookId)
+          } catch (err) {
+            console.warn('⚠️ Failed to increment playbook usage:', err)
+          }
+        }
+        
+        // Update confidence scores for selected playbooks
+        for (const playbookId of playbookIds) {
+          await updateConfidenceScore(playbookId)
+        }
+        
+      } else {
+        console.log('❌ No solution generated')
+        alert('No solution was generated for the selected playbooks.')
+      }
+      
     } catch (err) {
-      console.warn('⚠️ Failed to increment playbook usage:', err)
+      console.error('❌ Error regenerating solution based on playbooks:', err)
+      setError(err.message || 'Failed to regenerate solution based on selected playbooks')
+      alert(`Error: ${err.message || 'Failed to regenerate solution based on selected playbooks'}`)
+    } finally {
+      setGuidanceLoading(false)
+      
+      // Notify parent component that loading is complete
+      if (onLoadingChange) {
+        onLoadingChange(false)
+      }
     }
   }
 
@@ -574,20 +696,11 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult 
           <div className="flex items-center gap-2">
             <Button
               size="sm"
-              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1"
-              onClick={handleGetGuidance}
-              disabled={guidanceLoading || !playbooks.length || !ticketData}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1"
+              onClick={handleRegenerateBasedOnPlaybooks}
+              disabled={guidanceLoading || selectedPlaybooks.size === 0}
             >
-              {guidanceLoading ? 'Searching...' : 'Use Playbook'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={loading || !ticketData}
-              className="h-8 w-8 p-0"
-            >
-              <FiRefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              {guidanceLoading ? 'Regenerating...' : 'Regenerate based on Playbook'}
             </Button>
           </div>
         </div>
@@ -655,40 +768,30 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult 
             return (
               <div 
                 key={playbook.playbook_id || playbook._id || index} 
-                className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
-                onClick={() => handlePlaybookClick(playbook.playbook_id)}
+                className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
               >
                 <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-medium text-gray-900 mb-1 line-clamp-2">
-                      {playbook.title}
-                    </h4>
-                    <p className="text-xs text-black mb-1">
-                      ID: {playbook.playbook_id}
-                    </p>
-                    <p className="text-xs text-gray-600 mb-2 line-clamp-2">
-                      {playbook.description}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className={searchTypeInfo.color}>
-                        {searchTypeInfo.icon}
-                      </span>
-                      <span className="text-gray-500">{searchTypeInfo.label}</span>
-                      {playbook.match_percentage && (
-                        <span className="text-green-600 font-semibold">
-                          • {playbook.match_percentage}% match
-                        </span>
-                      )}
-                      {playbook.combined_score && !playbook.match_percentage && (
-                        <span className="text-gray-500">
-                          • {Math.round(playbook.combined_score * 100)}% match
-                        </span>
-                      )}
-                      {playbook.similarity_score && !playbook.match_percentage && (
-                        <span className="text-gray-500">
-                          • {Math.round(playbook.similarity_score * 100)}% similarity
-                        </span>
-                      )}
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <Checkbox
+                      checked={selectedPlaybooks.has(playbook.playbook_id || playbook._id)}
+                      onCheckedChange={(checked) => 
+                        handlePlaybookSelection(playbook.playbook_id || playbook._id, checked)
+                      }
+                      className="mt-1"
+                    />
+                    <div 
+                      className="flex-1 min-w-0 cursor-pointer"
+                      onClick={() => handlePlaybookClick(playbook)}
+                    >
+                      <h4 className="text-sm font-medium text-gray-900 mb-1 line-clamp-2">
+                        {playbook.title}
+                      </h4>
+                      <p className="text-xs text-black mb-1">
+                        ID: {playbook.playbook_id}
+                      </p>
+                      <p className="text-xs text-gray-600 mb-2 line-clamp-2">
+                        {playbook.description}
+                      </p>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 ml-2">
@@ -697,13 +800,34 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult 
                         {playbook.match_percentage}% Match
                       </Badge>
                     )}
-                    <FiExternalLink className="w-3 h-3 text-gray-400" />
                   </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs ml-6">
+                  <span className={searchTypeInfo.color}>
+                    {searchTypeInfo.icon}
+                  </span>
+                  <span className="text-gray-500">{searchTypeInfo.label}</span>
+                  {playbook.match_percentage && (
+                    <span className="text-green-600 font-semibold">
+                      • {playbook.match_percentage}% match
+                    </span>
+                  )}
+                  {playbook.combined_score && !playbook.match_percentage && (
+                    <span className="text-gray-500">
+                      • {Math.round(playbook.combined_score * 100)}% match
+                    </span>
+                  )}
+                  {playbook.similarity_score && !playbook.match_percentage && (
+                    <span className="text-gray-500">
+                      • {Math.round(playbook.similarity_score * 100)}% similarity
+                    </span>
+                  )}
                 </div>
                 
                 {/* Tags */}
                 {playbook.tags && playbook.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1 ml-6">
                     {playbook.tags.slice(0, 3).map((tag, tagIndex) => (
                       <Badge 
                         key={tagIndex} 
@@ -723,7 +847,7 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult 
                 
                 {/* Steps preview */}
                 {playbook.steps && playbook.steps.length > 0 && (
-                  <div className="mt-2 text-xs text-gray-500">
+                  <div className="mt-2 text-xs text-gray-500 ml-6">
                     <span className="font-medium">{playbook.steps.length}</span> step{playbook.steps.length !== 1 ? 's' : ''}
                     {playbook.outcome && (
                       <span className="ml-2">• Expected: {playbook.outcome}</span>
@@ -736,49 +860,15 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult 
           })
         )}
         
-        {/* AI Guidance Results */}
-        {aiGuidanceResults.length > 0 && (
-          <div className="pt-4 border-t border-gray-200">
-            <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-              <FiCheckCircle className="w-4 h-4 mr-2 text-green-600" />
-              AI Guidance Actions
-            </h4>
-            <div className="space-y-2">
-              {aiGuidanceResults.map((result, index) => (
-                <div key={index} className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h5 className="text-sm font-medium text-green-900 mb-1">
-                        {result.trigger_title || `Action ${index + 1}`}
-                      </h5>
-                      <p className="text-sm text-green-800">
-                        {result.action}
-                      </p>
-                      {result.expected_outcome && (
-                        <p className="text-xs text-green-700 mt-1">
-                          Expected: {result.expected_outcome}
-                        </p>
-                      )}
-                    </div>
-                    <Badge className="bg-green-100 text-green-800 text-xs">
-                      {result.playbook_title || 'Playbook'}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
         
-        {/* Search info */}
-        {ticketData && !loading && !error && (
-          <div className="pt-2 border-t border-gray-200">
-            <p className="text-xs text-gray-500 text-center">
-              Based on ticket: <span className="font-medium">{ticketData.ticket_id}</span>
-            </p>
-          </div>
-        )}
       </CardContent>
+      
+      {/* Playbook Detail Modal */}
+      <PlaybookDetailModal
+        playbook={selectedPlaybook}
+        isOpen={showPlaybookModal}
+        onClose={handleCloseModal}
+      />
     </Card>
   )
 }

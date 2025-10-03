@@ -36,7 +36,8 @@ const RCAWorkflow = ({
   problemStatementData = null,
   isGeneratingProblemStatement = false,
   setIsGeneratingProblemStatement,
-  hasAttemptedGeneration = false
+  hasAttemptedGeneration = false,
+  onGuidanceResult = null
 }) => {
   // Note: Problem statement state is now managed in the parent component (Analysis.jsx)
   
@@ -210,6 +211,7 @@ const RCAWorkflow = ({
         </CardContent>
       </Card>
 
+
       
       {/* Main Content */}
       <div className={`grid grid-cols-1 lg:grid-cols-1`}>
@@ -324,6 +326,7 @@ const RCAWorkflow = ({
               )}
               
               {currentStep === 4 && (
+                <>
                 <CorrectiveActionsStep
                   ticketData={ticketData}
                   stepData={stepData}
@@ -332,7 +335,12 @@ const RCAWorkflow = ({
                   onResponseChange={onResponseChange}
                   isEnhancingCorrectiveActions={isEnhancingCorrectiveActions}
                   setIsEnhancingCorrectiveActions={setIsEnhancingCorrectiveActions}
+                  
+                  aiGuidance={aiGuidance}
+                  onGuidanceResult={onGuidanceResult}
                  />
+
+                 </>
                )}
             </div>
 

@@ -9,6 +9,7 @@ import { FiChevronDown, FiChevronUp, FiUsers, FiCalendar, FiAlertTriangle, FiToo
 import { aiService } from '../../../api/services/aiService'
 import EnhancementModal from '../../ui/EnhancementModal'
 import { useTextEnhancement } from '../../../hooks/useTextEnhancement'
+import PlaybookRecommender from '../../PlaybookRecommender'
 
   const CorrectiveActionsStep = ({
   ticketData,
@@ -17,7 +18,9 @@ import { useTextEnhancement } from '../../../hooks/useTextEnhancement'
   response,
   onResponseChange,
   isEnhancingCorrectiveActions,
-  setIsEnhancingCorrectiveActions
+  setIsEnhancingCorrectiveActions,
+  aiGuidance,
+  onGuidanceResult
 }) => {
   const [isGeneratingSolutions, setIsGeneratingSolutions] = useState(false)
   const [generatedSolutions, setGeneratedSolutions] = useState(null)
@@ -26,6 +29,7 @@ import { useTextEnhancement } from '../../../hooks/useTextEnhancement'
   const [hasGeneratedSolutions, setHasGeneratedSolutions] = useState(false)
   const [isEnhancementModalOpen, setIsEnhancementModalOpen] = useState(false)
   const [enhancementOptions, setEnhancementOptions] = useState([])
+  const [isPlaybookGenerating, setIsPlaybookGenerating] = useState(false)
   
   // Use the custom hook for text enhancement
   const { enhanceText, isLoading: isEnhancing, error: enhancementError } = useTextEnhancement()
@@ -199,6 +203,39 @@ Confidence: ${solution.confidence}%`
     setEnhancementOptions([]);
   };
 
+  // Handle loading state from PlaybookRecommender
+  const handlePlaybookLoadingChange = (isLoading) => {
+    setIsPlaybookGenerating(isLoading);
+    if(isLoading) {
+      setGeneratedSolutions(null);
+      setHasGeneratedSolutions(false);
+    }
+  };
+
+  // Handle guidance result from PlaybookRecommender
+  const handlePlaybookGuidanceResult = (result) => {
+    if (result && result.solutions) {
+      setGeneratedSolutions(result);
+      setHasGeneratedSolutions(true);
+      console.log('Solutions generated from playbooks:', result);
+      
+      // Store corrective actions in stepData for persistence
+      const correctiveActionsData = {
+        generatedSolutions: result,
+        timestamp: new Date().toISOString()
+      }
+      
+      // Update stepData with corrective actions
+      if (typeof setStepData === 'function') {
+        setStepData(prevData => ({
+          ...prevData,
+          correctiveActions: correctiveActionsData
+        }))
+        console.log('CorrectiveActionsStep: Stored playbook-generated solutions in stepData:', correctiveActionsData)
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* AI-Generated Solutions Section */}
@@ -218,10 +255,12 @@ Confidence: ${solution.confidence}%`
           )}
         </div>
 
-        {isGeneratingSolutions && (
+        {(isGeneratingSolutions || isPlaybookGenerating) && (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-blue-700">Generating comprehensive solutions...</span>
+            <span className="ml-3 text-blue-700">
+              {isPlaybookGenerating ? 'Generating solutions from selected playbooks...' : 'Generating comprehensive solutions...'}
+            </span>
           </div>
         )}
 
@@ -481,6 +520,16 @@ Confidence: ${solution.confidence}%`
           </ul>
         </div>
       </div>
+
+      {/* Playbook Recommender - Moved to bottom of main content */}
+      <div className="mt-8">
+                    <PlaybookRecommender 
+                      ticketData={ticketData} 
+                      aiGuidanceQuestion={aiGuidance} 
+                      onGuidanceResult={handlePlaybookGuidanceResult}
+                      onLoadingChange={handlePlaybookLoadingChange}
+                    />
+                  </div>
 
       {/* Enhancement Modal */}
       <EnhancementModal
