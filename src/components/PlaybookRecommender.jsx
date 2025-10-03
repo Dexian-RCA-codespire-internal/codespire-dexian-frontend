@@ -777,7 +777,7 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
                       onCheckedChange={(checked) => 
                         handlePlaybookSelection(playbook.playbook_id || playbook._id, checked)
                       }
-                      className="mt-1"
+                      className="mt-1 bg-white"
                     />
                     <div 
                       className="flex-1 min-w-0 cursor-pointer"

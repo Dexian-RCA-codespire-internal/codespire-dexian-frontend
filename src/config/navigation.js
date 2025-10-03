@@ -10,7 +10,7 @@ export const navigationConfig = {
   
   // Optional features (can be enabled/disabled)
   patternDetector: false,        // Pattern & Duplicate Detector
-  playbookRecommender:true,    // Playbook Recommender
+  playbookRecommender:false,    // Playbook Recommender
   customerRcaSummary: false,     // Customer RCA Summary
   alertCorrelation: false,       // Alert Correlation
   complianceAudit: false,        // Compliance & Audit
