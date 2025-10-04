@@ -37,12 +37,41 @@ const Header = () => {
   const fetchUserProfile = async () => {
     if (!isAuthenticated || isLoadingProfile) return;
     
+    // Always prioritize auth context data first, then try to enhance with backend data
+    const contextProfile = user ? {
+      id: user.id,
+      name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User',
+      email: user.email || 'No email',
+      phone: user.phone || 'No phone',
+      role: user.role || 'User',
+      roles: user.roles || ['admin'],
+      preferences: user.preferences || {}
+    } : null;
+    
+    // If we don't have user data from auth context, don't proceed
+    if (!contextProfile) {
+      console.log('⚠️ No user data from auth context, cannot fetch profile');
+      setUserProfile({
+        id: 'guest',
+        name: 'Guest',
+        email: 'No email',
+        phone: 'No phone',
+        role: 'Guest',
+        roles: ['guest'],
+        preferences: {}
+      });
+      return;
+    }
+    
+    // Set the profile immediately with auth context data to avoid showing "Guest"
+    setUserProfile(contextProfile);
+    
     try {
       setIsLoadingProfile(true);
       setProfileError(null);
-      console.log('🔍 Fetching user profile from backend...');
+      console.log('🔍 Fetching user profile from backend to enhance data...');
       
-      // Try to get comprehensive session info first
+      // Try to get comprehensive session info first to enhance the profile
       const sessionResponse = await authService.getSession();
       
       console.log('🔍 Session response:', sessionResponse);
@@ -52,19 +81,19 @@ const Header = () => {
         const backendUser = sessionResponse.mongoUser || sessionResponse.user;
         console.log('🔍 Backend user data:', backendUser);
         
-        const profileData = {
-          id: backendUser.supertokensUserId || backendUser.id || user?.id,
-          name: backendUser.name || `${backendUser.firstName || ''} ${backendUser.lastName || ''}`.trim() || 'User',
-          email: backendUser.email || 'No email',
-          phone: backendUser.phone || 'No phone',
-          role: backendUser.role || 'User',
-          roles: backendUser.roles || ['admin'],
-          preferences: backendUser.preferences || {}
-          // Note: Removed lastLoginAt, sessionCount, activeSessions, status, isActive, isEmailVerified from display
+        // Enhance the profile with backend data, but keep auth context as fallback
+        const enhancedProfile = {
+          id: backendUser.supertokensUserId || backendUser.id || contextProfile.id,
+          name: backendUser.name || `${backendUser.firstName || ''} ${backendUser.lastName || ''}`.trim() || contextProfile.name,
+          email: backendUser.email || contextProfile.email,
+          phone: backendUser.phone || contextProfile.phone,
+          role: backendUser.role || contextProfile.role,
+          roles: backendUser.roles || contextProfile.roles,
+          preferences: backendUser.preferences || contextProfile.preferences
         };
         
-        setUserProfile(profileData);
-        console.log('✅ User profile loaded from backend:', profileData);
+        setUserProfile(enhancedProfile);
+        console.log('✅ User profile enhanced with backend data:', enhancedProfile);
       } else {
         // Try alternative endpoint - getUserProfile
         console.log('⚠️ Session info failed, trying getUserProfile endpoint...');
@@ -72,76 +101,40 @@ const Header = () => {
           const profileResponse = await authService.getUserProfile();
           if (profileResponse.success && profileResponse.data) {
             const profileUser = profileResponse.data;
-            const profileData = {
-              id: profileUser.userId || user?.id,
-              name: profileUser.name || `${profileUser.firstName || ''} ${profileUser.lastName || ''}`.trim() || 'User',
-              email: profileUser.email || 'No email',
-              phone: profileUser.phone || 'No phone',
-              role: profileUser.role || 'User',
-              roles: profileUser.roles || ['admin'],
-              preferences: profileUser.preferences || {}
+            const enhancedProfile = {
+              id: profileUser.userId || contextProfile.id,
+              name: profileUser.name || `${profileUser.firstName || ''} ${profileUser.lastName || ''}`.trim() || contextProfile.name,
+              email: profileUser.email || contextProfile.email,
+              phone: profileUser.phone || contextProfile.phone,
+              role: profileUser.role || contextProfile.role,
+              roles: profileUser.roles || contextProfile.roles,
+              preferences: profileUser.preferences || contextProfile.preferences
             };
             
-            setUserProfile(profileData);
-            console.log('✅ User profile loaded from getUserProfile endpoint:', profileData);
+            setUserProfile(enhancedProfile);
+            console.log('✅ User profile enhanced from getUserProfile endpoint:', enhancedProfile);
             return;
           }
         } catch (profileError) {
           console.warn('⚠️ getUserProfile also failed:', profileError);
         }
         
-        // Fallback to auth context data
-        console.log('⚠️ Using fallback user data from auth context');
-        const fallbackProfile = user ? {
-          id: user.id,
-          name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User',
-          email: user.email || 'No email',
-          phone: user.phone || 'No phone',
-          role: user.role || 'User',
-          roles: user.roles || ['admin'],
-          preferences: user.preferences || {}
-        } : {
-          id: 'guest',
-          name: 'Guest',
-          email: 'No email',
-          phone: 'No phone',
-          role: 'Guest',
-          roles: ['guest'],
-          preferences: {}
-        };
-        
-        setUserProfile(fallbackProfile);
+        // Backend calls failed, but we already have auth context data set
+        console.log('⚠️ Backend calls failed, keeping auth context data');
+        setProfileError('Backend unavailable - using cached profile data');
       }
     } catch (error) {
       console.error('❌ Error fetching user profile:', error);
-      setProfileError(error.message || 'Failed to fetch user profile');
+      setProfileError('Backend unavailable - using cached profile data');
       
-      // Use fallback data on error
-      const fallbackProfile = user ? {
-        id: user.id,
-        name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User',
-        email: user.email || 'No email',
-        phone: user.phone || 'No phone',
-        role: user.role || 'User',
-        roles: user.roles || ['admin'],
-        preferences: user.preferences || {}
-      } : {
-        id: 'guest',
-        name: 'Guest',
-        email: 'No email',
-        phone: 'No phone',
-        role: 'Guest',
-        roles: ['guest'],
-        preferences: {}
-      };
-      
-      setUserProfile(fallbackProfile);
+      // We already set the profile with auth context data, so don't change it
+      console.log('⚠️ Keeping auth context profile data due to backend error');
     } finally {
       setIsLoadingProfile(false);
     }
   };
 
-  // Get user profile data (use fetched data or fallback)
+  // Get user profile data (prioritize userProfile if available, then fallback to user from auth context)
   const currentUserProfile = userProfile || (user ? {
     id: user.id,
     name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User',
@@ -159,6 +152,17 @@ const Header = () => {
     roles: ['guest'],
     preferences: {}
   });
+
+  // Show "Guest" only when actually not authenticated
+  const displayProfile = isAuthenticated ? currentUserProfile : {
+    id: 'guest',
+    name: 'Guest',
+    email: 'No email',
+    phone: 'No phone',
+    role: 'Guest',
+    roles: ['guest'],
+    preferences: {}
+  };
 
   const handleNotificationClick = () => {
     if (isNotificationOpen) {
@@ -221,7 +225,7 @@ const Header = () => {
       setUserProfile(null);
       setProfileError(null);
     }
-  }, [isAuthenticated, user?.id]); // Re-fetch when user ID changes
+  }, [isAuthenticated, user?.id, user?.email]); // Re-fetch when user ID or email changes
   return (
     <motion.header
       className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm"
@@ -311,10 +315,10 @@ const Header = () => {
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-gray-900">
-                          {isLoadingProfile ? 'Loading...' : currentUserProfile.name}
+                          {isLoadingProfile ? 'Loading...' : displayProfile.name}
                         </p>
                         <div className="flex items-center space-x-2">
-                          <p className="text-sm text-gray-500 capitalize">{currentUserProfile.role}</p>
+                          <p className="text-sm text-gray-500 capitalize">{displayProfile.role}</p>
                         </div>
                       </div>
                     </div>
@@ -326,7 +330,7 @@ const Header = () => {
                         <div>
                           <p className="text-sm font-medium text-gray-900">Name</p>
                           <p className="text-xs text-gray-500">
-                            {isLoadingProfile ? 'Loading...' : currentUserProfile.name}
+                            {isLoadingProfile ? 'Loading...' : displayProfile.name}
                           </p>
                         </div>
                       </div>
@@ -335,7 +339,7 @@ const Header = () => {
                         <Mail className="w-4 h-4 text-gray-500" />
                         <div>
                           <p className="text-sm font-medium text-gray-900">Email</p>
-                          <p className="text-xs text-gray-500">{currentUserProfile.email}</p>
+                          <p className="text-xs text-gray-500">{displayProfile.email}</p>
                         </div>
                       </div>
                       
@@ -343,24 +347,25 @@ const Header = () => {
                         <Phone className="w-4 h-4 text-gray-500" />
                         <div>
                           <p className="text-sm font-medium text-gray-900">Phone Number</p>
-                          <p className="text-xs text-gray-500">{currentUserProfile.phone}</p>
+                          <p className="text-xs text-gray-500">{displayProfile.phone}</p>
                         </div>
                       </div>
 
 
 
-                      {/* Error Display */}
-                      {profileError && (
-                        <div className="flex items-center space-x-3 p-2 bg-red-50 rounded-md border border-red-200">
-                          <Bug className="w-4 h-4 text-red-500" />
+                      {/* Error Display - only show if there's an error and we're not showing guest profile */}
+                      {profileError && isAuthenticated && (
+                        <div className="flex items-center space-x-3 p-2 bg-yellow-50 rounded-md border border-yellow-200">
+                          <Bug className="w-4 h-4 text-yellow-600" />
                           <div>
-                            <p className="text-sm font-medium text-red-900">Profile Error</p>
-                            <p className="text-xs text-red-600">{profileError}</p>
+                            <p className="text-sm font-medium text-yellow-900">Backend Unavailable</p>
+                            <p className="text-xs text-yellow-700">Showing cached profile data</p>
                             <button
                               onClick={fetchUserProfile}
-                              className="text-xs text-red-700 hover:text-red-900 underline mt-1"
+                              className="text-xs text-yellow-800 hover:text-yellow-900 underline mt-1"
+                              disabled={isLoadingProfile}
                             >
-                              Retry
+                              {isLoadingProfile ? 'Retrying...' : 'Retry'}
                             </button>
                           </div>
                         </div>

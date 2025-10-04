@@ -61,10 +61,13 @@ class SessionService {
       // Get initial session info
       await this.getSessionInfo();
       
-      // Start periodic session validation (every 30 minutes - much less frequent)
+      // Start periodic session validation (every 60 minutes - less frequent)
       this.sessionCheckInterval = setInterval(async () => {
-        await this.validateSession();
-      }, 30 * 60 * 1000);
+        // Only validate if page is visible to avoid unnecessary requests
+        if (!document.hidden) {
+          await this.validateSession();
+        }
+      }, 60 * 60 * 1000);
       
       // Disable automatic session refresh to prevent 400 errors
       // this.sessionRefreshInterval = setInterval(async () => {
@@ -113,21 +116,8 @@ class SessionService {
         return false;
       }
 
-      // Check if cookies are actually present (manual cookie deletion detection)
-      const hasSessionCookies = () => {
-        const cookies = document.cookie.split(';').map(c => c.trim());
-        const sessionCookieNames = ['sAccessToken', 'sRefreshToken', 'sIdRefreshToken', 'sFrontToken'];
-        return sessionCookieNames.some(cookieName => 
-          cookies.some(cookie => cookie.startsWith(cookieName + '='))
-        );
-      };
-      
-      if (!hasSessionCookies()) {
-        console.log('❌ Session cookies missing - user manually deleted cookies');
-        this.isSessionValid = false;
-        this.notifyListeners('sessionInvalid', { reason: 'cookies_missing' });
-        return false;
-      }
+      // Skip aggressive cookie checking - let SuperTokens handle cookie validation
+      // Manual cookie detection can cause false positives with HttpOnly cookies
 
       // Try to get session status from backend using the lightweight endpoint
       try {
@@ -141,11 +131,7 @@ class SessionService {
         } else {
           console.log('❌ Session validation failed:', response.data.message);
           this.isSessionValid = false;
-          this.notifyListeners('sessionInvalid', { 
-            reason: 'session_validation_failed',
-            message: response.data.message,
-            sessionRevoked: response.data.sessionRevoked
-          });
+          // Don't trigger sessionInvalid immediately - let the validation retry
           return false;
         }
       } catch (apiError) {
@@ -175,13 +161,10 @@ class SessionService {
       
     } catch (error) {
       console.error('❌ Session validation error:', error);
-      // On any error, assume session is invalid
-      this.isSessionValid = false;
-      this.notifyListeners('sessionInvalid', { 
-        reason: 'validation_error',
-        message: error.message
-      });
-      return false;
+      // On validation errors, be lenient - assume session is still valid
+      console.warn('⚠️ Validation error - treating as temporary issue, not logging out');
+      this.isSessionValid = true;
+      return true;
     }
   }
 
@@ -278,6 +261,13 @@ class SessionService {
         if (response.data.success) {
           this.sessionInfo = response.data.data;
           
+          // Store user data in localStorage for offline access
+          if (this.sessionInfo.user || this.sessionInfo.mongoUser) {
+            const userData = this.sessionInfo.mongoUser || this.sessionInfo.user;
+            localStorage.setItem('cachedUserData', JSON.stringify(userData));
+            console.log('💾 User data cached to localStorage');
+          }
+          
           // Check if session is actually valid based on MongoDB activeSessions
           const mongoActiveSessions = response.data.data?.debug?.mongoActiveSessions || [];
           const sessionCount = response.data.data?.debug?.sessionCount || 0;
@@ -308,6 +298,42 @@ class SessionService {
         if (apiError.response && (apiError.response.status === 401 || apiError.response.status === 403)) {
           console.log('🔒 [DEBUG] Session expired, returning null');
           return null;
+        }
+        
+        // For other errors (backend down), try to use cached data
+        console.log('🔍 [DEBUG] Backend unavailable, trying cached user data...');
+        const cachedUserData = localStorage.getItem('cachedUserData');
+        if (cachedUserData) {
+          try {
+            const userData = JSON.parse(cachedUserData);
+            console.log('💾 Using cached user data:', userData.email || userData.name);
+            
+            this.sessionInfo = {
+              session: {
+                sessionHandle: 'cached-session',
+                userId: userData.supertokensUserId || userData.id || 'cached-user',
+                accessTokenPayload: {}
+              },
+              user: {
+                userId: userData.supertokensUserId || userData.id,
+                email: userData.email || 'Cached User',
+                name: userData.name || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Cached User',
+                firstName: userData.firstName || '',
+                lastName: userData.lastName || '',
+                phone: userData.phone || 'No phone',
+                role: userData.role || 'admin',
+                roles: userData.roles || ['admin'],
+                isEmailVerified: userData.isEmailVerified || false,
+                status: userData.status || 'active',
+                isActive: userData.isActive !== false,
+                lastLoginAt: userData.lastLoginAt,
+                preferences: userData.preferences || {}
+              }
+            };
+            return this.sessionInfo;
+          } catch (parseError) {
+            console.warn('⚠️ Error parsing cached user data:', parseError);
+          }
         }
       }
 
@@ -365,12 +391,13 @@ class SessionService {
       this.sessionInfo = null;
       this.isSessionValid = false;
       
-      // Clear any cached data
+      // Clear any cached data including user data
       localStorage.removeItem('user_preferences');
       localStorage.removeItem('app_state');
+      localStorage.removeItem('cachedUserData');
       sessionStorage.clear();
       
-      console.log('✅ Logout successful');
+      console.log('✅ Logout successful and cached data cleared');
       this.notifyListeners('logout', { timestamp: new Date().toISOString() });
       
     } catch (error) {
@@ -378,6 +405,7 @@ class SessionService {
       // Even if logout fails, clear local state
       this.sessionInfo = null;
       this.isSessionValid = false;
+      localStorage.removeItem('cachedUserData');
       this.notifyListeners('logout', { 
         error: error.message,
         timestamp: new Date().toISOString()
@@ -447,12 +475,17 @@ class SessionService {
         return;
       }
 
-      console.log('👁️ Tab became visible - checking session');
-      // Only validate if we haven't validated recently (within last 5 minutes)
+      console.log('👁️ Tab became visible - scheduling deferred session check');
+      // Only validate if we haven't validated recently (within last 10 minutes)
       const now = Date.now();
-      if (!this.lastValidationTime || (now - this.lastValidationTime) > 5 * 60 * 1000) {
-        await this.validateSession();
-        this.lastValidationTime = now;
+      if (!this.lastValidationTime || (now - this.lastValidationTime) > 10 * 60 * 1000) {
+        // Add delay to prevent logout during page refresh
+        setTimeout(() => {
+          if (document.visibilityState === 'visible') {
+            this.validateSession();
+            this.lastValidationTime = Date.now();
+          }
+        }, 5000);
       } else {
         console.log('⏭️ Skipping session validation - validated recently');
       }
@@ -480,15 +513,10 @@ class SessionService {
       return;
     }
 
-    console.log('🎯 Window focused - checking session');
-    // Only validate if we haven't validated recently (within last 5 minutes)
-    const now = Date.now();
-    if (!this.lastValidationTime || (now - this.lastValidationTime) > 5 * 60 * 1000) {
-      await this.validateSession();
-      this.lastValidationTime = now;
-    } else {
-      console.log('⏭️ Skipping session validation - validated recently');
-    }
+    console.log('🎯 Window focused - skipping immediate validation to prevent logout on refresh');
+    // Don't validate on window focus - this can cause logout during page refresh
+    // The regular interval and deferred visibility validation will handle session checks
+    console.log('⏭️ Window focus validation disabled to prevent authentication loops');
   }
 
   /**
