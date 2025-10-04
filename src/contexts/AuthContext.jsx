@@ -71,19 +71,27 @@ export const AuthProvider = ({ children }) => {
 
       const handleSessionInvalid = async (data) => {
         console.log('❌ [DEBUG] Session invalid in AuthContext:', data);
-        console.log('❌ [DEBUG] Current user state before logout:', {
-          isAuthenticated,
-          user: user?.email,
-          sessionInfo: !!sessionInfo
-        });
         
-        await clearAuthStateWithCleanup();
-        
-        console.log('❌ [DEBUG] Auth state cleared, redirecting to login...');
-        
-        // Redirect to login page
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login?expired=true';
+        // Only logout if session was explicitly revoked or unauthorized
+        if (data.reason === 'unauthorized' || data.sessionRevoked) {
+          console.log('🔒 Session explicitly revoked or unauthorized - logging out');
+          console.log('❌ [DEBUG] Current user state before logout:', {
+            isAuthenticated,
+            user: user?.email,
+            sessionInfo: !!sessionInfo
+          });
+          
+          await clearAuthStateWithCleanup();
+          
+          console.log('❌ [DEBUG] Auth state cleared, redirecting to login...');
+          
+          // Redirect to login page
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login?expired=true';
+          }
+        } else {
+          console.log('⚠️ Session validation issue but not explicitly revoked - ignoring');
+          console.log('⚠️ Reason:', data.reason, 'Message:', data.message);
         }
       };
 
@@ -92,14 +100,19 @@ export const AuthProvider = ({ children }) => {
         await clearAuthStateWithCleanup();
       };
 
-      // Set up cookie monitoring event listeners
-      const handleSessionCookiesMissing = async (data) => {
+      // Disable aggressive cookie monitoring that causes logout on refresh
+      // const handleSessionCookiesMissing = async (data) => {
+      //   console.log('🍪 Session cookies missing in AuthContext:', data);
+      //   await clearAuthStateWithCleanup();
+      //   if (!window.location.pathname.includes('/login')) {
+      //     window.location.href = '/login?expired=true';
+      //   }
+      // };
+
+      const handleSessionCookiesMissing = (data) => {
         console.log('🍪 Session cookies missing in AuthContext:', data);
-        await clearAuthStateWithCleanup();
-        // Redirect to login if not already there
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login?expired=true';
-        }
+        // Don't immediately logout - this can happen during page refresh
+        console.log('⚠️ Ignoring cookie missing event - could be temporary during refresh');
       };
 
       const handleSessionCookiesValid = (data) => {
@@ -187,9 +200,10 @@ export const AuthProvider = ({ children }) => {
     try {
       // Clear validation cache specifically
       localStorage.removeItem('lastSessionValidation');
+      localStorage.removeItem('cachedUserData');
       localStorage.clear();
       sessionStorage.clear();
-      console.log('✅ Local storage cleared');
+      console.log('✅ Local storage cleared including cached user data');
     } catch (error) {
       console.warn('⚠️ Error clearing local storage:', error.message);
     }
@@ -236,61 +250,191 @@ export const AuthProvider = ({ children }) => {
         return;
       }
       
-      // Check if user is authenticated locally
+      // Check if user is authenticated locally first (no backend call yet)
       const isAuthenticated = await Session.doesSessionExist();
       
       if (isAuthenticated) {
-        console.log('🔍 Local session exists, validating with backend...');
+        console.log('🔍 Local session exists, setting up monitoring...');
         
-        // Validate session with backend first
-        const sessionValid = await validateSession();
-        console.log('🔍 Session validation result:', sessionValid);
+        // Set authenticated state immediately based on local session
+        setIsAuthenticated(true);
         
-        if (sessionValid) {
-          console.log('✅ Session validated, starting session monitoring...');
+        // Start session monitoring immediately (don't wait for backend validation)
+        await sessionService.startSessionMonitoring();
+        cookieMonitorService.startMonitoring();
+        
+        // Get session info with better error handling (but don't logout on failure)
+        try {
+          const sessionInfo = await sessionService.getSessionInfo();
           
-          // Start session monitoring
-          await sessionService.startSessionMonitoring();
-          cookieMonitorService.startMonitoring();
-          
-          // Get session info with better error handling
-          try {
-            const sessionInfo = await sessionService.getSessionInfo();
+          if (sessionInfo && sessionInfo.user) {
+            // Ensure user data has all required fields with fallbacks
+            const userData = {
+              id: sessionInfo.user.userId || sessionInfo.session?.userId,
+              email: sessionInfo.user.email || 'No email',
+              name: sessionInfo.user.name || 'User',
+              firstName: sessionInfo.user.firstName || '',
+              lastName: sessionInfo.user.lastName || '',
+              phone: sessionInfo.user.phone || 'No phone',
+              role: sessionInfo.user.role || 'admin',
+              roles: sessionInfo.user.roles || ['admin'],
+              isEmailVerified: sessionInfo.user.isEmailVerified || false,
+              status: sessionInfo.user.status || 'active',
+              isActive: sessionInfo.user.isActive !== false,
+              lastLoginAt: sessionInfo.user.lastLoginAt,
+              preferences: sessionInfo.user.preferences || {}
+            };
             
-            if (sessionInfo && sessionInfo.user) {
-              // Ensure user data has all required fields with fallbacks
+            setUser(userData);
+            setSessionInfo(sessionInfo);
+            console.log('✅ Auth initialized successfully:', userData.email);
+          } else {
+            console.log('⚠️ No session info available - trying to get user data from SuperTokens directly');
+            
+            // Try to get user data from SuperTokens session payload
+            try {
+              const supertokensPayload = await Session.getAccessTokenPayloadSecurely();
+              console.log('🔍 SuperTokens payload:', supertokensPayload);
+              
+              if (supertokensPayload) {
+                // Extract what we can from the payload
+                const userData = {
+                  id: supertokensPayload.userId || supertokensPayload.sub || 'authenticated-user',
+                  email: supertokensPayload.email || 'Authenticated User',
+                  name: supertokensPayload.name || supertokensPayload.email || 'Authenticated User',
+                  firstName: supertokensPayload.firstName || '',
+                  lastName: supertokensPayload.lastName || '',
+                  phone: supertokensPayload.phone || 'No phone',
+                  role: supertokensPayload.role || 'admin',
+                  roles: supertokensPayload.roles || ['admin'],
+                  isEmailVerified: supertokensPayload.isEmailVerified || false,
+                  status: 'active',
+                  isActive: true,
+                  lastLoginAt: null,
+                  preferences: {}
+                };
+                
+                setUser(userData);
+                console.log('✅ Auth initialized with SuperTokens payload:', userData.email);
+              } else {
+                console.log('⚠️ No SuperTokens payload available - using minimal user data');
+                
+                // Create minimal user data to indicate authentication
+                const userData = {
+                  id: 'authenticated-user',
+                  email: 'Authenticated User',
+                  name: 'Authenticated User',
+                  firstName: '',
+                  lastName: '',
+                  phone: 'No phone',
+                  role: 'admin',
+                  roles: ['admin'],
+                  isEmailVerified: false,
+                  status: 'active',
+                  isActive: true,
+                  lastLoginAt: null,
+                  preferences: {}
+                };
+                
+                setUser(userData);
+                console.log('✅ Auth initialized with minimal data for authenticated user');
+              }
+            } catch (payloadError) {
+              console.warn('⚠️ Error getting SuperTokens payload:', payloadError.message);
+              
+              // Still set minimal user data since we know session exists
               const userData = {
-                id: sessionInfo.user.userId || sessionInfo.session?.userId,
-                email: sessionInfo.user.email || 'No email',
-                name: sessionInfo.user.name || 'User',
-                firstName: sessionInfo.user.firstName || '',
-                lastName: sessionInfo.user.lastName || '',
-                phone: sessionInfo.user.phone || 'No phone',
-                role: sessionInfo.user.role || 'admin',
-                roles: sessionInfo.user.roles || ['admin'],
-                isEmailVerified: sessionInfo.user.isEmailVerified || false,
-                status: sessionInfo.user.status || 'active',
-                isActive: sessionInfo.user.isActive !== false,
-                lastLoginAt: sessionInfo.user.lastLoginAt,
-                preferences: sessionInfo.user.preferences || {}
+                id: 'authenticated-user',
+                email: 'Authenticated User',
+                name: 'Authenticated User',
+                firstName: '',
+                lastName: '',
+                phone: 'No phone',
+                role: 'admin',
+                roles: ['admin'],
+                isEmailVerified: false,
+                status: 'active',
+                isActive: true,
+                lastLoginAt: null,
+                preferences: {}
               };
               
               setUser(userData);
-              setSessionInfo(sessionInfo);
-              setIsAuthenticated(true);
-              console.log('✅ Auth initialized successfully:', userData.email);
-            } else {
-              console.log('❌ No session info available - session validation failed');
-              await clearAuthStateWithCleanup();
+              console.log('✅ Auth initialized with fallback data for authenticated user');
             }
-          } catch (sessionError) {
-            console.warn('⚠️ Error getting session info:', sessionError.message);
-            console.log('❌ Session error - clearing auth state');
-            await clearAuthStateWithCleanup();
           }
-        } else {
-          console.log('❌ Session validation failed, clearing auth state');
-          await clearAuthStateWithCleanup();
+        } catch (sessionError) {
+          console.warn('⚠️ Error getting session info during initialization:', sessionError.message);
+          console.log('⚠️ Still setting authenticated state since local session exists');
+          
+          // Try to get basic user data from SuperTokens even if backend fails
+          try {
+            const supertokensPayload = await Session.getAccessTokenPayloadSecurely();
+            console.log('🔍 SuperTokens payload (fallback):', supertokensPayload);
+            
+            if (supertokensPayload) {
+              const userData = {
+                id: supertokensPayload.userId || supertokensPayload.sub || 'authenticated-user',
+                email: supertokensPayload.email || 'Authenticated User',
+                name: supertokensPayload.name || supertokensPayload.email || 'Authenticated User',
+                firstName: supertokensPayload.firstName || '',
+                lastName: supertokensPayload.lastName || '',
+                phone: supertokensPayload.phone || 'No phone',
+                role: supertokensPayload.role || 'admin',
+                roles: supertokensPayload.roles || ['admin'],
+                isEmailVerified: supertokensPayload.isEmailVerified || false,
+                status: 'active',
+                isActive: true,
+                lastLoginAt: null,
+                preferences: {}
+              };
+              
+              setUser(userData);
+              console.log('✅ Auth initialized with SuperTokens fallback data:', userData.email);
+            } else {
+              // Final fallback - minimal authenticated user data
+              const userData = {
+                id: 'authenticated-user',
+                email: 'Authenticated User',
+                name: 'Authenticated User',
+                firstName: '',
+                lastName: '',
+                phone: 'No phone',
+                role: 'admin',
+                roles: ['admin'],
+                isEmailVerified: false,
+                status: 'active',
+                isActive: true,
+                lastLoginAt: null,
+                preferences: {}
+              };
+              
+              setUser(userData);
+              console.log('✅ Auth initialized with final fallback for authenticated user');
+            }
+          } catch (fallbackError) {
+            console.warn('⚠️ Error in SuperTokens fallback:', fallbackError.message);
+            
+            // Absolute final fallback
+            const userData = {
+              id: 'authenticated-user',
+              email: 'Authenticated User',
+              name: 'Authenticated User',
+              firstName: '',
+              lastName: '',
+              phone: 'No phone',
+              role: 'admin',
+              roles: ['admin'],
+              isEmailVerified: false,
+              status: 'active',
+              isActive: true,
+              lastLoginAt: null,
+              preferences: {}
+            };
+            
+            setUser(userData);
+            console.log('✅ Auth initialized with absolute fallback for authenticated user');
+          }
         }
       } else {
         console.log('ℹ️ User is not authenticated');
@@ -298,7 +442,8 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('❌ Error initializing auth:', error);
-      clearAuthState();
+      // Don't clear auth state on initialization errors - could be temporary
+      console.log('⚠️ Auth initialization failed but not clearing state - might be temporary');
     } finally {
       setIsLoading(false);
     }
@@ -318,32 +463,17 @@ export const AuthProvider = ({ children }) => {
         return false;
       }
       
-      // Check if cookies are actually present (manual cookie deletion detection)
-      const hasSessionCookies = () => {
-        const cookies = document.cookie.split(';').map(c => c.trim());
-        const sessionCookieNames = ['sAccessToken', 'sRefreshToken', 'sIdRefreshToken', 'sFrontToken'];
-        return sessionCookieNames.some(cookieName => 
-          cookies.some(cookie => cookie.startsWith(cookieName + '='))
-        );
-      };
-      
-      if (!hasSessionCookies()) {
-        console.log('❌ Session cookies missing - user manually deleted cookies');
-        await clearAuthStateWithCleanup();
-        return false;
-      }
-      
-      // Only validate with backend if we haven't validated recently (within last 5 minutes)
+      // Only validate with backend if we haven't validated recently (within last 10 minutes)
       const now = Date.now();
       const lastValidation = localStorage.getItem('lastSessionValidation');
-      if (lastValidation && (now - parseInt(lastValidation)) < 5 * 60 * 1000) {
+      if (lastValidation && (now - parseInt(lastValidation)) < 10 * 60 * 1000) {
         console.log('⏭️ Skipping backend validation - validated recently');
         return true;
       }
       
       // Call backend session status endpoint with timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
       try {
         const response = await authService.checkSessionStatus();
@@ -362,38 +492,70 @@ export const AuthProvider = ({ children }) => {
           return true;
         } else {
           console.log('❌ Session validation failed:', response.message);
-          // Check if session was explicitly revoked
+          // Only logout on explicit session revocation
           if (response.sessionRevoked) {
             console.log('🔒 Session was explicitly revoked, logging out');
             return false;
           }
-          // For other validation failures, be strict - logout user
-          console.warn('⚠️ Backend validation failed, logging out user');
-          return false;
+          // For other validation failures, be more lenient - try to refresh session
+          console.log('⚠️ Backend validation failed, attempting session refresh...');
+          try {
+            await Session.attemptRefreshingSession();
+            console.log('✅ Session refreshed successfully after validation failure');
+            localStorage.setItem('lastSessionValidation', now.toString());
+            return true;
+          } catch (refreshError) {
+            console.error('❌ Session refresh failed:', refreshError);
+            return false;
+          }
         }
       } catch (apiError) {
         clearTimeout(timeoutId);
         console.warn('⚠️ Backend session validation failed:', apiError.message);
-        console.log('🔍 API Error details:', {
-          status: apiError.response?.status,
-          data: apiError.response?.data,
-          sessionRevoked: apiError.response?.data?.sessionRevoked
-        });
         
         // Check if it's a 401 error (unauthorized) - this usually means session is invalid
         if (apiError.response?.status === 401) {
-          console.log('🔒 401 Unauthorized - session is invalid, logging out');
-          return false;
+          console.log('🔒 401 Unauthorized - attempting session refresh...');
+          try {
+            await Session.attemptRefreshingSession();
+            console.log('✅ Session refreshed successfully after 401');
+            localStorage.setItem('lastSessionValidation', now.toString());
+            return true;
+          } catch (refreshError) {
+            console.error('❌ Session refresh failed after 401:', refreshError);
+            return false;
+          }
         }
         
-        // For other errors, be strict - assume session is invalid
-        console.warn('⚠️ Backend error - assuming session is invalid, logging out');
-        return false;
+        // For network errors or other issues, be more lenient - assume session is still valid
+        if (apiError.code === 'NETWORK_ERROR' || apiError.message.includes('timeout')) {
+          console.log('⚠️ Network error during validation - assuming session is still valid');
+          return true;
+        }
+        
+        // For other errors, try to refresh session before giving up
+        console.log('⚠️ Other error during validation - attempting session refresh...');
+        try {
+          await Session.attemptRefreshingSession();
+          console.log('✅ Session refreshed successfully after error');
+          localStorage.setItem('lastSessionValidation', now.toString());
+          return true;
+        } catch (refreshError) {
+          console.error('❌ Session refresh failed after error:', refreshError);
+          return false;
+        }
       }
     } catch (error) {
       console.error('❌ Session validation error:', error);
-      // On any error, assume session is invalid and logout
-      return false;
+      // Try to refresh session before giving up
+      try {
+        await Session.attemptRefreshingSession();
+        console.log('✅ Session refreshed successfully after validation error');
+        return true;
+      } catch (refreshError) {
+        console.error('❌ Session refresh failed after validation error:', refreshError);
+        return false;
+      }
     }
   };
 
