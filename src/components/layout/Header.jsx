@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Bell, X, User, Mail, Phone, LogOut, Bug } from "lucide-react";
+import { X, User, Mail, Phone, LogOut } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { authService } from "../../api/services/authService";
 import useNotifications from "../../hooks/useNotifications";
@@ -8,13 +7,9 @@ import NotificationBell from "../notifications/NotificationBell";
 import NotificationPortal from "../notifications/NotificationPortal";
 
 const Header = () => {
-  const { user, isAuthenticated, logout, sessionInfo } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isDebugPanelOpen, setIsDebugPanelOpen] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
-  const [profileError, setProfileError] = useState(null);
-  const notificationRef = useRef(null);
   const userMenuRef = useRef(null);
   
   // Use the notification hook
@@ -33,104 +28,36 @@ const Header = () => {
     loadMore: loadMoreNotifications
   } = useNotifications();
 
-  // Fetch real user profile data from backend
+  // Fetch user profile data from backend
   const fetchUserProfile = async () => {
-    if (!isAuthenticated || isLoadingProfile) return;
-    
-    // Always prioritize auth context data first, then try to enhance with backend data
-    const contextProfile = user ? {
-      id: user.id,
-      name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User',
-      email: user.email || 'No email',
-      phone: user.phone || 'No phone',
-      role: user.role || 'User',
-      roles: user.roles || ['admin'],
-      preferences: user.preferences || {}
-    } : null;
-    
-    // If we don't have user data from auth context, don't proceed
-    if (!contextProfile) {
-      console.log('⚠️ No user data from auth context, cannot fetch profile');
-      setUserProfile({
-        id: 'guest',
-        name: 'Guest',
-        email: 'No email',
-        phone: 'No phone',
-        role: 'Guest',
-        roles: ['guest'],
-        preferences: {}
-      });
-      return;
-    }
-    
-    // Set the profile immediately with auth context data to avoid showing "Guest"
-    setUserProfile(contextProfile);
-    
+    if (!isAuthenticated || !user) return;
+
     try {
-      setIsLoadingProfile(true);
-      setProfileError(null);
-      console.log('🔍 Fetching user profile from backend to enhance data...');
-      
-      // Try to get comprehensive session info first to enhance the profile
       const sessionResponse = await authService.getSession();
-      
-      console.log('🔍 Session response:', sessionResponse);
-      
       if (sessionResponse.success && (sessionResponse.user || sessionResponse.mongoUser)) {
-        // Use mongoUser data if available (contains real user data), otherwise fallback to user data
         const backendUser = sessionResponse.mongoUser || sessionResponse.user;
-        console.log('🔍 Backend user data:', backendUser);
-        
-        // Enhance the profile with backend data, but keep auth context as fallback
-        const enhancedProfile = {
-          id: backendUser.supertokensUserId || backendUser.id || contextProfile.id,
-          name: backendUser.name || `${backendUser.firstName || ''} ${backendUser.lastName || ''}`.trim() || contextProfile.name,
-          email: backendUser.email || contextProfile.email,
-          phone: backendUser.phone || contextProfile.phone,
-          role: backendUser.role || contextProfile.role,
-          roles: backendUser.roles || contextProfile.roles,
-          preferences: backendUser.preferences || contextProfile.preferences
-        };
-        
-        setUserProfile(enhancedProfile);
-        console.log('✅ User profile enhanced with backend data:', enhancedProfile);
-      } else {
-        // Try alternative endpoint - getUserProfile
-        console.log('⚠️ Session info failed, trying getUserProfile endpoint...');
-        try {
-          const profileResponse = await authService.getUserProfile();
-          if (profileResponse.success && profileResponse.data) {
-            const profileUser = profileResponse.data;
-            const enhancedProfile = {
-              id: profileUser.userId || contextProfile.id,
-              name: profileUser.name || `${profileUser.firstName || ''} ${profileUser.lastName || ''}`.trim() || contextProfile.name,
-              email: profileUser.email || contextProfile.email,
-              phone: profileUser.phone || contextProfile.phone,
-              role: profileUser.role || contextProfile.role,
-              roles: profileUser.roles || contextProfile.roles,
-              preferences: profileUser.preferences || contextProfile.preferences
-            };
-            
-            setUserProfile(enhancedProfile);
-            console.log('✅ User profile enhanced from getUserProfile endpoint:', enhancedProfile);
-            return;
-          }
-        } catch (profileError) {
-          console.warn('⚠️ getUserProfile also failed:', profileError);
-        }
-        
-        // Backend calls failed, but we already have auth context data set
-        console.log('⚠️ Backend calls failed, keeping auth context data');
-        setProfileError('Backend unavailable - using cached profile data');
+        setUserProfile({
+          id: backendUser.supertokensUserId || backendUser.id || user.id,
+          name: backendUser.name || `${backendUser.firstName || ''} ${backendUser.lastName || ''}`.trim() || user.name || 'User',
+          email: backendUser.email || user.email || 'No email',
+          phone: backendUser.phone || user.phone || 'No phone',
+          role: backendUser.role || user.role || 'User',
+          roles: backendUser.roles || user.roles || ['admin'],
+          preferences: backendUser.preferences || user.preferences || {}
+        });
       }
     } catch (error) {
-      console.error('❌ Error fetching user profile:', error);
-      setProfileError('Backend unavailable - using cached profile data');
-      
-      // We already set the profile with auth context data, so don't change it
-      console.log('⚠️ Keeping auth context profile data due to backend error');
-    } finally {
-      setIsLoadingProfile(false);
+      console.error('Error fetching user profile:', error);
+      // Fallback to auth context data
+      setUserProfile({
+        id: user.id,
+        name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User',
+        email: user.email || 'No email',
+        phone: user.phone || 'No phone',
+        role: user.role || 'User',
+        roles: user.roles || ['admin'],
+        preferences: user.preferences || {}
+      });
     }
   };
 
@@ -182,7 +109,6 @@ const Header = () => {
 
   const closeUserMenu = () => {
     setIsUserMenuOpen(false);
-    setProfileError(null); // Clear any profile errors when closing menu
   };
 
   const handleLogout = async () => {
@@ -221,17 +147,12 @@ const Header = () => {
     if (isAuthenticated && user) {
       fetchUserProfile();
     } else {
-      // Clear user profile when not authenticated
       setUserProfile(null);
-      setProfileError(null);
     }
-  }, [isAuthenticated, user?.id, user?.email]); // Re-fetch when user ID or email changes
+  }, [isAuthenticated, user?.id, user?.email]);
   return (
-    <motion.header
+    <header
       className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm"
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      transition={{ duration: 0.3 }}
     >
       <div className="h-16 flex items-center justify-between px-6">
         <div className="flex items-center space-x-3">
@@ -283,15 +204,10 @@ const Header = () => {
             </button>
 
             {/* User Profile Popup */}
-            <AnimatePresence>
-              {isUserMenuOpen && (
-                <motion.div
-                  className="absolute right-0 top-10 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
-                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
-                >
+            {isUserMenuOpen && (
+              <div
+                className="absolute right-0 top-10 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
+              >
                   <div className="p-4 border-b border-gray-200">
                     <div className="flex items-center justify-between">
                       <h3 className="font-semibold text-gray-900">Profile</h3>
@@ -315,7 +231,7 @@ const Header = () => {
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-gray-900">
-                          {isLoadingProfile ? 'Loading...' : displayProfile.name}
+                          {displayProfile.name}
                         </p>
                         <div className="flex items-center space-x-2">
                           <p className="text-sm text-gray-500 capitalize">{displayProfile.role}</p>
@@ -330,7 +246,7 @@ const Header = () => {
                         <div>
                           <p className="text-sm font-medium text-gray-900">Name</p>
                           <p className="text-xs text-gray-500">
-                            {isLoadingProfile ? 'Loading...' : displayProfile.name}
+                            {displayProfile.name}
                           </p>
                         </div>
                       </div>
@@ -353,24 +269,6 @@ const Header = () => {
 
 
 
-                      {/* Error Display - only show if there's an error and we're not showing guest profile */}
-                      {profileError && isAuthenticated && (
-                        <div className="flex items-center space-x-3 p-2 bg-yellow-50 rounded-md border border-yellow-200">
-                          <Bug className="w-4 h-4 text-yellow-600" />
-                          <div>
-                            <p className="text-sm font-medium text-yellow-900">Backend Unavailable</p>
-                            <p className="text-xs text-yellow-700">Showing cached profile data</p>
-                            <button
-                              onClick={fetchUserProfile}
-                              className="text-xs text-yellow-800 hover:text-yellow-900 underline mt-1"
-                              disabled={isLoadingProfile}
-                            >
-                              {isLoadingProfile ? 'Retrying...' : 'Retry'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
                     </div>
                   </div>
                   
@@ -383,15 +281,14 @@ const Header = () => {
                       <span>Logout</span>
                     </button>
                   </div>
-                </motion.div>
+                </div>
               )}
-            </AnimatePresence>
           </div>
         </div>
       </div>
 
     
-    </motion.header>
+    </header>
   );
 };
 
