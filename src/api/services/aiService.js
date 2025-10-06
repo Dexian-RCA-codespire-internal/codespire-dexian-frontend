@@ -158,6 +158,15 @@ export const aiService = {
         feedback
       });
       return response.data;
+    },
+
+    // Search AI guidance in playbook triggers
+    searchGuidanceInTriggers: async ({ playbookIds, guidanceQuestion }) => {
+      const response = await api.post('/ai/playbook-recommender/search-guidance', {
+        playbookIds,
+        guidanceQuestion
+      });
+      return response.data;
     }
   },
 
@@ -196,7 +205,7 @@ export const aiService = {
   problemStatement: {
     // Generate AI-powered problem statement
     generate: async (ticketData) => {
-      const response = await api.post('/v1/problem-statement/generate', ticketData);
+      const response = await api.post('/problem-statement/generate', ticketData);
       return response.data;
     }
   },
@@ -205,7 +214,7 @@ export const aiService = {
   timelineContext: {
     // Generate AI-powered timeline and context description
     generate: async (data) => {
-      const response = await api.post('/v1/timeline-context/generate', data);
+      const response = await api.post('/timeline-context/generate', data);
       return response.data;
     }
   },
@@ -214,7 +223,7 @@ export const aiService = {
   impactAssessment: {
     // Analyze impact assessment based on problem statement and timeline context
     analyze: async (data) => {
-      const response = await api.post('/v1/impact-assessment/analyze', data);
+      const response = await api.post('/impact-assessment/analyze', data);
       return response.data;
     }
   },
@@ -223,7 +232,7 @@ export const aiService = {
   textEnhancement: {
     // Enhance text using AI
     enhance: async (data) => {
-      const response = await api.post('/v1/text-enhancement/enhance', data);
+      const response = await api.post('/text-enhancement/enhance', data);
       return response.data;
     }
   },
@@ -232,7 +241,7 @@ export const aiService = {
   rootCauseAnalysis: {
     // Analyze root causes for a ticket
     analyze: async (data) => {
-      const response = await api.post('/v1/rca-root-cause/analyze', data);
+      const response = await api.post('/rca-root-cause/analyze', data);
       return response.data;
     }
   },
@@ -241,7 +250,7 @@ export const aiService = {
   solutionGeneration: {
     // Generate solutions for a ticket
     generate: async (data) => {
-      const response = await api.post('/v1/solution-generation/generate', data);
+      const response = await api.post('/solution-generation/generate', data);
       return response.data;
     }
   }

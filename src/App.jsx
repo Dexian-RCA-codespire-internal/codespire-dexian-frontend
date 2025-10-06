@@ -4,11 +4,12 @@ import { SuperTokensWrapper } from 'supertokens-auth-react'
 import RoutesIndex from './routes'
 import useWebSocketOnly from './hooks/useWebSocketOnly'
 import ToastContainer from './components/ui/ToastContainer'
-// import './utils/websocketChecks' // Disabled - notification system correctly uses REST API + WebSocket
+import SessionManager from './components/SessionManager'
+
 
 function AppContent() {
-  // Initialize WebSocket connection
-  useWebSocketOnly(import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081');
+  // Initialize WebSocket connection and get notification handlers
+   useWebSocketOnly(import.meta.env.VITE_BACKEND_URL);
 
   return (
     <>
@@ -16,14 +17,16 @@ function AppContent() {
         <title>Dexian RCA Dashboard</title>
       </Helmet>
 
-      <main className="h-full">
-        <RoutesIndex />
-      </main>
+      <SessionManager>
+        <main className="h-full">
+          <RoutesIndex />
+        </main>
 
-
-
-      {/* Toast Notifications */}
-      <ToastContainer />
+        {/* Toast Notifications */}
+        <ToastContainer />
+        
+ 
+      </SessionManager>
     </>
   )
 }

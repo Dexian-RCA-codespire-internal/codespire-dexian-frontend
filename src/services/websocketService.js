@@ -15,7 +15,7 @@ class WebSocketService {
    * Initialize WebSocket connection
    * @param {String} serverUrl - Backend server URL
    */
-  connect(serverUrl = 'http://localhost:8081') {
+  connect(serverUrl = import.meta.env.VITE_BACKEND_URL) {
     if (this.socket && this.isConnected) {
       console.log('WebSocket already connected');
       return;

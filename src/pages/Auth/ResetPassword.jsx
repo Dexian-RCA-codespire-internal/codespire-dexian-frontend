@@ -4,7 +4,8 @@ import { MdLock, MdVisibility, MdVisibilityOff, MdArrowBack } from 'react-icons/
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertCircle, CheckCircle } from 'lucide-react'
 import { validatePassword, getPasswordStrength, getPasswordRequirements } from '../../utils/validation'
-import api from '../../api'
+import { useAuth } from '../../contexts/AuthContext'
+import EmailPassword from 'supertokens-auth-react/recipe/emailpassword'
 
 export default function ResetPassword() {
   const [newPassword, setNewPassword] = useState('')
@@ -21,14 +22,32 @@ export default function ResetPassword() {
   
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { resetPassword } = useAuth()
 
   useEffect(() => {
     // Get token from URL parameters
     const tokenFromUrl = searchParams.get('token')
+    const rid = searchParams.get('rid')
+    const tenantId = searchParams.get('tenantId')
+    
+    console.log('🔍 Reset password URL params:', {
+      token: tokenFromUrl ? 'present' : 'missing',
+      rid,
+      tenantId,
+      fullUrl: window.location.href
+    })
+    
     if (!tokenFromUrl) {
       setError('Invalid or missing reset token. Please request a new password reset.')
       return
     }
+    
+    // Validate that this is a SuperTokens password reset token
+    if (rid !== 'emailpassword') {
+      setError('Invalid reset token type. Please request a new password reset.')
+      return
+    }
+    
     setToken(tokenFromUrl)
   }, [searchParams])
 
@@ -95,43 +114,20 @@ export default function ResetPassword() {
     setError('')
 
     try {
-      const response = await fetch('http://localhost:8081/api/v1/auth/reset-password', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          token: token,
-          newPassword: newPassword,
-          confirmPassword: confirmPassword
-        })
-      })
-
-      console.log('Response status:', response.status)
-      console.log('Response headers:', response.headers)
-
-      // Check if response is ok
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      // Try to parse as JSON
-      let data
-      const contentType = response.headers.get('content-type')
-      if (contentType && contentType.includes('application/json')) {
-        data = await response.json()
-      } else {
-        // If not JSON, read as text to see what we got
-        const text = await response.text()
-        console.log('Non-JSON response:', text)
-        throw new Error('Server returned non-JSON response')
-      }
-
-      console.log('Response data:', data)
+      // Use SuperTokens EmailPassword.submitNewPassword
+      // SuperTokens automatically consumes the token from the URL
+      const response = await EmailPassword.submitNewPassword({
+        formFields: [
+          {
+            id: "password",
+            value: newPassword
+          }
+        ]
+      });
       
-      if (data.success) {
+      console.log('🔐 Password reset response:', response);
+      
+      if (response.status === "OK") {
         setSuccess(true)
         setSuccessMessage('Password updated successfully!')
         
@@ -149,8 +145,13 @@ export default function ResetPassword() {
             } 
           })
         }, 2000)
+      } else if (response.status === "FIELD_ERROR") {
+        const passwordError = response.formFields?.find(field => field.id === 'password')
+        setError(passwordError?.error || 'Password validation failed')
+      } else if (response.status === "RESET_PASSWORD_INVALID_TOKEN_ERROR") {
+        setError('Invalid or expired reset token. Please request a new password reset.')
       } else {
-        setError(data.message || 'Failed to reset password. Please try again.')
+        setError(response.message || 'Failed to reset password. Please try again.')
       }
     } catch (err) {
       console.error('Password reset error:', err)

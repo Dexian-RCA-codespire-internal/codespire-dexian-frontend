@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ticketService, aiService } from '../api'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
-import { Button } from '../components/ui/button'
-import { Input } from '../components/ui/input'
-import { Textarea } from '../components/ui/textarea'
-import { Badge } from '../components/ui/badge'
+import { Button } from '../components/ui/Button'
+import { Input } from '../components/ui/Input'
+import { Textarea } from '../components/ui/Textarea'
+import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/skeleton'
 import { RCAWorkflow } from '../components/RCA'
 import { FiUpload, FiImage, FiUser, FiPlus, FiClock, FiMoreHorizontal, FiSearch, FiZap, FiTrendingUp, FiAlertTriangle, FiCheckCircle } from 'react-icons/fi'
@@ -25,10 +25,6 @@ const Analysis = () => {
   const [similarCasesError, setSimilarCasesError] = useState(null)
   
   // AI suggestions state
-  const [aiSuggestions, setAiSuggestions] = useState([])
-  const [aiSuggestionsData, setAiSuggestionsData] = useState([]) // Store full suggestion objects
-  const [aiSuggestionsLoading, setAiSuggestionsLoading] = useState(false)
-  const [aiSuggestionsError, setAiSuggestionsError] = useState(null)
   
   const [analysisNotes, setAnalysisNotes] = useState('')
   const [rootCause, setRootCause] = useState('')
@@ -49,6 +45,11 @@ const Analysis = () => {
   })
   const [isGeneratingProblemStatement, setIsGeneratingProblemStatement] = useState(false)
   const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false)
+  
+  // Impact Assessment state
+  const [impactAssessments, setImpactAssessments] = useState([])
+  const [isGeneratingImpactAssessment, setIsGeneratingImpactAssessment] = useState(false)
+  const [hasAttemptedImpactGeneration, setHasAttemptedImpactGeneration] = useState(false)
   
   // Debug wrapper for setAnalysisResponse
   const debugSetAnalysisResponse = (value) => {
@@ -95,42 +96,6 @@ const Analysis = () => {
     }
   }
 
-  // Fetch AI suggestions based on similar cases
-  const fetchAISuggestions = async (similarCasesData, currentTicket) => {
-    try {
-      setAiSuggestionsLoading(true)
-      setAiSuggestionsError(null)
-      console.log('Fetching AI suggestions for similar cases:', similarCasesData)
-      
-      if (similarCasesData && similarCasesData.results && similarCasesData.results.length > 0) {
-        const response = await ticketService.getAISuggestions(similarCasesData.results, currentTicket)
-        console.log('AI suggestions received:', response)
-        
-        // Extract suggestions from response - adjust based on actual API response structure
-        const suggestions = response.suggestions || response.data?.suggestions || []
-        console.log('Raw suggestions from API:', suggestions)
-        
-        // Convert suggestion objects to strings for display
-        const suggestionStrings = suggestions.map(suggestion => {
-          if (typeof suggestion === 'string') {
-            return suggestion
-          } else if (suggestion && typeof suggestion === 'object') {
-            return suggestion.suggestion || suggestion.text || suggestion.description || JSON.stringify(suggestion)
-          }
-          return String(suggestion)
-        })
-        
-        console.log('Processed suggestion strings:', suggestionStrings)
-        setAiSuggestions(suggestionStrings)
-        setAiSuggestionsData(suggestions) // Store full objects for future use
-      }
-    } catch (err) {
-      console.error('Error fetching AI suggestions:', err)
-      setAiSuggestionsError(err.message || 'Failed to fetch AI suggestions')
-    } finally {
-      setAiSuggestionsLoading(false)
-    }
-  }
 
   // Fetch ticket data when component loads
   useEffect(() => {
@@ -159,7 +124,12 @@ const Analysis = () => {
               department_affected_step2: ticket.department_affected_step2 || '',
               issueType: ticket.issueType || '',
               severity: ticket.severity || '',
-              businessImpactCategory: ticket.businessImpactCategory || ''
+              businessImpactCategory: ticket.businessImpactCategory || '',
+              impact_assessments_step2: ticket.impact_assessments_step2 || null,
+              problemStatementData: ticket.problemStatementData || null,
+              impactAssessments: ticket.impactAssessments || null,
+              rootCauseAnalysis: ticket.rootCauseAnalysis || null,
+              correctiveActions: ticket.correctiveActions || null
             }
           } else {
             // Old structure: convert individual step fields to array
@@ -176,7 +146,12 @@ const Analysis = () => {
               department_affected_step2: ticket.department_affected_step2 || '',
               issueType: ticket.issueType || '',
               severity: ticket.severity || '',
-              businessImpactCategory: ticket.businessImpactCategory || ''
+              businessImpactCategory: ticket.businessImpactCategory || '',
+              impact_assessments_step2: ticket.impact_assessments_step2 || null,
+              problemStatementData: ticket.problemStatementData || null,
+              impactAssessments: ticket.impactAssessments || null,
+              rootCauseAnalysis: ticket.rootCauseAnalysis || null,
+              correctiveActions: ticket.correctiveActions || null
             }
           }
           console.log('Final existingStepData:', existingStepData);
@@ -184,12 +159,31 @@ const Analysis = () => {
           
           // Find and navigate to first incomplete step
           const firstIncompleteStep = findFirstIncompleteStepWithData(existingStepData)
+          console.log('=== SETTING RCA STEP ===')
+          console.log('First incomplete step determined:', firstIncompleteStep)
           setRcaStep(firstIncompleteStep)
           
           // Load the response for the current step
           const stepResponse = existingStepData.rca_workflow_steps[firstIncompleteStep - 1] || ''
           console.log('Loading step response for step', firstIncompleteStep, ':', stepResponse)
           debugSetAnalysisResponse(stepResponse)
+          
+          // Restore problem statement data if available
+          if (existingStepData.problemStatementData) {
+            setProblemStatementData(existingStepData.problemStatementData)
+          }
+          
+          // Restore impact assessments if available
+          if (existingStepData.impactAssessments) {
+            console.log('Restoring impact assessments:', existingStepData.impactAssessments)
+            // Store impact assessments in stepData for ImpactAssessmentStep to access
+            setStepData(prevData => ({
+              ...prevData,
+              impact_assessments_step2: existingStepData.impactAssessments
+            }))
+          } else if (existingStepData.impact_assessments_step2) {
+            console.log('Restoring impact assessments from step2 field:', existingStepData.impact_assessments_step2)
+          }
           
           // Generate problem statement if not already generated
           if (!hasAttemptedGeneration) {
@@ -198,16 +192,19 @@ const Analysis = () => {
           } else {
             console.log('Problem statement generation already attempted, skipping...')
           }
+          
+          // Generate impact assessment if not already generated
+          if (!hasAttemptedImpactGeneration) {
+            console.log('Triggering impact assessment generation...')
+            generateImpactAssessment(ticket)
+          } else {
+            console.log('Impact assessment generation already attempted, skipping...')
+          }
         }
         
-        // Start fetching similar cases and AI suggestions after ticket data is loaded
+        // Start fetching similar cases after ticket data is loaded
         if (ticket) {
-          // Start both requests in parallel for better UX
-          fetchSimilarCases(ticket).then(similarCasesData => {
-            if (similarCasesData) {
-              fetchAISuggestions(similarCasesData, ticket)
-            }
-          })
+          fetchSimilarCases(ticket)
         }
       } catch (err) {
         console.error('Error fetching ticket data:', err)
@@ -297,6 +294,12 @@ const Analysis = () => {
         
         setProblemStatementData(newProblemStatementData)
         
+        // Store problem statement data in stepData for persistence
+        setStepData(prevData => ({
+          ...prevData,
+          problemStatementData: newProblemStatementData
+        }))
+        
         // Auto-populate step 1 with the first problem definition and dropdown values
         if (problemStatement.problemDefinitions && problemStatement.problemDefinitions.length > 0) {
           const firstDefinition = problemStatement.problemDefinitions[0]
@@ -369,6 +372,65 @@ const Analysis = () => {
     }
   }
 
+  // Generate Impact Assessment function
+  const generateImpactAssessment = async (ticket) => {
+    console.log('generateImpactAssessment called with:', {
+      ticket: !!ticket,
+      isGeneratingImpactAssessment,
+      hasAttemptedImpactGeneration
+    })
+    
+    if (!ticket || isGeneratingImpactAssessment) {
+      console.log('Skipping impact assessment generation due to conditions')
+      return
+    }
+    
+    // Check if impact assessment data already exists
+    if (impactAssessments.length > 0) {
+      console.log('Impact assessments already exist, skipping generation')
+      return
+    }
+    
+    console.log('Generating impact assessment...')
+
+    try {
+      setIsGeneratingImpactAssessment(true)
+      setHasAttemptedImpactGeneration(true)
+      
+      // Check if we have the required data from previous steps
+      if (stepData.rca_workflow_steps[0]) {
+        const requestData = {
+          problemStatement: stepData.rca_workflow_steps[0],
+          timelineContext: stepData.rca_workflow_steps[0] // Use problem statement as context since timeline is removed
+        }
+        
+        const response = await aiService.impactAssessment.analyze(requestData)
+        
+        if (response.success && response.data && response.data.impactAssessments) {
+          // Store the impact assessments
+          setImpactAssessments(response.data.impactAssessments)
+          
+          // Save impact assessments to stepData for persistence
+          setStepData((prevData) => ({
+            ...prevData,
+            impact_assessments_step2: response.data.impactAssessments
+          }))
+          
+          console.log('Impact assessments generated successfully:', response.data.impactAssessments)
+        } else {
+          console.warn('Impact assessment API returned unsuccessful response:', response)
+        }
+      } else {
+        console.log('No problem statement available for impact assessment generation')
+      }
+    } catch (error) {
+      console.error('Error generating impact assessment:', error)
+      // Don't show alert here as it's automatic generation
+    } finally {
+      setIsGeneratingImpactAssessment(false)
+    }
+  }
+
   const analysisInsights = [
     {
       type: 'critical',
@@ -406,41 +468,21 @@ const Analysis = () => {
       step: 1,
       title: 'Problem Definition',
       aiGuidance: 'What specific problem or incident occurred? Please describe the symptoms observed.',
-      aiSuggestions: [
-        'Payment gateway timeouts during peak traffic',
-        'User authentication failures after deployment',
-        'Database connection pool exhaustion'
-      ]
     },
     {
       step: 2,
       title: 'Impact Assessment',
-      aiGuidance: 'What was the business and technical impact of this issue?',
-      aiSuggestions: [
-        '50% increase in failed transactions',
-        'Customer support tickets increased by 200%',
-        'Revenue loss of $15K during outage'
-      ]
+      aiGuidance: 'What was the business and technical impact of this issue?'
     },
     {
       step: 3,
       title: 'Root Cause Analysis',
-      aiGuidance: 'Based on your investigation, what is the underlying root cause?',
-      aiSuggestions: [
-        'Inefficient database query causing resource contention',
-        'Missing connection pool configuration limits',
-        'Inadequate load balancing for traffic spikes'
-      ]
+      aiGuidance: 'Based on your investigation, what is the underlying root cause?'
     },
     {
       step: 4,
       title: 'Corrective Actions',
-      aiGuidance: 'What specific actions will you take to prevent this issue from recurring?',
-      aiSuggestions: [
-        'Implement database query optimization and indexing',
-        'Configure proper connection pool limits and monitoring',
-        'Set up auto-scaling for traffic spikes'
-      ]
+      aiGuidance: 'What specific actions will you take to prevent this issue from recurring?'
     }
   ]
 
@@ -494,9 +536,8 @@ const Analysis = () => {
       console.log('updatedSteps after mapping:', updatedSteps);
       
       const updatedStepData = {
+        ...stepData, // Preserve all existing stepData
         rca_workflow_steps: updatedSteps,
-        impact_level_step2: stepData.impact_level_step2 || '',
-        department_affected_step2: stepData.department_affected_step2 || '',
         status: rcaStep === 4 ? 'Resolved' : 'In Progress'
       }
 
@@ -523,8 +564,7 @@ const Analysis = () => {
           if (!stepData.rca_workflow_steps[0] || stepData.rca_workflow_steps[0].trim().length === 0) {
             incompleteSteps.push('Problem Definition (Step 1)')
           }
-          if (!stepData.rca_workflow_steps[1] || stepData.rca_workflow_steps[1].trim().length === 0 || 
-              !stepData.impact_level_step2 || !stepData.department_affected_step2) {
+          if (!stepData.rca_workflow_steps[1] || stepData.rca_workflow_steps[1].trim().length === 0) {
             incompleteSteps.push('Impact Assessment (Step 2)')
           }
           if (!stepData.rca_workflow_steps[2] || stepData.rca_workflow_steps[2].trim().length === 0) {
@@ -580,14 +620,11 @@ const Analysis = () => {
     if (rcaStep < 4) return true // Not on final step yet
     
     // Check if steps 1-3 have data
-    const hasRequiredSteps = stepData.rca_workflow_steps[0] && stepData.rca_workflow_steps[0].trim().length > 0 &&
-                            stepData.rca_workflow_steps[2] && stepData.rca_workflow_steps[2].trim().length > 0
+    const hasStep1 = stepData.rca_workflow_steps[0] && stepData.rca_workflow_steps[0].trim().length > 0
+    const hasStep2 = stepData.rca_workflow_steps[1] && stepData.rca_workflow_steps[1].trim().length > 0
+    const hasStep3 = stepData.rca_workflow_steps[2] && stepData.rca_workflow_steps[2].trim().length > 0
     
-    // Special check for step 2 (impact assessment) - needs all three fields
-    const hasImpactStep = stepData.rca_workflow_steps[1] && stepData.rca_workflow_steps[1].trim().length > 0 && 
-                         stepData.impact_level_step2 && stepData.department_affected_step2
-    
-    return hasRequiredSteps && hasImpactStep
+    return hasStep1 && hasStep2 && hasStep3
   }
 
   // Find the first incomplete step
@@ -597,9 +634,8 @@ const Analysis = () => {
       return 1
     }
     
-    // Check step 2 (Impact Assessment) - needs all three fields
-    if (!stepData.rca_workflow_steps[1] || stepData.rca_workflow_steps[1].trim().length === 0 || 
-        !stepData.impact_level_step2 || !stepData.department_affected_step2) {
+    // Check step 2 (Impact Assessment) - needs content
+    if (!stepData.rca_workflow_steps[1] || stepData.rca_workflow_steps[1].trim().length === 0) {
       return 2
     }
     
@@ -614,23 +650,46 @@ const Analysis = () => {
 
   // Find the first incomplete step with provided data
   const findFirstIncompleteStepWithData = (stepDataToCheck) => {
+    console.log('=== FINDING FIRST INCOMPLETE STEP ===')
+    console.log('stepDataToCheck:', stepDataToCheck)
+    console.log('rca_workflow_steps:', stepDataToCheck.rca_workflow_steps)
+    
     // Check step 1 (Problem Definition)
-    if (!stepDataToCheck.rca_workflow_steps[0] || stepDataToCheck.rca_workflow_steps[0].trim().length === 0) {
+    const step1Content = stepDataToCheck.rca_workflow_steps?.[0] || ''
+    console.log('Step 1 content:', step1Content, 'Length:', step1Content.trim().length)
+    if (!step1Content || step1Content.trim().length === 0) {
+      console.log('Step 1 is incomplete, returning step 1')
       return 1
     }
     
-    // Check step 2 (Impact Assessment) - needs all three fields
-    if (!stepDataToCheck.rca_workflow_steps[1] || stepDataToCheck.rca_workflow_steps[1].trim().length === 0 || 
-        !stepDataToCheck.impact_level_step2 || !stepDataToCheck.department_affected_step2) {
+    // Check step 2 (Impact Assessment) - needs step content (dropdowns are optional)
+    const step2Content = stepDataToCheck.rca_workflow_steps?.[1] || ''
+    console.log('Step 2 content:', step2Content, 'Length:', step2Content.trim().length)
+    console.log('impact_level_step2:', stepDataToCheck.impact_level_step2)
+    console.log('department_affected_step2:', stepDataToCheck.department_affected_step2)
+    if (!step2Content || step2Content.trim().length === 0) {
+      console.log('Step 2 is incomplete (no content), returning step 2')
       return 2
     }
     
     // Check step 3 (Root Cause Analysis)
-    if (!stepDataToCheck.rca_workflow_steps[2] || stepDataToCheck.rca_workflow_steps[2].trim().length === 0) {
+    const step3Content = stepDataToCheck.rca_workflow_steps?.[2] || ''
+    console.log('Step 3 content:', step3Content, 'Length:', step3Content.trim().length)
+    if (!step3Content || step3Content.trim().length === 0) {
+      console.log('Step 3 is incomplete, returning step 3')
       return 3
     }
     
-    // If all steps are complete, return step 4
+    // Check step 4 (Corrective Actions)
+    const step4Content = stepDataToCheck.rca_workflow_steps?.[3] || ''
+    console.log('Step 4 content:', step4Content, 'Length:', step4Content.trim().length)
+    if (!step4Content || step4Content.trim().length === 0) {
+      console.log('Step 4 is incomplete, returning step 4')
+      return 4
+    }
+    
+    // If all steps are complete, return step 4 (final step)
+    console.log('All steps are complete, returning step 4')
     return 4
   }
 
@@ -651,6 +710,11 @@ const Analysis = () => {
     console.log('Current stepData:', stepData);
     console.log('rca_workflow_steps:', stepData.rca_workflow_steps);
     console.log('Current analysisResponse before update:', analysisResponse);
+    console.log('Step 1 dropdown values:', {
+      issueType: stepData.issueType,
+      severity: stepData.severity,
+      businessImpactCategory: stepData.businessImpactCategory
+    });
     
     // Allow navigation to any step
     setRcaStep(stepNumber)
@@ -687,9 +751,7 @@ const Analysis = () => {
             onResponseChange={debugSetAnalysisResponse}
             onNext={handleRcaNext}
             onPrevious={handleRcaPrevious}
-            aiSuggestions={[]}
             similarCases={null}
-            aiSuggestionsLoading={false}
             similarCasesLoading={false}
             nextButtonText={rcaStep === 5 ? "Complete RCA →" : "Next Step →"}
             showPrevious={rcaStep > 1}
@@ -742,9 +804,7 @@ const Analysis = () => {
           onResponseChange={debugSetAnalysisResponse}
           onNext={handleRcaNext}
           onPrevious={handleRcaPrevious}
-          aiSuggestions={aiSuggestions.length > 0 ? aiSuggestions : getCurrentStepData().aiSuggestions}
           similarCases={similarCases}
-          aiSuggestionsLoading={aiSuggestionsLoading}
           similarCasesLoading={similarCasesLoading}
           nextButtonText={rcaStep === 4 ? "Complete RCA →" : "Next Step →"}
           showPrevious={rcaStep > 1}

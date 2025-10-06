@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
-import { Button } from '../ui/button'
-import { Badge } from '../ui/badge'
+import { Button } from '../ui/Button'
+import { Badge } from '../ui/Badge'
 import { Skeleton } from '../ui/skeleton'
 import { FiMessageCircle, FiZap, FiSearch, FiArrowRight, FiArrowLeft, FiCheck, FiSave, FiDownload, FiLoader } from 'react-icons/fi'
 import { 
@@ -24,9 +24,7 @@ const RCAWorkflow = ({
   onResponseChange, 
   onNext, 
   onPrevious, 
-  aiSuggestions = [], 
   similarCases = [],
-  aiSuggestionsLoading = false,
   similarCasesLoading = false,
   nextButtonText = "Next Step →",
   showPrevious = true,
@@ -38,7 +36,8 @@ const RCAWorkflow = ({
   problemStatementData = null,
   isGeneratingProblemStatement = false,
   setIsGeneratingProblemStatement,
-  hasAttemptedGeneration = false
+  hasAttemptedGeneration = false,
+  onGuidanceResult = null
 }) => {
   // Note: Problem statement state is now managed in the parent component (Analysis.jsx)
   
@@ -172,7 +171,7 @@ const RCAWorkflow = ({
                 const isCompleted = stepNumber < currentStep
                 const isCurrent = stepNumber === currentStep
                 const isFuture = stepNumber > currentStep
-                const isClickable = onStepClick
+                const isClickable = onStepClick && (stepNumber <= currentStep || stepNumber === currentStep + 1)
                 
                 return (
                   <div 
@@ -191,7 +190,9 @@ const RCAWorkflow = ({
                         ? 'bg-green-600 text-white hover:bg-green-700' 
                         : isCurrent 
                         ? 'bg-green-600 text-white hover:bg-green-700' 
-                        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                        : isClickable
+                        ? 'bg-blue-500 text-white hover:bg-blue-600'
+                        : 'bg-gray-200 text-gray-600 cursor-not-allowed'
                     } ${isClickable ? 'hover:scale-105 cursor-pointer' : 'cursor-default'}`}>
                       {isCompleted ? <FiCheck className="w-4 h-4" /> : stepNumber}
                     </div>
@@ -209,6 +210,7 @@ const RCAWorkflow = ({
           </div>
         </CardContent>
       </Card>
+
 
       
       {/* Main Content */}
@@ -318,19 +320,27 @@ const RCAWorkflow = ({
                   isEnhancingRootCause={isEnhancingRootCause}
                   setIsEnhancingRootCause={setIsEnhancingRootCause}
                   stepData={stepData}
+                  setStepData={setStepData}
                   similarCases={similarCases}
                 />
               )}
               
               {currentStep === 4 && (
+                <>
                 <CorrectiveActionsStep
                   ticketData={ticketData}
                   stepData={stepData}
+                  setStepData={setStepData}
                   response={response}
                   onResponseChange={onResponseChange}
                   isEnhancingCorrectiveActions={isEnhancingCorrectiveActions}
                   setIsEnhancingCorrectiveActions={setIsEnhancingCorrectiveActions}
+                  
+                  aiGuidance={aiGuidance}
+                  onGuidanceResult={onGuidanceResult}
                  />
+
+                 </>
                )}
             </div>
 

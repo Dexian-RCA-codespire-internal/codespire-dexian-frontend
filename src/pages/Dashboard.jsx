@@ -9,7 +9,7 @@ import { FaServer } from "react-icons/fa";
 import { Button } from '../components/ui/Button'
 import useWebSocketOnly from '../hooks/useWebSocketOnly'
 import { slaService } from '../api/services/slaService'
-import { integrationService } from '../api/services/integrationService'
+import { integrationService, authService } from '../api'
 import useNotifications from '../hooks/useNotifications';
 import { BiServer } from 'react-icons/bi';
 const Dashboard = () => {
@@ -22,7 +22,7 @@ const Dashboard = () => {
     pollingStatus,
     lastPollingEvent,
     addNotification
-  } = useWebSocketOnly(import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081')
+  } = useWebSocketOnly(import.meta.env.VITE_BACKEND_URL)
   
   // Info popup state
   const [showInfoPopup, setShowInfoPopup] = useState(false)
@@ -110,12 +110,7 @@ const Dashboard = () => {
           const startTime = performance.now()
           
           // Ping the server by making a simple request
-          const pingResponse = await fetch('http://localhost:8081/api/v1/health', {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          })
+          const pingResponse = await authService.ping(); 
           
           const endTime = performance.now()
           const pingMs = Math.round(endTime - startTime)
@@ -264,13 +259,7 @@ const Dashboard = () => {
         const startTime = performance.now()
         
         // Measure actual ping to server
-        const pingResponse = await fetch('http://localhost:8081/health', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        })
-        
+        const pingResponse = await authService.ping(); 
         const endTime = performance.now()
         const pingMs = Math.round(endTime - startTime)
         

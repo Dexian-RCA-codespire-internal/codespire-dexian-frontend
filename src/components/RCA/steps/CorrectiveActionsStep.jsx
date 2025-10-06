@@ -1,29 +1,54 @@
 import React, { useState, useEffect } from 'react'
-import AutoSuggestionTextarea from '../../ui/AutoSuggestionTextarea'
+// import AutoSuggestionTextarea from '../../ui/AutoSuggestionTextarea'
+import { Textarea } from '../../ui/Textarea'
+import { Button } from '../../ui/Button'
+import { IoIosColorWand } from "react-icons/io"
+import { FiLoader } from "react-icons/fi"
 import { BsStars, BsClock, BsCheckCircle, BsExclamationTriangle, BsLightning } from "react-icons/bs"
 import { FiChevronDown, FiChevronUp, FiUsers, FiCalendar, FiAlertTriangle, FiTool, FiShield, FiTrendingUp } from "react-icons/fi"
 import { aiService } from '../../../api/services/aiService'
+import EnhancementModal from '../../ui/EnhancementModal'
+import { useTextEnhancement } from '../../../hooks/useTextEnhancement'
+import PlaybookRecommender from '../../PlaybookRecommender'
 
   const CorrectiveActionsStep = ({
   ticketData,
   stepData,
+  setStepData,
   response,
   onResponseChange,
   isEnhancingCorrectiveActions,
-  setIsEnhancingCorrectiveActions
+  setIsEnhancingCorrectiveActions,
+  aiGuidance,
+  onGuidanceResult
 }) => {
   const [isGeneratingSolutions, setIsGeneratingSolutions] = useState(false)
   const [generatedSolutions, setGeneratedSolutions] = useState(null)
   const [expandedSolution, setExpandedSolution] = useState(null)
   const [selectedSolution, setSelectedSolution] = useState(null)
   const [hasGeneratedSolutions, setHasGeneratedSolutions] = useState(false)
+  const [isEnhancementModalOpen, setIsEnhancementModalOpen] = useState(false)
+  const [enhancementOptions, setEnhancementOptions] = useState([])
+  const [isPlaybookGenerating, setIsPlaybookGenerating] = useState(false)
+  
+  // Use the custom hook for text enhancement
+  const { enhanceText, isLoading: isEnhancing, error: enhancementError } = useTextEnhancement()
 
-  // Generate solutions when component mounts or when ticket data is available
+  // Restore corrective actions data from stepData when component mounts
   useEffect(() => {
-    if (ticketData && stepData && !hasGeneratedSolutions && !isGeneratingSolutions) {
-      generateSolutions()
+    if (stepData?.correctiveActions) {
+      console.log('CorrectiveActionsStep: Restoring corrective actions from stepData:', stepData.correctiveActions)
+      setGeneratedSolutions(stepData.correctiveActions.generatedSolutions || null)
+      setHasGeneratedSolutions(true)
     }
-  }, [ticketData, stepData, hasGeneratedSolutions, isGeneratingSolutions])
+  }, [stepData?.correctiveActions])
+
+  // Generate solutions when component mounts (only if no existing data)
+  useEffect(() => {
+    if (ticketData && !hasGeneratedSolutions && !stepData?.correctiveActions) {
+      generateSolutions();
+    }
+  }, [stepData?.correctiveActions])
 
   // Generate AI solutions
   const generateSolutions = async () => {
@@ -68,6 +93,46 @@ import { aiService } from '../../../api/services/aiService'
         setGeneratedSolutions(result)
         setHasGeneratedSolutions(true)
         console.log('Solutions generated successfully:', result)
+        
+        // Automatically populate the first solution in the textarea
+        if (result.solutions.length > 0) {
+          const firstSolution = result.solutions[0];
+          const solutionSummary = `${firstSolution.title}
+
+Description: ${firstSolution.description}
+
+Implementation Steps:
+${firstSolution.steps.map((step, index) => 
+  `${index + 1}. ${step.title} (${step.duration})
+   - ${step.description}
+   - Responsible: ${step.responsible}`
+).join('\n\n')}
+
+Expected Outcome: ${firstSolution.expectedOutcome}
+
+Risk Level: ${firstSolution.riskLevel}
+Timeframe: ${firstSolution.timeframe}
+Confidence: ${firstSolution.confidence}%`;
+
+          onResponseChange(solutionSummary);
+          setSelectedSolution(firstSolution);
+          console.log('Automatically populated first solution in textarea');
+        }
+        
+        // Store corrective actions in stepData for persistence
+        const correctiveActionsData = {
+          generatedSolutions: result,
+          timestamp: new Date().toISOString()
+        }
+        
+        // Update stepData with corrective actions
+        if (typeof setStepData === 'function') {
+          setStepData(prevData => ({
+            ...prevData,
+            correctiveActions: correctiveActionsData
+          }))
+          console.log('CorrectiveActionsStep: Stored corrective actions in stepData:', correctiveActionsData)
+        }
       } else {
         console.error('Failed to generate solutions:', result)
         alert('Failed to generate solutions. Please try again.')
@@ -129,40 +194,97 @@ Confidence: ${solution.confidence}%`
     }
   }
 
-  // Generic text enhancement function
-  const handleEnhanceText = async (currentText, setLoadingState, setLoadingFunction) => {
-    if (!currentText.trim()) {
-      alert('Please enter some text to enhance.')
-      return
+  // Handle opening enhancement modal
+  const handleEnhanceCorrectiveActions = async () => {
+    if (!response.trim()) {
+      alert("Please enter some text in the corrective actions to enhance.");
+      return;
     }
 
-    try {
-      setLoadingFunction(true)
-      
-      const requestData = {
-        text: currentText,
-        reference: `${ticketData?.short_description || ''} ${ticketData?.description || ''}`.trim()
-      }
-      
-      const response = await aiService.textEnhancement.enhance(requestData)
-      
-      if (response.success && response.data && response.data.enhancedText) {
-        const enhancedText = response.data.enhancedText
-        
-        // Update the response with enhanced text
-        onResponseChange(enhancedText)
-        
-        console.log('Text enhanced successfully:', response.data)
-      } else {
-        alert('Failed to enhance text. Please try again.')
-      }
-    } catch (error) {
-      console.error('Error enhancing text:', error)
-      alert('Failed to enhance text. Please try again.')
-    } finally {
-      setLoadingFunction(false)
+    setIsEnhancementModalOpen(true);
+    
+    // Call the enhancement API
+    const reference = `${ticketData?.short_description || ""} ${ticketData?.description || ""}`.trim();
+    const result = await enhanceText(response, reference);
+    
+    if (result && result.enhancedOptions) {
+      setEnhancementOptions(result.enhancedOptions);
+    } else if (enhancementError) {
+      alert(`Failed to enhance text: ${enhancementError}`);
+      setIsEnhancementModalOpen(false);
     }
-  }
+  };
+
+  // Handle selecting an enhancement option
+  const handleSelectEnhancement = (enhancedText) => {
+    onResponseChange(enhancedText);
+    setIsEnhancementModalOpen(false);
+    setEnhancementOptions([]);
+  };
+
+  // Handle closing the modal
+  const handleCloseModal = () => {
+    setIsEnhancementModalOpen(false);
+    setEnhancementOptions([]);
+  };
+
+  // Handle loading state from PlaybookRecommender
+  const handlePlaybookLoadingChange = (isLoading) => {
+    setIsPlaybookGenerating(isLoading);
+    if(isLoading) {
+      setGeneratedSolutions(null);
+      setHasGeneratedSolutions(false);
+    }
+  };
+
+  // Handle guidance result from PlaybookRecommender
+  const handlePlaybookGuidanceResult = (result) => {
+    if (result && result.solutions) {
+      setGeneratedSolutions(result);
+      setHasGeneratedSolutions(true);
+      console.log('Solutions generated from playbooks:', result);
+      
+      // Automatically populate the first solution in the textarea
+      if (result.solutions.length > 0) {
+        const firstSolution = result.solutions[0];
+        const solutionSummary = `${firstSolution.title}
+
+Description: ${firstSolution.description}
+
+Implementation Steps:
+${firstSolution.steps.map((step, index) => 
+  `${index + 1}. ${step.title} (${step.duration})
+   - ${step.description}
+   - Responsible: ${step.responsible}`
+).join('\n\n')}
+
+Expected Outcome: ${firstSolution.expectedOutcome}
+
+Risk Level: ${firstSolution.riskLevel}
+Timeframe: ${firstSolution.timeframe}
+Confidence: ${firstSolution.confidence}%`;
+
+        onResponseChange(solutionSummary);
+        setSelectedSolution(firstSolution);
+        console.log('Automatically populated first solution in textarea');
+      }
+      
+      // Store corrective actions in stepData for persistence
+      const correctiveActionsData = {
+        generatedSolutions: result,
+        timestamp: new Date().toISOString()
+      }
+      
+      // Update stepData with corrective actions
+      if (typeof setStepData === 'function') {
+        setStepData(prevData => ({
+          ...prevData,
+          correctiveActions: correctiveActionsData
+        }))
+        console.log('CorrectiveActionsStep: Stored playbook-generated solutions in stepData:', correctiveActionsData)
+      }
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -183,10 +305,12 @@ Confidence: ${solution.confidence}%`
           )}
         </div>
 
-        {isGeneratingSolutions && (
+        {(isGeneratingSolutions || isPlaybookGenerating) && (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-blue-700">Generating comprehensive solutions...</span>
+            <span className="ml-3 text-blue-700">
+              {isPlaybookGenerating ? 'Generating solutions from selected playbooks...' : 'Generating comprehensive solutions...'}
+            </span>
           </div>
         )}
 
@@ -356,59 +480,80 @@ Confidence: ${solution.confidence}%`
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Additional Corrective Actions or Modifications
         </label>
-        <AutoSuggestionTextarea
-          value={response}
-          onChange={(e) => {
-            onResponseChange(e)
-          }}
-          placeholder="Add custom corrective actions or modify the generated solutions..."
-          rows={6}
-          className="w-full resize-none"
-          reference={ticketData ? `${ticketData.short_description} ${ticketData.description || ''}`.trim() : ''}
-          onEnhance={() => handleEnhanceText(response, isEnhancingCorrectiveActions, setIsEnhancingCorrectiveActions)}
-          isEnhancing={isEnhancingCorrectiveActions}
-        />
+        <div className="relative">
+          {/* <AutoSuggestionTextarea
+            value={response}
+            onChange={(e) => {
+              onResponseChange(e)
+            }}
+            placeholder="Add custom corrective actions or modify the generated solutions..."
+            rows={6}
+            className="w-full resize-none pr-20"
+            reference={ticketData ? `${ticketData.short_description} ${ticketData.description || ''}`.trim() : ''}
+            onEnhance={() => handleEnhanceText(response, isEnhancingCorrectiveActions, setIsEnhancingCorrectiveActions)}
+            isEnhancing={isEnhancingCorrectiveActions}
+          /> */}
+          <Textarea
+            value={response}
+            onChange={(e) => {
+              onResponseChange(e.target.value)
+            }}
+            placeholder="Add custom corrective actions or modify the generated solutions..."
+            rows={8}
+            className="w-full"
+            disabled={isEnhancingCorrectiveActions}
+          />
+          <div className="absolute bottom-1 right-1 flex gap-1">
+            <Button
+              onClick={() => {
+                onResponseChange("");
+              }}
+              disabled={!response.trim()}
+              className="bg-white border border-gray-300 text-black hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded shadow-sm text-sm"
+              size="sm"
+            >
+              Clear
+            </Button>
+            <Button
+              onClick={handleEnhanceCorrectiveActions}
+              disabled={isEnhancing || !response.trim()}
+              className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded shadow-sm flex items-center gap-1"
+              size="sm"
+            >
+              {isEnhancing ? (
+                <FiLoader className="w-4 h-4 animate-spin" />
+              ) : (
+                <IoIosColorWand className="w-4 h-4 text-green-600" />
+              )}
+              <span className="text-sm text-green-600">{isEnhancing ? 'Enhancing...' : 'Enhance'}</span>
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Action Categories (kept as reference) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-          <h4 className="text-sm font-medium text-green-900 mb-2 flex items-center gap-2">
-            <BsLightning className="w-4 h-4" />
-            Immediate Actions
-          </h4>
-          <ul className="text-sm text-green-700 space-y-1">
-            <li>• Apply hotfixes</li>
-            <li>• Restart services</li>
-            <li>• Clear caches</li>
-            <li>• Rollback changes</li>
-          </ul>
-        </div>
-        <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-          <h4 className="text-sm font-medium text-yellow-900 mb-2 flex items-center gap-2">
-            <BsClock className="w-4 h-4" />
-            Preventive Measures
-          </h4>
-          <ul className="text-sm text-yellow-700 space-y-1">
-            <li>• Update monitoring</li>
-            <li>• Improve testing</li>
-            <li>• Add validations</li>
-            <li>• Enhance documentation</li>
-          </ul>
-        </div>
-        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <h4 className="text-sm font-medium text-blue-900 mb-2 flex items-center gap-2">
-            <FiTrendingUp className="w-4 h-4" />
-            Long-term Improvements
-          </h4>
-          <ul className="text-sm text-blue-700 space-y-1">
-            <li>• Architecture changes</li>
-            <li>• Process improvements</li>
-            <li>• Training programs</li>
-            <li>• Tool upgrades</li>
-          </ul>
-        </div>
-      </div>
+
+
+      {/* Playbook Recommender - Moved to bottom of main content */}
+      <div className="mt-8">
+                    <PlaybookRecommender 
+                      ticketData={ticketData} 
+                      aiGuidanceQuestion={aiGuidance} 
+                      onGuidanceResult={handlePlaybookGuidanceResult}
+                      onLoadingChange={handlePlaybookLoadingChange}
+                    />
+                  </div>
+
+      {/* Enhancement Modal */}
+      <EnhancementModal
+        isOpen={isEnhancementModalOpen}
+        onClose={handleCloseModal}
+        originalText={response}
+        onSelectOption={handleSelectEnhancement}
+        enhancedOptions={enhancementOptions}
+        isLoading={isEnhancing}
+        title="Enhance Corrective Actions"
+      />
     </div>
   )
 }
