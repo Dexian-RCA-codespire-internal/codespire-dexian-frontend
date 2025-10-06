@@ -5,14 +5,13 @@ import { authService } from "../../api/services/authService";
 import useNotifications from "../../hooks/useNotifications";
 import NotificationBell from "../notifications/NotificationBell";
 import NotificationPortal from "../notifications/NotificationPortal";
-
+import { useNavigate } from "react-router-dom";
 const Header = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const userMenuRef = useRef(null);
-  
-  // Use the notification hook
+  const navigate = useNavigate();
   const {
     items: notifications,
     unread,
@@ -28,7 +27,6 @@ const Header = () => {
     loadMore: loadMoreNotifications
   } = useNotifications();
 
-  // Fetch user profile data from backend
   const fetchUserProfile = async () => {
     if (!isAuthenticated || !user) return;
 
@@ -37,73 +35,31 @@ const Header = () => {
       if (sessionResponse.success && (sessionResponse.user || sessionResponse.mongoUser)) {
         const backendUser = sessionResponse.mongoUser || sessionResponse.user;
         setUserProfile({
-          id: backendUser.supertokensUserId || backendUser.id || user.id,
-          name: backendUser.name || `${backendUser.firstName || ''} ${backendUser.lastName || ''}`.trim() || user.name || 'User',
-          email: backendUser.email || user.email || 'No email',
-          phone: backendUser.phone || user.phone || 'No phone',
-          role: backendUser.role || user.role || 'User',
-          roles: backendUser.roles || user.roles || ['admin'],
-          preferences: backendUser.preferences || user.preferences || {}
+          id: backendUser.supertokensUserId ,
+          name: backendUser.name,
+          email: backendUser.email ,
+          phone: backendUser.phone ,
+          role: backendUser.role ,
+          preferences: backendUser.preferences 
         });
       }
     } catch (error) {
-      console.error('Error fetching user profile:', error);
-      // Fallback to auth context data
-      setUserProfile({
-        id: user.id,
-        name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User',
-        email: user.email || 'No email',
-        phone: user.phone || 'No phone',
-        role: user.role || 'User',
-        roles: user.roles || ['admin'],
-        preferences: user.preferences || {}
-      });
     }
   };
-
-  // Get user profile data (prioritize userProfile if available, then fallback to user from auth context)
-  const currentUserProfile = userProfile || (user ? {
-    id: user.id,
-    name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User',
-    email: user.email || 'No email',
-    phone: user.phone || 'No phone',
-    role: user.role || 'User',
-    roles: user.roles || ['admin'],
-    preferences: user.preferences || {}
-  } : {
-    id: 'guest',
-    name: 'Guest',
-    email: 'No email',
-    phone: 'No phone',
-    role: 'Guest',
-    roles: ['guest'],
-    preferences: {}
-  });
-
-  // Show "Guest" only when actually not authenticated
-  const displayProfile = isAuthenticated ? currentUserProfile : {
-    id: 'guest',
-    name: 'Guest',
-    email: 'No email',
-    phone: 'No phone',
-    role: 'Guest',
-    roles: ['guest'],
-    preferences: {}
-  };
-
+  const displayProfile = userProfile
   const handleNotificationClick = () => {
     if (isNotificationOpen) {
       closeNotifications();
     } else {
       openNotifications();
     }
-    setIsUserMenuOpen(false); // Close user menu when opening notifications
+    setIsUserMenuOpen(false); 
   };
 
   const toggleUserMenu = () => {
     setIsUserMenuOpen(!isUserMenuOpen);
     if (isNotificationOpen) {
-      closeNotifications(); // Close notifications when opening user menu
+      closeNotifications(); 
     }
   };
 
@@ -114,20 +70,15 @@ const Header = () => {
   const handleLogout = async () => {
     try {
       setIsUserMenuOpen(false);
-      console.log('🚪 Logging out user...');
       
       await logout();
-      
-      // Redirect to login page
-      window.location.href = "/login";
+ 
+      navigate("/login");
     } catch (error) {
-      console.error("Error during logout:", error);
-      // Force redirect even if logout fails
-      window.location.href = "/login";
+      navigate("/login");
     }
   };
 
-  // Close popups when clicking outside and monitor session status
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
@@ -142,7 +93,7 @@ const Header = () => {
     };
   }, []);
 
-  // Fetch user profile when authentication status changes
+
   useEffect(() => {
     if (isAuthenticated && user) {
       fetchUserProfile();
@@ -172,16 +123,15 @@ const Header = () => {
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           </div>
         </div>
-        {/* before proofile I want a notification icon 2 as notification number*/}
-
+   
         <div className="flex items-center space-x-4 gap-4">
-          {/* New Notification Bell */}
+      
           <NotificationBell
             count={unread}
             onClick={handleNotificationClick}
           />
 
-          {/* New Notification Portal */}
+      
           <NotificationPortal
             open={isNotificationOpen}
             items={notifications}
@@ -203,7 +153,7 @@ const Header = () => {
               <User className="w-5 h-5 text-gray-600" />
             </button>
 
-            {/* User Profile Popup */}
+
             {isUserMenuOpen && (
               <div
                 className="absolute right-0 top-10 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
@@ -224,7 +174,7 @@ const Header = () => {
                   </div>
                   
                   <div className="p-4 space-y-4">
-                    {/* User Info */}
+           
                     <div className="flex items-center space-x-3 pb-3 border-b border-gray-100">
                       <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                         <User className="w-5 h-5 text-blue-600" />
@@ -239,7 +189,6 @@ const Header = () => {
                       </div>
                     </div>
 
-                    {/* Profile Options */}
                     <div className="space-y-2">
                       <div className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-md transition-colors">
                         <User className="w-4 h-4 text-gray-500" />

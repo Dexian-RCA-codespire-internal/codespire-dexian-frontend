@@ -72,7 +72,7 @@ class SessionService {
 
       
     } catch (error) {
-      console.error('❌ Error starting session monitoring:', error);
+
       this.isSessionValid = false;
     }
   }
@@ -111,10 +111,6 @@ class SessionService {
         return false;
       }
 
-      // Skip aggressive cookie checking - let SuperTokens handle cookie validation
-      // Manual cookie detection can cause false positives with HttpOnly cookies
-
-      // Try to get session status from backend using the lightweight endpoint
       try {
         const response = await api.get('/users/session/status');
         if (response.data.success && response.data.data.isValid) {
@@ -126,13 +122,11 @@ class SessionService {
         } else {
  
           this.isSessionValid = false;
-          // Don't trigger sessionInvalid immediately - let the validation retry
+   
           return false;
         }
       } catch (apiError) {
-        console.warn('⚠️ Backend session validation failed:', apiError.message);
-        
-        // Check if it's a 401 error or sessionRevoked flag - session is invalid
+
         if (apiError.response && (apiError.response.status === 401 || apiError.response.data?.sessionRevoked)) {
         
           this.isSessionValid = false;
@@ -143,9 +137,8 @@ class SessionService {
           });
           return false;
         }
-        
-        // For other errors, be strict - assume session is invalid
-        console.warn('⚠️ Backend session validation failed - assuming session is invalid');
+   
+  
         this.isSessionValid = false;
         this.notifyListeners('sessionInvalid', { 
           reason: 'backend_error',
@@ -155,9 +148,7 @@ class SessionService {
       }
       
     } catch (error) {
-      console.error('❌ Session validation error:', error);
-      // On validation errors, be lenient - assume session is still valid
-      console.warn('⚠️ Validation error - treating as temporary issue, not logging out');
+
       this.isSessionValid = true;
       return true;
     }
@@ -178,7 +169,6 @@ class SessionService {
         return false;
       }
 
-      // Use backend session refresh endpoint
       try {
         const response = await api.post('/users/session/refresh');
         if (response.data.success) {
@@ -194,9 +184,7 @@ class SessionService {
           throw new Error('Backend session refresh failed');
         }
       } catch (apiError) {
-        console.warn('⚠️ Backend session refresh failed:', apiError.message);
-        
-        // If backend fails, just check if SuperTokens session still exists
+
         const sessionExists = await Session.doesSessionExist();
         if (sessionExists) {
         
@@ -215,7 +203,7 @@ class SessionService {
       }
       
     } catch (error) {
-      console.error('❌ Session refresh error:', error);
+
       this.isSessionValid = false;
       this.notifyListeners('sessionRefreshFailed', { 
         error: error.message,
@@ -225,9 +213,6 @@ class SessionService {
     }
   }
 
-  /**
-   * Get current session information
-   */
   async getSessionInfo() {
     try {
      
@@ -241,7 +226,6 @@ class SessionService {
         return null;
       }
 
-      // Try to get detailed session info from backend
       try {
         
         const response = await api.get('/users/session/info');
@@ -250,20 +234,17 @@ class SessionService {
         
         if (response.data.success) {
           this.sessionInfo = response.data.data;
-          
-          // Store user data in localStorage for offline access
+
           if (this.sessionInfo.user || this.sessionInfo.mongoUser) {
             const userData = this.sessionInfo.mongoUser || this.sessionInfo.user;
             localStorage.setItem('cachedUserData', JSON.stringify(userData));
      
           }
           
-          // Check if session is actually valid based on MongoDB activeSessions
-          const mongoActiveSessions = response.data.data?.debug?.mongoActiveSessions || [];
+
           const sessionCount = response.data.data?.debug?.sessionCount || 0;
           
 
-          // If MongoDB shows no active sessions, session might be revoked
           if (sessionCount === 0) {
             
             this.sessionInfo = null;
@@ -273,20 +254,14 @@ class SessionService {
           return this.sessionInfo;
         }
       } catch (apiError) {
-        console.warn('⚠️ [DEBUG] Could not get detailed session info from backend:', {
-          message: apiError.message,
-          status: apiError.response?.status,
-          data: apiError.response?.data
-        });
-        
+  
         // If it's a 401/403, the session is likely expired
         if (apiError.response && (apiError.response.status === 401 || apiError.response.status === 403)) {
 
           return null;
         }
         
-        // For other errors (backend down), try to use cached data
-       
+   
         const cachedUserData = localStorage.getItem('cachedUserData');
         if (cachedUserData) {
           try {
@@ -300,24 +275,24 @@ class SessionService {
                 accessTokenPayload: {}
               },
               user: {
-                userId: userData.supertokensUserId || userData.id,
-                email: userData.email || 'Cached User',
-                name: userData.name || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Cached User',
-                firstName: userData.firstName || '',
-                lastName: userData.lastName || '',
-                phone: userData.phone || 'No phone',
-                role: userData.role || 'admin',
-                roles: userData.roles || ['admin'],
-                isEmailVerified: userData.isEmailVerified || false,
-                status: userData.status || 'active',
-                isActive: userData.isActive !== false,
+                userId: userData.supertokensUserId ,
+                email: userData.email ,
+                name: userData.name ,
+                firstName: userData.firstName ,
+                lastName: userData.lastName ,
+                phone: userData.phone ,
+                role: userData.role ,
+                roles: userData.roles ,
+                isEmailVerified: userData.isEmailVerified ,
+                status: userData.status ,
+                isActive: userData.isActive ,
                 lastLoginAt: userData.lastLoginAt,
-                preferences: userData.preferences || {}
+                preferences: userData.preferences 
               }
             };
             return this.sessionInfo;
           } catch (parseError) {
-            console.warn('⚠️ Error parsing cached user data:', parseError);
+     throw parseError;
           }
         }
       }
@@ -354,7 +329,6 @@ class SessionService {
       return null;
       
     } catch (error) {
-      console.error('❌ Error getting session info:', error);
       return null;
     }
   }
@@ -386,8 +360,7 @@ class SessionService {
       this.notifyListeners('logout', { timestamp: new Date().toISOString() });
       
     } catch (error) {
-      console.error('❌ Logout error:', error);
-      // Even if logout fails, clear local state
+
       this.sessionInfo = null;
       this.isSessionValid = false;
       localStorage.removeItem('cachedUserData');
