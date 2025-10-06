@@ -70,7 +70,7 @@ export const initSuperTokens = () => {
         sessionScope: import.meta.env.VITE_SESSION_DOMAIN || 'localhost',
         // Remove aggressive session expiry handler to prevent loops
         onSessionExpired: () => {
-          console.log('🔒 Session expired event triggered');
+
           // Only dispatch event, don't redirect immediately
           window.dispatchEvent(new CustomEvent('sessionExpired', {
             detail: { reason: 'expired' }
@@ -84,9 +84,8 @@ export const initSuperTokens = () => {
               // Handle session refresh with better error handling
               refreshSession: async function (input) {
                 try {
-                  console.log('🔄 Attempting session refresh...');
-                  const result = await originalImplementation.refreshSession(input);
-                  console.log('✅ Session refreshed successfully');
+              const result = await originalImplementation.refreshSession(input);
+                  
                   
                   // Dispatch refresh success event
                   window.dispatchEvent(new CustomEvent('sessionRefreshed', {
@@ -124,7 +123,7 @@ export const initSuperTokens = () => {
                   
                   // Only redirect on unauthorized errors, not on network issues
                   if (error.message.includes('UNAUTHORISED') && !window.location.pathname.includes('/login')) {
-                    console.log('🔒 Unauthorized - redirecting to login');
+              
                     window.location.href = '/login?expired=true';
                   }
                   
@@ -141,12 +140,12 @@ export const initSuperTokens = () => {
       location: {
         ...original.location,
         setHref: (href) => {
-          console.log('🔗 SuperTokens redirect:', href);
+   
           
           // Fix redirect URLs that point to /auth/login
           if (href.includes('/auth/login')) {
             const fixedHref = href.replace('/auth/login', '/login');
-            console.log('🔧 Fixed redirect URL:', fixedHref);
+      
             window.location.href = fixedHref;
           } else {
             window.location.href = href;

@@ -51,7 +51,7 @@ class SessionService {
       // Check if user is authenticated
       const isAuthenticated = await Session.doesSessionExist();
       if (!isAuthenticated) {
-        console.log('ℹ️ No active session found');
+ 
         this.isSessionValid = false;
         return;
       }
@@ -69,12 +69,7 @@ class SessionService {
         }
       }, 60 * 60 * 1000);
       
-      // Disable automatic session refresh to prevent 400 errors
-      // this.sessionRefreshInterval = setInterval(async () => {
-      //   await this.refreshSession();
-      // }, 20 * 60 * 1000);
-      
-      console.log('✅ Session monitoring started');
+
       
     } catch (error) {
       console.error('❌ Error starting session monitoring:', error);
@@ -86,7 +81,7 @@ class SessionService {
    * Stop session monitoring
    */
   stopSessionMonitoring() {
-    console.log('🛑 Stopping session monitoring...');
+   
     
     if (this.sessionCheckInterval) {
       clearInterval(this.sessionCheckInterval);
@@ -99,7 +94,7 @@ class SessionService {
     }
     
     this.isSessionValid = false;
-    console.log('✅ Session monitoring stopped');
+
   }
 
   /**
@@ -110,7 +105,7 @@ class SessionService {
       const isAuthenticated = await Session.doesSessionExist();
       
       if (!isAuthenticated) {
-        console.log('❌ Session validation failed - no session exists');
+
         this.isSessionValid = false;
         this.notifyListeners('sessionInvalid', { reason: 'no_session' });
         return false;
@@ -125,11 +120,11 @@ class SessionService {
         if (response.data.success && response.data.data.isValid) {
           this.sessionInfo = response.data.data;
           this.isSessionValid = true;
-          console.log('✅ Session validation successful');
+
           this.notifyListeners('sessionValid', { sessionInfo: this.sessionInfo });
           return true;
         } else {
-          console.log('❌ Session validation failed:', response.data.message);
+ 
           this.isSessionValid = false;
           // Don't trigger sessionInvalid immediately - let the validation retry
           return false;
@@ -139,7 +134,7 @@ class SessionService {
         
         // Check if it's a 401 error or sessionRevoked flag - session is invalid
         if (apiError.response && (apiError.response.status === 401 || apiError.response.data?.sessionRevoked)) {
-          console.log('🔒 Session appears to be revoked/expired (401 or sessionRevoked)');
+        
           this.isSessionValid = false;
           this.notifyListeners('sessionInvalid', { 
             reason: 'session_revoked',
@@ -173,11 +168,11 @@ class SessionService {
    */
   async refreshSession() {
     try {
-      console.log('🔄 Refreshing session...');
+
       
       const isAuthenticated = await Session.doesSessionExist();
       if (!isAuthenticated) {
-        console.log('❌ Cannot refresh - no active session');
+    
         this.isSessionValid = false;
         this.notifyListeners('sessionInvalid', { reason: 'no_session' });
         return false;
@@ -187,7 +182,7 @@ class SessionService {
       try {
         const response = await api.post('/users/session/refresh');
         if (response.data.success) {
-          console.log('✅ Session refreshed successfully');
+
           this.sessionInfo = response.data.data.userData;
           this.isSessionValid = true;
           this.notifyListeners('sessionRefreshed', { 
@@ -204,7 +199,7 @@ class SessionService {
         // If backend fails, just check if SuperTokens session still exists
         const sessionExists = await Session.doesSessionExist();
         if (sessionExists) {
-          console.log('✅ SuperTokens session still exists, keeping session valid');
+        
           this.isSessionValid = true;
           this.notifyListeners('sessionRefreshed', { 
             sessionInfo: 'valid',
@@ -212,7 +207,7 @@ class SessionService {
           });
           return true;
         } else {
-          console.log('❌ SuperTokens session no longer exists');
+
           this.isSessionValid = false;
           this.notifyListeners('sessionInvalid', { reason: 'session_expired' });
           return false;
@@ -235,28 +230,23 @@ class SessionService {
    */
   async getSessionInfo() {
     try {
-      console.log('🔍 [DEBUG] getSessionInfo called');
+     
       
       const isAuthenticated = await Session.doesSessionExist();
-      console.log('🔍 [DEBUG] SuperTokens session exists:', isAuthenticated);
+ 
       
       if (!isAuthenticated) {
-        console.log('❌ [DEBUG] No SuperTokens session found');
+
         this.sessionInfo = null;
         return null;
       }
 
       // Try to get detailed session info from backend
       try {
-        console.log('🔍 [DEBUG] Calling backend session info endpoint...');
+        
         const response = await api.get('/users/session/info');
         
-        console.log('🔍 [DEBUG] Backend response:', {
-          status: response.status,
-          success: response.data.success,
-          hasData: !!response.data.data,
-          debug: response.data.data?.debug
-        });
+ 
         
         if (response.data.success) {
           this.sessionInfo = response.data.data;
@@ -265,22 +255,17 @@ class SessionService {
           if (this.sessionInfo.user || this.sessionInfo.mongoUser) {
             const userData = this.sessionInfo.mongoUser || this.sessionInfo.user;
             localStorage.setItem('cachedUserData', JSON.stringify(userData));
-            console.log('💾 User data cached to localStorage');
+     
           }
           
           // Check if session is actually valid based on MongoDB activeSessions
           const mongoActiveSessions = response.data.data?.debug?.mongoActiveSessions || [];
           const sessionCount = response.data.data?.debug?.sessionCount || 0;
           
-          console.log('🔍 [DEBUG] MongoDB session check:', {
-            mongoActiveSessions: mongoActiveSessions.length,
-            sessionCount,
-            sessionHandle: response.data.data?.session?.sessionHandle
-          });
-          
+
           // If MongoDB shows no active sessions, session might be revoked
           if (sessionCount === 0) {
-            console.log('⚠️ [DEBUG] MongoDB shows no active sessions - session might be revoked');
+            
             this.sessionInfo = null;
             return null;
           }
@@ -296,17 +281,17 @@ class SessionService {
         
         // If it's a 401/403, the session is likely expired
         if (apiError.response && (apiError.response.status === 401 || apiError.response.status === 403)) {
-          console.log('🔒 [DEBUG] Session expired, returning null');
+
           return null;
         }
         
         // For other errors (backend down), try to use cached data
-        console.log('🔍 [DEBUG] Backend unavailable, trying cached user data...');
+       
         const cachedUserData = localStorage.getItem('cachedUserData');
         if (cachedUserData) {
           try {
             const userData = JSON.parse(cachedUserData);
-            console.log('💾 Using cached user data:', userData.email || userData.name);
+   
             
             this.sessionInfo = {
               session: {
@@ -379,7 +364,7 @@ class SessionService {
    */
   async logout() {
     try {
-      console.log('🚪 Logging out user...');
+  
       
       // Stop session monitoring
       this.stopSessionMonitoring();
@@ -397,7 +382,7 @@ class SessionService {
       localStorage.removeItem('cachedUserData');
       sessionStorage.clear();
       
-      console.log('✅ Logout successful and cached data cleared');
+ 
       this.notifyListeners('logout', { timestamp: new Date().toISOString() });
       
     } catch (error) {
@@ -417,7 +402,7 @@ class SessionService {
    * Handle session expired event
    */
   handleSessionExpired(event) {
-    console.log('🔒 Session expired:', event.detail);
+
     this.isSessionValid = false;
     this.sessionInfo = null;
     this.stopSessionMonitoring();
@@ -428,7 +413,7 @@ class SessionService {
    * Handle session refreshed event
    */
   handleSessionRefreshed(event) {
-    console.log('✅ Session refreshed:', event.detail);
+
     this.isSessionValid = true;
     this.notifyListeners('sessionRefreshed', event.detail);
   }
@@ -437,7 +422,7 @@ class SessionService {
    * Handle session refresh failed event
    */
   handleSessionRefreshFailed(event) {
-    console.log('❌ Session refresh failed:', event.detail);
+ 
     this.isSessionValid = false;
     this.notifyListeners('sessionRefreshFailed', event.detail);
   }
@@ -446,7 +431,7 @@ class SessionService {
    * Handle session revoked event
    */
   handleSessionRevoked(event) {
-    console.log('🚫 Session revoked:', event.detail);
+
     this.isSessionValid = false;
     this.sessionInfo = null;
     this.stopSessionMonitoring();
@@ -471,12 +456,11 @@ class SessionService {
 
       // Skip session validation for public auth pages
       if (isPublicAuthPage()) {
-        console.log('🔓 Public auth page detected, skipping session validation on tab focus');
+      
         return;
       }
 
-      console.log('👁️ Tab became visible - scheduling deferred session check');
-      // Only validate if we haven't validated recently (within last 10 minutes)
+    
       const now = Date.now();
       if (!this.lastValidationTime || (now - this.lastValidationTime) > 10 * 60 * 1000) {
         // Add delay to prevent logout during page refresh
@@ -486,9 +470,7 @@ class SessionService {
             this.lastValidationTime = Date.now();
           }
         }, 5000);
-      } else {
-        console.log('⏭️ Skipping session validation - validated recently');
-      }
+      } 
     }
   }
 
@@ -509,14 +491,10 @@ class SessionService {
 
     // Skip session validation for public auth pages
     if (isPublicAuthPage()) {
-      console.log('🔓 Public auth page detected, skipping session validation on window focus');
+      
       return;
     }
 
-    console.log('🎯 Window focused - skipping immediate validation to prevent logout on refresh');
-    // Don't validate on window focus - this can cause logout during page refresh
-    // The regular interval and deferred visibility validation will handle session checks
-    console.log('⏭️ Window focus validation disabled to prevent authentication loops');
   }
 
   /**
