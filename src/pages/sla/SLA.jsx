@@ -82,18 +82,6 @@ const SLA = () => {
               sla.status
             );
             
-            // Log any discrepancies between backend and frontend calculations
-            if (process.env.NODE_ENV === 'development' && frontendSLAInfo.status !== sla.calculatedSLAStatus) {
-              console.warn('🔍 SLA Status mismatch:', {
-                ticketId: sla.ticket_id,
-                backend: sla.calculatedSLAStatus,
-                frontend: frontendSLAInfo.status,
-                openedTime: sla.opened_time_ist || sla.opened_time,
-                priority: sla.priority,
-                status: sla.status
-              });
-            }
-            
             return {
               ...sla,
               slaInfo: {

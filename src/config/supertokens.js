@@ -10,8 +10,8 @@ export const initSuperTokens = () => {
   SuperTokens.init({
     appInfo: {
       appName: 'Dexian RCA Dashboard',
-      apiDomain: import.meta.env.VITE_API_URL ,
-      websiteDomain: import.meta.env.VITE_FRONTEND_URL ,
+      apiDomain: import.meta.env.VITE_API_URL,
+      websiteDomain: import.meta.env.VITE_FRONTEND_URL,
       apiBasePath: '/auth',
       websiteBasePath: '/'
     },

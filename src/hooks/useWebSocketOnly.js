@@ -9,7 +9,7 @@ import { webSocketManager } from '../utils/websocketManager';
  * WebSocket-only hook that completely eliminates REST API calls
  * All data fetching is done through WebSocket events
  */
-export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
+export const useWebSocketOnly = (serverUrl = import.meta.env.VITE_BACKEND_URL) => {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
   const { success, error, info, warning } = useToast();
@@ -633,7 +633,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
   useEffect(() => {
     if (isConnected && !pollingStatus) {
       // Perform immediate health check when first connecting
-      fetch('http://localhost:8081/api/v1/servicenow-polling/health-check')
+      fetch(`${import.meta.env.VITE_API_URL}/servicenow-polling/health-check`)
         .then(response => response.json())
         .then(data => {
           if (data.success) {
@@ -672,7 +672,7 @@ export const useWebSocketOnly = (serverUrl = 'http://localhost:8081') => {
     if (!isConnected) return;
 
     const interval = setInterval(() => {
-      fetch('http://localhost:8081/api/v1/servicenow-polling/health-check')
+      fetch(`${import.meta.env.VITE_API_URL}/servicenow-polling/health-check`)
         .then(response => response.json())
         .then(data => {
           if (data.success) {
