@@ -38,10 +38,10 @@ services:
     container_name: codespire-fullstack-backend
     restart: unless-stopped
     ports:
-      - "8081:8081"
+      - "8002:8002"
     environment:
       - NODE_ENV=production
-      - PORT=8081
+      - PORT=8002
       - MONGODB_URI=mongodb://mongodb:27017/dexian-backend
       - TICKET_DATABASE_URL=mongodb://mongodb:27017/dexian-backend
       - SUPERTOKENS_CONNECTION_URI=http://supertokens:3567
@@ -137,7 +137,7 @@ services:
       - web
       - codespire-network
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8081/api/v1/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8002/api/v1/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -147,7 +147,7 @@ services:
       - "traefik.http.routers.rca-api.rule=Host(`rca-sit.codespiresolutions.cloud`) && PathPrefix(`/api`)"
       - "traefik.http.routers.rca-api.entrypoints=websecure"
       - "traefik.http.routers.rca-api.tls.certresolver=letsencrypt"
-      - "traefik.http.services.rca-api.loadbalancer.server.port=8081"
+      - "traefik.http.services.rca-api.loadbalancer.server.port=8002"
 
   # MongoDB Database
   mongodb:
