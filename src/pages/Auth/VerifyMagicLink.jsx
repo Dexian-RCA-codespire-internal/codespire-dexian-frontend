@@ -64,7 +64,7 @@ const VerifyMagicLink = () => {
   const handleRedirectToLogin = () => {
     navigate('/login', { 
       state: { 
-        message: 'Email verified successfully! Please log in to continue.' 
+        message: '' 
       }
     });
   };
