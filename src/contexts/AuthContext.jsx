@@ -40,12 +40,12 @@ export const AuthProvider = ({ children }) => {
       
       // Set up session service event listeners
       const handleSessionExpired = async (data) => {
-        console.log('🔒 Session expired in AuthContext:', data);
+         ('🔒 Session expired in AuthContext:', data);
         await clearAuthStateWithCleanup();
       };
 
       const handleSessionRefreshed = (data) => {
-        console.log('✅ Session refreshed in AuthContext:', data);
+         ('✅ Session refreshed in AuthContext:', data);
         if (data.sessionInfo && data.sessionInfo.user) {
           // Normalize user data with fallbacks
           const userData = {
@@ -70,12 +70,12 @@ export const AuthProvider = ({ children }) => {
       };
 
       const handleSessionInvalid = async (data) => {
-        console.log('❌ [DEBUG] Session invalid in AuthContext:', data);
+         ('❌ [DEBUG] Session invalid in AuthContext:', data);
         
         // Only logout if session was explicitly revoked or unauthorized
         if (data.reason === 'unauthorized' || data.sessionRevoked) {
-          console.log('🔒 Session explicitly revoked or unauthorized - logging out');
-          console.log('❌ [DEBUG] Current user state before logout:', {
+           ('🔒 Session explicitly revoked or unauthorized - logging out');
+           ('❌ [DEBUG] Current user state before logout:', {
             isAuthenticated,
             user: user?.email,
             sessionInfo: !!sessionInfo
@@ -83,26 +83,26 @@ export const AuthProvider = ({ children }) => {
           
           await clearAuthStateWithCleanup();
           
-          console.log('❌ [DEBUG] Auth state cleared, redirecting to login...');
+           ('❌ [DEBUG] Auth state cleared, redirecting to login...');
           
           // Redirect to login page
           if (window.location.pathname !== '/login') {
             window.location.href = '/login?expired=true';
           }
         } else {
-          console.log('⚠️ Session validation issue but not explicitly revoked - ignoring');
-          console.log('⚠️ Reason:', data.reason, 'Message:', data.message);
+           ('⚠️ Session validation issue but not explicitly revoked - ignoring');
+           ('⚠️ Reason:', data.reason, 'Message:', data.message);
         }
       };
 
       const handleLogout = async (data) => {
-        console.log('🚪 Logout in AuthContext:', data);
+         ('🚪 Logout in AuthContext:', data);
         await clearAuthStateWithCleanup();
       };
 
       // Disable aggressive cookie monitoring that causes logout on refresh
       // const handleSessionCookiesMissing = async (data) => {
-      //   console.log('🍪 Session cookies missing in AuthContext:', data);
+      //    ('🍪 Session cookies missing in AuthContext:', data);
       //   await clearAuthStateWithCleanup();
       //   if (!window.location.pathname.includes('/login')) {
       //     window.location.href = '/login?expired=true';
@@ -110,13 +110,13 @@ export const AuthProvider = ({ children }) => {
       // };
 
       const handleSessionCookiesMissing = (data) => {
-        console.log('🍪 Session cookies missing in AuthContext:', data);
+         ('🍪 Session cookies missing in AuthContext:', data);
         // Don't immediately logout - this can happen during page refresh
-        console.log('⚠️ Ignoring cookie missing event - could be temporary during refresh');
+         ('⚠️ Ignoring cookie missing event - could be temporary during refresh');
       };
 
       const handleSessionCookiesValid = (data) => {
-        console.log('✅ Session cookies valid in AuthContext:', data);
+         ('✅ Session cookies valid in AuthContext:', data);
         // Cookies are valid, ensure we're authenticated
         if (!isAuthenticated) {
           initializeAuth();
@@ -124,7 +124,7 @@ export const AuthProvider = ({ children }) => {
       };
 
       const handleCookiesCleaned = async (data) => {
-        console.log('🧹 Cookies cleaned in AuthContext:', data);
+         ('🧹 Cookies cleaned in AuthContext:', data);
         await clearAuthStateWithCleanup();
       };
 
@@ -153,13 +153,13 @@ export const AuthProvider = ({ children }) => {
       };
     } else {
       // For public auth pages, just set loading to false without initializing auth
-      console.log('🔓 Public auth page detected, skipping auth initialization');
+       ('🔓 Public auth page detected, skipping auth initialization');
       setIsLoading(false);
     }
   }, []);
 
   const clearAuthState = () => {
-    console.log('🧹 Clearing auth state...');
+     ('🧹 Clearing auth state...');
     
     setIsAuthenticated(false);
     setUser(null);
@@ -171,11 +171,11 @@ export const AuthProvider = ({ children }) => {
     // Stop cookie monitoring
     cookieMonitorService.stopMonitoring();
     
-    console.log('✅ Auth state cleared');
+     ('✅ Auth state cleared');
   };
 
   const clearAuthStateWithCleanup = async () => {
-    console.log('🧹 Clearing auth state and cleaning up...');
+     ('🧹 Clearing auth state and cleaning up...');
     
     setIsAuthenticated(false);
     setUser(null);
@@ -189,9 +189,9 @@ export const AuthProvider = ({ children }) => {
     
     // Clean up SuperTokens session and cookies
     try {
-      console.log('🍪 Cleaning up SuperTokens session and cookies...');
+       ('🍪 Cleaning up SuperTokens session and cookies...');
       await Session.signOut();
-      console.log('✅ SuperTokens session cleaned up');
+       ('✅ SuperTokens session cleaned up');
     } catch (error) {
       console.warn('⚠️ Error cleaning up SuperTokens session:', error.message);
     }
@@ -203,7 +203,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('cachedUserData');
       localStorage.clear();
       sessionStorage.clear();
-      console.log('✅ Local storage cleared including cached user data');
+       ('✅ Local storage cleared including cached user data');
     } catch (error) {
       console.warn('⚠️ Error clearing local storage:', error.message);
     }
@@ -220,12 +220,12 @@ export const AuthProvider = ({ children }) => {
           document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
         }
       }
-      console.log('✅ Manual cookie cleanup completed');
+       ('✅ Manual cookie cleanup completed');
     } catch (error) {
       console.warn('⚠️ Error in manual cookie cleanup:', error.message);
     }
     
-    console.log('✅ Auth state cleared completely');
+     ('✅ Auth state cleared completely');
   };
 
   const initializeAuth = async () => {
@@ -245,7 +245,7 @@ export const AuthProvider = ({ children }) => {
 
       // Skip session validation for public auth pages
       if (isPublicAuthPage()) {
-        console.log('🔓 Public auth page detected, skipping auth initialization');
+         ('🔓 Public auth page detected, skipping auth initialization');
         setIsLoading(false);
         return;
       }
@@ -254,7 +254,7 @@ export const AuthProvider = ({ children }) => {
       const isAuthenticated = await Session.doesSessionExist();
       
       if (isAuthenticated) {
-        console.log('🔍 Local session exists, setting up monitoring...');
+         ('🔍 Local session exists, setting up monitoring...');
         
         // Set authenticated state immediately based on local session
         setIsAuthenticated(true);
@@ -287,14 +287,14 @@ export const AuthProvider = ({ children }) => {
             
             setUser(userData);
             setSessionInfo(sessionInfo);
-            console.log('✅ Auth initialized successfully:', userData.email);
+             ('✅ Auth initialized successfully:', userData.email);
           } else {
-            console.log('⚠️ No session info available - trying to get user data from SuperTokens directly');
+             ('⚠️ No session info available - trying to get user data from SuperTokens directly');
             
             // Try to get user data from SuperTokens session payload
             try {
               const supertokensPayload = await Session.getAccessTokenPayloadSecurely();
-              console.log('🔍 SuperTokens payload:', supertokensPayload);
+               ('🔍 SuperTokens payload:', supertokensPayload);
               
               if (supertokensPayload) {
                 // Extract what we can from the payload
@@ -315,9 +315,9 @@ export const AuthProvider = ({ children }) => {
                 };
                 
                 setUser(userData);
-                console.log('✅ Auth initialized with SuperTokens payload:', userData.email);
+                 ('✅ Auth initialized with SuperTokens payload:', userData.email);
               } else {
-                console.log('⚠️ No SuperTokens payload available - using minimal user data');
+                 ('⚠️ No SuperTokens payload available - using minimal user data');
                 
                 // Create minimal user data to indicate authentication
                 const userData = {
@@ -337,7 +337,7 @@ export const AuthProvider = ({ children }) => {
                 };
                 
                 setUser(userData);
-                console.log('✅ Auth initialized with minimal data for authenticated user');
+                 ('✅ Auth initialized with minimal data for authenticated user');
               }
             } catch (payloadError) {
               console.warn('⚠️ Error getting SuperTokens payload:', payloadError.message);
@@ -360,17 +360,17 @@ export const AuthProvider = ({ children }) => {
               };
               
               setUser(userData);
-              console.log('✅ Auth initialized with fallback data for authenticated user');
+               ('✅ Auth initialized with fallback data for authenticated user');
             }
           }
         } catch (sessionError) {
           console.warn('⚠️ Error getting session info during initialization:', sessionError.message);
-          console.log('⚠️ Still setting authenticated state since local session exists');
+           ('⚠️ Still setting authenticated state since local session exists');
           
           // Try to get basic user data from SuperTokens even if backend fails
           try {
             const supertokensPayload = await Session.getAccessTokenPayloadSecurely();
-            console.log('🔍 SuperTokens payload (fallback):', supertokensPayload);
+             ('🔍 SuperTokens payload (fallback):', supertokensPayload);
             
             if (supertokensPayload) {
               const userData = {
@@ -390,7 +390,7 @@ export const AuthProvider = ({ children }) => {
               };
               
               setUser(userData);
-              console.log('✅ Auth initialized with SuperTokens fallback data:', userData.email);
+               ('✅ Auth initialized with SuperTokens fallback data:', userData.email);
             } else {
               // Final fallback - minimal authenticated user data
               const userData = {
@@ -410,7 +410,7 @@ export const AuthProvider = ({ children }) => {
               };
               
               setUser(userData);
-              console.log('✅ Auth initialized with final fallback for authenticated user');
+               ('✅ Auth initialized with final fallback for authenticated user');
             }
           } catch (fallbackError) {
             console.warn('⚠️ Error in SuperTokens fallback:', fallbackError.message);
@@ -433,17 +433,17 @@ export const AuthProvider = ({ children }) => {
             };
             
             setUser(userData);
-            console.log('✅ Auth initialized with absolute fallback for authenticated user');
+             ('✅ Auth initialized with absolute fallback for authenticated user');
           }
         }
       } else {
-        console.log('ℹ️ User is not authenticated');
+         ('ℹ️ User is not authenticated');
         clearAuthState();
       }
     } catch (error) {
       console.error('❌ Error initializing auth:', error);
       // Don't clear auth state on initialization errors - could be temporary
-      console.log('⚠️ Auth initialization failed but not clearing state - might be temporary');
+       ('⚠️ Auth initialization failed but not clearing state - might be temporary');
     } finally {
       setIsLoading(false);
     }
@@ -451,12 +451,12 @@ export const AuthProvider = ({ children }) => {
 
   const validateSession = async () => {
     try {
-      console.log('🔍 Validating session with backend...');
+       ('🔍 Validating session with backend...');
       
       // Check if session exists locally first
       const sessionExists = await Session.doesSessionExist();
       if (!sessionExists) {
-        console.log('❌ No local session found');
+         ('❌ No local session found');
         if (isAuthenticated) {
           await clearAuthStateWithCleanup();
         }
@@ -467,7 +467,7 @@ export const AuthProvider = ({ children }) => {
       const now = Date.now();
       const lastValidation = localStorage.getItem('lastSessionValidation');
       if (lastValidation && (now - parseInt(lastValidation)) < 10 * 60 * 1000) {
-        console.log('⏭️ Skipping backend validation - validated recently');
+         ('⏭️ Skipping backend validation - validated recently');
         return true;
       }
       
@@ -479,7 +479,7 @@ export const AuthProvider = ({ children }) => {
         const response = await authService.checkSessionStatus();
         clearTimeout(timeoutId);
         
-        console.log('🔍 Backend session validation response:', {
+         ('🔍 Backend session validation response:', {
           success: response.success,
           isValid: response.data?.isValid,
           sessionRevoked: response.sessionRevoked,
@@ -487,21 +487,21 @@ export const AuthProvider = ({ children }) => {
         });
         
         if (response.success && response.data.isValid) {
-          console.log('✅ Session validation successful');
+           ('✅ Session validation successful');
           localStorage.setItem('lastSessionValidation', now.toString());
           return true;
         } else {
-          console.log('❌ Session validation failed:', response.message);
+           ('❌ Session validation failed:', response.message);
           // Only logout on explicit session revocation
           if (response.sessionRevoked) {
-            console.log('🔒 Session was explicitly revoked, logging out');
+             ('🔒 Session was explicitly revoked, logging out');
             return false;
           }
           // For other validation failures, be more lenient - try to refresh session
-          console.log('⚠️ Backend validation failed, attempting session refresh...');
+           ('⚠️ Backend validation failed, attempting session refresh...');
           try {
             await Session.attemptRefreshingSession();
-            console.log('✅ Session refreshed successfully after validation failure');
+             ('✅ Session refreshed successfully after validation failure');
             localStorage.setItem('lastSessionValidation', now.toString());
             return true;
           } catch (refreshError) {
@@ -515,10 +515,10 @@ export const AuthProvider = ({ children }) => {
         
         // Check if it's a 401 error (unauthorized) - this usually means session is invalid
         if (apiError.response?.status === 401) {
-          console.log('🔒 401 Unauthorized - attempting session refresh...');
+           ('🔒 401 Unauthorized - attempting session refresh...');
           try {
             await Session.attemptRefreshingSession();
-            console.log('✅ Session refreshed successfully after 401');
+             ('✅ Session refreshed successfully after 401');
             localStorage.setItem('lastSessionValidation', now.toString());
             return true;
           } catch (refreshError) {
@@ -529,15 +529,15 @@ export const AuthProvider = ({ children }) => {
         
         // For network errors or other issues, be more lenient - assume session is still valid
         if (apiError.code === 'NETWORK_ERROR' || apiError.message.includes('timeout')) {
-          console.log('⚠️ Network error during validation - assuming session is still valid');
+           ('⚠️ Network error during validation - assuming session is still valid');
           return true;
         }
         
         // For other errors, try to refresh session before giving up
-        console.log('⚠️ Other error during validation - attempting session refresh...');
+         ('⚠️ Other error during validation - attempting session refresh...');
         try {
           await Session.attemptRefreshingSession();
-          console.log('✅ Session refreshed successfully after error');
+           ('✅ Session refreshed successfully after error');
           localStorage.setItem('lastSessionValidation', now.toString());
           return true;
         } catch (refreshError) {
@@ -550,7 +550,7 @@ export const AuthProvider = ({ children }) => {
       // Try to refresh session before giving up
       try {
         await Session.attemptRefreshingSession();
-        console.log('✅ Session refreshed successfully after validation error');
+         ('✅ Session refreshed successfully after validation error');
         return true;
       } catch (refreshError) {
         console.error('❌ Session refresh failed after validation error:', refreshError);
@@ -562,13 +562,13 @@ export const AuthProvider = ({ children }) => {
   const checkAuthStatus = async () => {
     try {
       setIsLoading(true);
-      console.log('🔍 Checking authentication status...');
+       ('🔍 Checking authentication status...');
       
       // Check if session exists using SuperTokens
       const sessionExists = await Session.doesSessionExist();
       
       if (!sessionExists) {
-        console.log('❌ No session found');
+         ('❌ No session found');
         clearAuthState();
         return;
       }
@@ -577,7 +577,7 @@ export const AuthProvider = ({ children }) => {
       const response = await authService.getSession();
       
       if (response.success && response.session) {
-        console.log('✅ User is authenticated');
+         ('✅ User is authenticated');
         
         const { session: sessionData, user: userData } = response;
         
@@ -597,13 +597,13 @@ export const AuthProvider = ({ children }) => {
           ...sessionData.accessTokenPayload
         });
         
-        console.log('✅ User data loaded:', {
+         ('✅ User data loaded:', {
           userId: sessionData.userId,
           email: userData.email,
           roles: userData.roles
         });
       } else {
-        console.log('❌ Failed to get session data');
+         ('❌ Failed to get session data');
         clearAuthState();
       }
     } catch (error) {
@@ -613,9 +613,9 @@ export const AuthProvider = ({ children }) => {
       try {
         const sessionStillExists = await Session.doesSessionExist();
         if (sessionStillExists) {
-          console.log('🧹 Attempting to clear corrupted session');
+           ('🧹 Attempting to clear corrupted session');
           await Session.signOut();
-          console.log('✅ Cleared corrupted session');
+           ('✅ Cleared corrupted session');
         }
       } catch (signOutError) {
         console.error('❌ Failed to clear corrupted session:', signOutError);
@@ -630,19 +630,19 @@ export const AuthProvider = ({ children }) => {
   const login = async (credentials) => {
     try {
       setIsLoading(true);
-      console.log('🔐 Attempting login...');
+       ('🔐 Attempting login...');
       
       const response = await authService.login(credentials);
       
       if (response.success) {
-        console.log('✅ Login successful');
+         ('✅ Login successful');
         
         // Refresh auth state after successful login
         await checkAuthStatus();
         
         return response;
       } else {
-        console.log('❌ Login failed:', response.message);
+         ('❌ Login failed:', response.message);
         clearAuthState();
         return response;
       }
@@ -658,7 +658,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       setIsLoading(true);
-      console.log('🔐 Attempting logout...');
+       ('🔐 Attempting logout...');
       
       // Use session service for logout
       await sessionService.logout();
@@ -666,7 +666,7 @@ export const AuthProvider = ({ children }) => {
       // Always clear local state regardless of API response
       await clearAuthStateWithCleanup();
       
-      console.log('✅ Logout completed');
+       ('✅ Logout completed');
       return { success: true, message: 'Logout successful' };
     } catch (error) {
       console.error('❌ Logout error:', error);
@@ -679,7 +679,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const forceLogout = async () => {
-    console.log('🚪 Force logout initiated...');
+     ('🚪 Force logout initiated...');
     
     try {
       // First, try to revoke session on backend
@@ -693,7 +693,7 @@ export const AuthProvider = ({ children }) => {
         });
         
         if (response.ok) {
-          console.log('✅ Backend logout successful');
+           ('✅ Backend logout successful');
         } else {
           console.warn('⚠️ Backend logout failed, continuing with frontend cleanup');
         }
@@ -739,7 +739,7 @@ export const AuthProvider = ({ children }) => {
           sessionStorage.removeItem(key);
         });
         
-        console.log('✅ Nuclear storage cleanup completed');
+         ('✅ Nuclear storage cleanup completed');
       } catch (error) {
         console.warn('⚠️ Error during nuclear storage cleanup:', error.message);
       }
@@ -757,12 +757,12 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       setIsLoading(true);
-      console.log('� Attempting registration...');
+       ('� Attempting registration...');
       
       const response = await authService.register(userData);
       
       if (response.success) {
-        console.log('✅ Registration successful');
+         ('✅ Registration successful');
         
         // Don't automatically authenticate after registration
         // User needs to verify email first
@@ -782,7 +782,7 @@ export const AuthProvider = ({ children }) => {
   // Send OTP
   const sendOTP = async (email) => {
     try {
-      console.log('📧 Sending OTP...');
+       ('📧 Sending OTP...');
       return await authService.sendOTP(email);
     } catch (error) {
       console.error('❌ Send OTP error:', error);
@@ -794,12 +794,12 @@ export const AuthProvider = ({ children }) => {
   const verifyOTP = async (deviceId, preAuthSessionId, userInputCode) => {
     try {
       setIsLoading(true);
-      console.log('� Verifying OTP...');
+       ('� Verifying OTP...');
       
       const response = await authService.verifyOTP(deviceId, preAuthSessionId, userInputCode);
       
       if (response.success) {
-        console.log('✅ OTP verification successful');
+         ('✅ OTP verification successful');
         
         // Update authentication state
         setIsAuthenticated(true);
@@ -826,7 +826,7 @@ export const AuthProvider = ({ children }) => {
   // Send email verification
   const sendEmailVerification = async () => {
     try {
-      console.log('📧 Sending email verification...');
+       ('📧 Sending email verification...');
       return await authService.sendEmailVerification();
     } catch (error) {
       console.error('❌ Send email verification error:', error);
@@ -847,7 +847,7 @@ export const AuthProvider = ({ children }) => {
   // Send password reset
   const sendPasswordReset = async (email) => {
     try {
-      console.log('📧 Sending password reset...');
+       ('📧 Sending password reset...');
       return await authService.sendPasswordReset(email);
     } catch (error) {
       console.error('❌ Send password reset error:', error);
@@ -858,7 +858,7 @@ export const AuthProvider = ({ children }) => {
   // Reset password
   const resetPassword = async (formFields) => {
     try {
-      console.log('🔐 Resetting password...');
+       ('🔐 Resetting password...');
       return await authService.resetPassword(formFields);
     } catch (error) {
       console.error('❌ Reset password error:', error);
@@ -869,7 +869,7 @@ export const AuthProvider = ({ children }) => {
   // Email verification
   const verifyEmail = async () => {
     try {
-      console.log('📧 Verifying email...');
+       ('📧 Verifying email...');
       return await authService.verifyEmailToken();
     } catch (error) {
       console.error('❌ Email verification error:', error);
@@ -880,7 +880,7 @@ export const AuthProvider = ({ children }) => {
   // Consume passwordless code (for OTP-based operations)
   const consumePasswordlessCode = async (userInputCode, password = null) => {
     try {
-      console.log('🔓 Consuming passwordless code...');
+       ('🔓 Consuming passwordless code...');
       // For SuperTokens, we use the regular verifyOTP method for passwordless code consumption
       // The password parameter is for password reset scenarios
       return await authService.verifyOTP(null, userInputCode);
@@ -903,7 +903,7 @@ export const AuthProvider = ({ children }) => {
   // Refresh session data
   const refreshSession = async () => {
     try {
-      console.log('🔄 Refreshing session...');
+       ('🔄 Refreshing session...');
       await checkAuthStatus();
     } catch (error) {
       console.error('❌ Refresh session error:', error);
@@ -979,13 +979,13 @@ export const AuthProvider = ({ children }) => {
     // Testing/debugging methods
     clearValidationCache: () => {
       localStorage.removeItem('lastSessionValidation');
-      console.log('🧹 Validation cache cleared');
+       ('🧹 Validation cache cleared');
     },
     forceSessionValidation: async () => {
-      console.log('🔍 Forcing session validation...');
+       ('🔍 Forcing session validation...');
       localStorage.removeItem('lastSessionValidation'); // Clear cache
       const isValid = await validateSession();
-      console.log('🔍 Force validation result:', isValid);
+       ('🔍 Force validation result:', isValid);
       return isValid;
     }
   };
