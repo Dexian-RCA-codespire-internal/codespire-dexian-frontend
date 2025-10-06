@@ -20,7 +20,7 @@ export const authService = {
    */
   register: async (userData) => {
     try {
-      console.log('🔐 Registering user with SuperTokens:', userData.email);
+
       
       const formFields = [
         { id: "email", value: userData.email },
@@ -43,7 +43,7 @@ export const authService = {
       });
       
       if (response.status === "OK") {
-        console.log('✅ User registered successfully');
+
         return {
           success: true,
           status: response.status,
@@ -73,7 +73,7 @@ export const authService = {
    */
   login: async (credentials) => {
     try {
-      console.log('🔐 Signing in user with SuperTokens:', credentials.email);
+
       
       const response = await EmailPassword.signIn({
         formFields: [
@@ -83,7 +83,7 @@ export const authService = {
       });
       
       if (response.status === "OK") {
-        console.log('✅ User signed in successfully');
+      
         
         // Check if email verification is required
         const emailVerificationStatus = await EmailVerification.isEmailVerified();
@@ -124,14 +124,13 @@ export const authService = {
    */
   logout: async () => {
     try {
-      console.log('🔐 Signing out user');
+ ;
       await Session.signOut();
       
       // Clear all local storage and session storage to ensure clean state
       localStorage.clear();
       sessionStorage.clear();
-      
-      console.log('✅ User signed out successfully and all local data cleared');
+   
       return { success: true };
     } catch (error) {
       console.error('❌ Logout error:', error);
@@ -158,12 +157,12 @@ export const authService = {
    */
   sendEmailVerification: async () => {
     try {
-      console.log('📧 Sending email verification');
+    
       
       const response = await EmailVerification.sendVerificationEmail();
       
       if (response.status === "OK") {
-        console.log('✅ Email verification sent successfully');
+    
         return { success: true, status: response.status };
       } else if (response.status === "EMAIL_ALREADY_VERIFIED_ERROR") {
         return { 
@@ -189,12 +188,12 @@ export const authService = {
    */
   verifyEmailToken: async () => {
     try {
-      console.log('📧 Verifying email token');
+      
       
       const response = await EmailVerification.verifyEmail();
       
       if (response.status === "OK") {
-        console.log('✅ Email verified successfully');
+      
         return { success: true, status: response.status };
       } else if (response.status === "EMAIL_VERIFICATION_INVALID_TOKEN_ERROR") {
         return { 
@@ -240,14 +239,14 @@ export const authService = {
    */
   sendOTP: async (email) => {
     try {
-      console.log('📧 Sending OTP to:', email);
+  
       
       const response = await Passwordless.createCode({
         email
       });
       
       if (response.status === "OK") {
-        console.log('✅ OTP sent successfully');
+     
         return {
           success: true,
           status: response.status,
@@ -273,7 +272,7 @@ export const authService = {
    */
   verifyOTP: async (deviceId, preAuthSessionId, userInputCode) => {
     try {
-      console.log('🔐 Verifying OTP');
+    
       
       const response = await Passwordless.consumeCode({
         deviceId,
@@ -282,7 +281,7 @@ export const authService = {
       });
       
       if (response.status === "OK") {
-        console.log('✅ OTP verified successfully');
+     
         return {
           success: true,
           status: response.status,
@@ -327,7 +326,7 @@ export const authService = {
    */
   resendOTP: async (deviceId, preAuthSessionId) => {
     try {
-      console.log('📧 Resending OTP');
+ 
       
       const response = await Passwordless.resendCode({
         deviceId,
@@ -335,7 +334,7 @@ export const authService = {
       });
       
       if (response.status === "OK") {
-        console.log('✅ OTP resent successfully');
+      
         return { success: true, status: response.status };
       } else if (response.status === "RESTART_FLOW_ERROR") {
         return {
@@ -365,7 +364,7 @@ export const authService = {
    */
   sendPasswordReset: async (email) => {
     try {
-      console.log('📧 Sending password reset email to:', email);
+    
       
       const response = await EmailPassword.sendPasswordResetEmail({
         formFields: [
@@ -374,7 +373,7 @@ export const authService = {
       });
       
       if (response.status === "OK") {
-        console.log('✅ Password reset email sent successfully');
+    
         return { success: true, status: response.status };
       } else if (response.status === "FIELD_ERROR") {
         return {
@@ -400,14 +399,14 @@ export const authService = {
    */
   resetPassword: async (formFields) => {
     try {
-      console.log('🔐 Resetting password');
+    
       
       const response = await EmailPassword.submitNewPassword({
         formFields
       });
       
       if (response.status === "OK") {
-        console.log('✅ Password reset successfully');
+      
         return { success: true, status: response.status };
       } else if (response.status === "FIELD_ERROR") {
         return {
@@ -443,7 +442,7 @@ export const authService = {
    */
   checkSessionStatus: async () => {
     try {
-      console.log('🔍 Checking session status with backend...');
+  
       
       // First check if session exists locally
       const sessionExists = await Session.doesSessionExist();
@@ -457,7 +456,7 @@ export const authService = {
       // Call the lightweight session status endpoint (using simple version for debugging)
       const response = await api.get('/users/session/status/simple');
       
-      console.log('✅ Session status check successful:', response.data);
+     
       
       return {
         success: true,
@@ -480,7 +479,7 @@ export const authService = {
    */
   getSession: async () => {
     try {
-      console.log('🔍 Getting session data from backend...');
+  
       
       // First check if session exists locally
       const sessionExists = await Session.doesSessionExist();
@@ -494,7 +493,7 @@ export const authService = {
       // Get comprehensive session info from backend
       const response = await api.get('/users/session/info');
       
-      console.log('✅ Session data retrieved from backend:', response.data);
+ 
       
       return {
         success: true,
@@ -505,10 +504,7 @@ export const authService = {
     } catch (error) {
       console.error('❌ Get session error:', error.response?.data || error.message);
       
-      // If session exists locally but backend call fails, session might be corrupted
-      if (await Session.doesSessionExist()) {
-        console.log('⚠️ Local session exists but backend validation failed');
-      }
+    
       
       return { 
         success: false, 
