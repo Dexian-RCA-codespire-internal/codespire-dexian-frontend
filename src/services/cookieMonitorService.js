@@ -190,7 +190,7 @@ class CookieMonitorService {
         
         // Immediately check with backend to see if session is revoked
         try {
-          const response = await fetch('http://localhost:8081/api/v1/users/session/status', {
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/users/session/status`, {
             method: 'GET',
             credentials: 'include'
           });
@@ -300,7 +300,7 @@ class CookieMonitorService {
         
         try {
           // Make a quick backend call to verify session using the correct endpoint
-          const response = await fetch('http://localhost:8081/api/v1/users/session/status', {
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/users/session/status`, {
             method: 'GET',
             credentials: 'include'
           });
@@ -409,7 +409,6 @@ class CookieMonitorService {
         // Delete with different paths and domains
         this.deleteCookie(cookieName);
         this.deleteCookie(cookieName, '/');
-        this.deleteCookie(cookieName, '/', 'localhost');
         this.deleteCookie(cookieName, '/', window.location.hostname);
         this.deleteCookie(cookieName, '/', '.' + window.location.hostname);
         this.deleteCookie(cookieName, '/', '127.0.0.1');

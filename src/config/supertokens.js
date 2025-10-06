@@ -17,8 +17,8 @@ export const initSuperTokens = () => {
   SuperTokens.init({
     appInfo: {
       appName: 'Dexian RCA Dashboard',
-      apiDomain: import.meta.env.VITE_API_URL || 'http://localhost:8081',
-      websiteDomain: import.meta.env.VITE_FRONTEND_URL || 'http://localhost:3001',
+      apiDomain: import.meta.env.VITE_API_URL,
+      websiteDomain: import.meta.env.VITE_FRONTEND_URL,
       apiBasePath: '/auth',
       websiteBasePath: '/'
     },
@@ -84,7 +84,7 @@ export const initSuperTokens = () => {
         },
         invalidClaimStatusCode: 403,
         autoAddCredentials: true,
-        sessionScope: import.meta.env.VITE_SESSION_DOMAIN || 'localhost',
+        sessionScope: import.meta.env.VITE_SESSION_DOMAIN,
         // Enhanced session configuration
         sessionExpiredStatusCode: 401,
         // Add session refresh handling

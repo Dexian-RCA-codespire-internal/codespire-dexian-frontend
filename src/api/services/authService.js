@@ -6,7 +6,7 @@ import Session from 'supertokens-auth-react/recipe/session';
 import api from '../index.js';
 
 // API Base URLs
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 // Authentication API services using SuperTokens
 export const authService = {
@@ -137,6 +137,16 @@ export const authService = {
       console.error('❌ Logout error:', error);
       throw error;
     }
+  },
+
+  forceLogout: async () => {
+    try {
+        const response = await api.post('/users/logout')
+        return response;
+      } catch (error) {
+        console.error('❌ Force logout error:', error);
+        return { success: false, message: error.message };
+      }
   },
 
   // ===========================================
@@ -541,6 +551,24 @@ export const authService = {
     } catch (error) {
       console.error('❌ Get user profile error:', error);
       throw error;
+    }
+  },
+
+  verifyUserWithToken: async (token) =>{
+    try{
+      const response = api.get(``)
+    } catch(error){
+
+    }
+  },
+
+  ping: async () =>{
+    try{
+      const response = await api.get('/health');
+      return response;
+    } catch (error){
+      console.log("error",error);
+      return error;
     }
   }
 };

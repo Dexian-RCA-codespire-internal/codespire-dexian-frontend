@@ -338,96 +338,6 @@ const RCACompletion = () => {
     setProgress(progress)
   }
 
-  // Original streaming API call (restored and made robust)
-  const callStreamingAPI = async (ticketData, stepData) => {
-    try {
-      setStreaming(true)
-      setStreamingError(null)
-      setStreamingProgress('Initializing RCA report generation...')
-      
-      // Generate WebSocket socket ID (in real implementation, this would come from WebSocket connection)
-      const socketId = `socket_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      
-      // Prepare the request payload
-      const requestPayload = {
-        ticketData: {
-          ticket_id: ticketData.ticket_id || 'INC0001234',
-          short_description: ticketData.short_description || 'System outage affecting multiple users',
-          category: ticketData.category || 'Infrastructure',
-          priority: ticketData.priority || 'High',
-          source: ticketData.source || 'ServiceNow'
-        },
-        rcaFields: {
-          problem: stepData.problem_step1 || 'System outage due to connectivity issues',
-          timeline: stepData.timeline_step2 || 'Issue reported at 2PM, resolved at 4PM',
-          impact: stepData.impact_step3 || 'Multiple users affected, business operations disrupted',
-          rootCause: stepData.root_cause_step4 || 'Hardware failure in network infrastructure',
-          correctiveActions: stepData.corrective_actions_step5 || 'Replaced faulty hardware, implemented monitoring'
-        }
-      }
-      
-      console.log('Calling streaming API with payload:', requestPayload)
-      
-      // Make the API call
-      const response = await fetch('http://localhost:8081/api/v1/rca/stream', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken') || 'YOUR_AUTH_TOKEN'}`,
-          'x-socket-id': socketId
-        },
-        body: JSON.stringify(requestPayload)
-      })
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      
-      setStreamingProgress('Connected to streaming API, processing RCA data...')
-      setWebsocketConnected(true)
-      
-      // Handle streaming response
-      const reader = response.body?.getReader()
-      if (reader) {
-        const decoder = new TextDecoder()
-        let buffer = ''
-        
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-          
-          for (const line of lines) {
-            if (line.trim()) {
-              try {
-                const data = JSON.parse(line)
-                handleStreamingData(data)
-              } catch (e) {
-                console.log('Non-JSON streaming data:', line)
-                setStreamingProgress(line)
-              }
-            }
-          }
-        }
-      } else {
-        // Fallback for non-streaming response
-        const result = await response.json()
-        handleStreamingData(result)
-      }
-      
-    } catch (err) {
-      console.error('Streaming API error:', err)
-      setStreamingError(err.message)
-      setWebsocketConnected(false)
-    } finally {
-      setStreaming(false)
-      setStreamingProgress('')
-    }
-  }
-
   const handleStreamingData = (data) => {
     console.log('Received streaming data:', data)
     
@@ -509,9 +419,6 @@ const RCACompletion = () => {
     setGeneratingCustomer(true)
 
     try {
-      console.log('📡 Making API call to /rca/stream via rcaService')
-      console.log('📡 Socket ID:', websocketService.getSocket()?.id)
-      console.log('📡 Payload:', { ticketData: ticketDataPayload, rcaFields: rcaFieldsPayload })
       
       // Make API call using rcaService
       const data = await rcaService.streamRCAGeneration({

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import Session from 'supertokens-auth-react/recipe/session';
 import EmailVerification from 'supertokens-auth-react/recipe/emailverification';
-import { authService } from '../api/services/authService';
+import { authService } from '../api';
 import sessionService from '../services/sessionService';
 import cookieMonitorService from '../services/cookieMonitorService';
 
@@ -522,13 +522,7 @@ export const AuthProvider = ({ children }) => {
     try {
       // First, try to revoke session on backend
       try {
-        const response = await fetch('http://localhost:8081/api/v1/users/logout', {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
+        const response = await authService.forceLogout();
         
         if (response.ok) {
           console.log('✅ Backend logout successful');
@@ -551,7 +545,7 @@ export const AuthProvider = ({ children }) => {
           const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
           
           // Clear with multiple domain/path combinations
-          const domains = ['', 'localhost', '.localhost', '127.0.0.1', '.127.0.0.1', window.location.hostname, '.' + window.location.hostname];
+          const domains = [import.meta.env.VITE_SESSION_DOMAIN];
           const paths = ['/', '/auth', '/api'];
           
           domains.forEach(domain => {

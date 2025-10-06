@@ -83,7 +83,7 @@ const SLA = () => {
             );
             
             // Log any discrepancies between backend and frontend calculations
-            if (process.env.NODE_ENV === 'development' && frontendSLAInfo.status !== sla.calculatedSLAStatus) {
+            if (import.meta.env.NODE_ENV === 'development' && frontendSLAInfo.status !== sla.calculatedSLAStatus) {
               console.warn('🔍 SLA Status mismatch:', {
                 ticketId: sla.ticket_id,
                 backend: sla.calculatedSLAStatus,

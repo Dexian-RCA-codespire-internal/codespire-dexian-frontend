@@ -38,7 +38,7 @@ export const useSecureWebSocket = () => {
       setAuthError(null);
 
       // Connect with authentication token
-      webSocketService.connect(process.env.REACT_APP_BACKEND_URL || 'http://localhost:8081', token);
+      webSocketService.connect(import.meta.env.REACT_APP_BACKEND_URL, token);
     } catch (error) {
       console.error('❌ Failed to get access token for WebSocket:', error);
       setAuthError('Failed to get access token');
@@ -141,7 +141,7 @@ export const useSecureWebSocket = () => {
     if (wsConnected) {
       healthCheckIntervalRef.current = setInterval(async () => {
         try {
-          const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'http://localhost:8081'}/api/v1/servicenow-polling/health-check`, {
+          const response = await fetch(`${import.meta.env.REACT_APP_BACKEND_URL}/api/v1/servicenow-polling/health-check`, {
             headers: {
               'Authorization': `Bearer ${await getAccessToken()}`
             }
