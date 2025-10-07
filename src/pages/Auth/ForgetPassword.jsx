@@ -79,7 +79,7 @@ export default function ForgetPassword() {
                     alt="Dexian Logo" 
                     className="w-12 h-12 object-contain"
                   />
-                  <span className="text-2xl font-bold text-[#2b8f88]">Dexian</span>
+                  <span className="text-2xl font-bold text-[#2b8f88]">AIResolve360</span>
                 </div>
               </div>
               

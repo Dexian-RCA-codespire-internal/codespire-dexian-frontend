@@ -28,6 +28,7 @@ export default function Register() {
   const [showCountryDropdown, setShowCountryDropdown] = useState(false)
   const [countrySearch, setCountrySearch] = useState('')
   const dropdownRef = useRef(null)
+  const countrySearchRef = useRef(null)
 
   // Redirect if already authenticated (but only check once to avoid multiple redirects)
   useEffect(() => {
@@ -45,6 +46,21 @@ export default function Register() {
   // Password strength calculation
   const passwordStrength = getPasswordStrength(formData.password)
   const passwordRequirements = getPasswordRequirements(formData.password)
+  const strengthBarClass =
+  passwordStrength.level === 'weak' ? 'bg-red-500' :
+  passwordStrength.level === 'fair' ? 'bg-orange-500' :
+  passwordStrength.level === 'good' ? 'bg-blue-500' :
+  passwordStrength.level === 'strong' ? 'bg-green-500' :
+  passwordStrength.level === 'invalid' ? 'bg-red-500' :
+  'bg-gray-300';
+
+  const strengthPercent =
+    passwordStrength.level === 'weak' ? 25 :
+    passwordStrength.level === 'fair' ? 50 :
+    passwordStrength.level === 'good' ? 75 :
+    passwordStrength.level === 'strong' ? 100 :
+    passwordStrength.level === 'invalid' ? 'bg-red-500' :
+    0;
 
   // Country dropdown functions
   const filteredCountries = countrySearch ? searchCountries(countrySearch) : COUNTRY_CODES
@@ -79,25 +95,30 @@ export default function Register() {
   }, [])
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target
-    const newValue = type === 'checkbox' ? checked : value
-    
+    const { name, value, type, checked } = e.target;
+    let newValue = type === 'checkbox' ? checked : value;
+
+    // For password fields, trim to 15 chars
+    if (name === 'password' || name === 'confirmPassword') {
+      newValue = newValue.slice(0, 15);
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: newValue
-    }))
+    }));
 
     // Clear validation errors when user starts typing
     if (validationErrors[name]) {
       setValidationErrors(prev => ({
         ...prev,
         [name]: null
-      }))
+      }));
     }
 
     // Clear auth error when user makes changes
     if (error) {
-      clearError()
+      clearError();
     }
   }
 
@@ -140,7 +161,7 @@ export default function Register() {
         password: formData.password,
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
-        phone: `${selectedCountry.code}${formData.phone}`
+        phone: `${selectedCountry.dialCode}${formData.phone}`
       }
 
       const response = await register(userData)
@@ -196,7 +217,7 @@ export default function Register() {
                 alt="Dexian Logo" 
                 className="w-10 h-10 sm:w-12 sm:h-12 object-contain"
               />
-              <span className="text-xl sm:text-2xl font-bold text-[#2b8f88]">Dexian</span>
+              <span className="text-xl sm:text-2xl font-bold text-[#2b8f88]">AIResolve360</span>
             </div>
           </div>
           
@@ -297,7 +318,15 @@ export default function Register() {
                   <div className="relative" ref={dropdownRef}>
                     <button
                       type="button"
-                      onClick={() => setShowCountryDropdown(!showCountryDropdown)}
+                      onClick={() => {
+                        setShowCountryDropdown(prev => {
+                          const next = !prev
+                          if (next) {
+                            setTimeout(() => countrySearchRef.current?.focus(), 0)
+                          }
+                          return next
+                        })
+                      }}
                       className="flex items-center px-2 sm:px-3 h-10 sm:h-12 border border-gray-200 border-r-0 rounded-l-lg bg-gray-50 hover:bg-gray-100 focus:outline-none"
                     >
                       <span className="text-base sm:text-lg mr-1 sm:mr-2 flag-emoji">{selectedCountry.flag}</span>
@@ -313,6 +342,7 @@ export default function Register() {
                           <div className="relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                             <input
+                              ref={countrySearchRef}
                               type="text"
                               placeholder="Search countries..."
                               value={countrySearch}
@@ -369,6 +399,7 @@ export default function Register() {
                       name="password"
                       value={formData.password}
                       onChange={handleInputChange}
+                      maxLength={15}
                       placeholder="Password"
                       className="pl-10 pr-10 h-10 sm:h-12 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm sm:text-base"
                       required
@@ -400,9 +431,9 @@ export default function Register() {
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
-                    <div 
-                      className={`h-1.5 sm:h-2 rounded-full transition-all duration-300 bg-${passwordStrength.color}-500`}
-                      style={{ width: `${(passwordRequirements.filter(req => req.met).length / passwordRequirements.length) * 100}%` }}
+                    <div
+                      className={`h-1.5 sm:h-2 rounded-full transition-all duration-300 ${strengthBarClass}`}
+                      style={{ width: `${strengthPercent}%` }}
                     ></div>
                   </div>
                   <div className="space-y-1">
@@ -423,19 +454,27 @@ export default function Register() {
               )}
 
               {/* Confirm Password Input */}
+              {/* Error message above input */}
+              {formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                <div className="flex items-center mb-1 text-red-600 text-xs">
+                  <AlertCircle className="h-3 w-3 mr-1" />
+                  Passwords do not match
+                </div>
+              )}
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-gray-400" />
                 </div>
-                    <Input
-                      type={showConfirmPassword ? "text" : "password"}
-                      name="confirmPassword"
-                      value={formData.confirmPassword}
-                      onChange={handleInputChange}
-                      placeholder="Confirm Password"
-                      className="pl-10 pr-10 h-10 sm:h-12 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm sm:text-base"
-                      required
-                    />
+                <Input
+                  type={showConfirmPassword ? "text" : "password"}
+                  name="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
+                  maxLength={15}
+                  placeholder="Confirm Password"
+                  className="pl-10 pr-10 h-10 sm:h-12 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm sm:text-base"
+                  required
+                />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -449,8 +488,8 @@ export default function Register() {
                 </button>
               </div>
 
-              {/* Terms and Conditions */}
-              <div className="flex items-start">
+              {/* Terms and Conditions can comment out once we have proper terms and conditions */}
+              {/* <div className="flex items-start">
                 <Checkbox
                   id="terms"
                   name="agreeToTerms"
@@ -468,7 +507,7 @@ export default function Register() {
                     Privacy Policy
                   </a>
                 </label>
-              </div>
+              </div> */}
 
               {/* Register Button */}
               <Button
