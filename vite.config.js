@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -7,18 +7,22 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-export default defineConfig({
-  plugins: [react(),],
-  server: {
-    port: 3001,
-    open: false
-  },
-  preview: {
-    port: 3001
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve( __dirname,'./src') // <-- This creates the @ alias
+export default defineConfig(() => {
+
+  const env = loadEnv(process.cwd(), '');
+  return {
+    plugins: [react(),],
+    server: {
+      port: env.VITE_PORT,
+      open: false
+    },
+    preview: {
+      port: env.VITE_PORT
+    },
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src') // <-- This creates the @ alias
+      }
     }
   }
 })
