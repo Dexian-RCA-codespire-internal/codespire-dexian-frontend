@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ticketService, aiService } from '../api'
+import { ticketService, aiService, rcaService } from '../api'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -33,6 +33,12 @@ const Analysis = () => {
   // RCA Workflow State
   const [rcaStep, setRcaStep] = useState(1)
   const [analysisResponse, setAnalysisResponse] = useState('')
+  
+  // RCA Resolved Data State
+  const [rcaResolvedData, setRcaResolvedData] = useState(null)
+  const [isLoadingRcaData, setIsLoadingRcaData] = useState(false)
+  const [rcaDataError, setRcaDataError] = useState(null)
+  const [hasExistingRcaData, setHasExistingRcaData] = useState(false)
   
   // Problem Statement State
   const [problemStatementData, setProblemStatementData] = useState({
@@ -67,6 +73,163 @@ const Analysis = () => {
     severity: '',
     businessImpactCategory: ''
   })
+
+  // Fetch RCA resolved data
+  const fetchRcaResolvedData = async (ticketId) => {
+    if (!ticketId) return
+    
+    try {
+      setIsLoadingRcaData(true)
+      setRcaDataError(null)
+      
+      console.log('Fetching RCA resolved data for ticket:', ticketId)
+      const response = await rcaService.getRCAResolvedTicket(ticketId)
+      
+      if (response.success && response.ticket) {
+        console.log('RCA resolved data found:', response)
+        setRcaResolvedData(response)
+        setHasExistingRcaData(true)
+        
+        // Load existing step data into state
+        const resolutionSteps = response.ticket.resolution_steps
+        
+        // Update step data based on existing progress
+        const newStepData = { 
+          ...stepData,
+          rca_workflow_steps: [...(stepData.rca_workflow_steps || ['', '', '', ''])]
+        }
+        
+        // Problem Statement (Step 1)
+        if (resolutionSteps.problem_statement?.completed) {
+          newStepData.issueType = resolutionSteps.problem_statement.issueType || ''
+          newStepData.severity = resolutionSteps.problem_statement.severity || ''
+          newStepData.businessImpactCategory = resolutionSteps.problem_statement.businessImpactCategory || ''
+          newStepData.rca_workflow_steps[0] = resolutionSteps.problem_statement.problemStatement || ''
+        }
+        
+        // Impact Assessment (Step 2)
+        if (resolutionSteps.impact_analysis?.completed) {
+          newStepData.impact_level_step2 = resolutionSteps.impact_analysis.impactLevel || ''
+          newStepData.department_affected_step2 = resolutionSteps.impact_analysis.departmentAffected || ''
+          const impactsText = Array.isArray(resolutionSteps.impact_analysis.impacts) 
+            ? resolutionSteps.impact_analysis.impacts.join('\n') 
+            : resolutionSteps.impact_analysis.impacts || ''
+          newStepData.rca_workflow_steps[1] = impactsText
+        }
+        
+        // Root Cause Analysis (Step 3)
+        if (resolutionSteps.root_cause?.completed) {
+          // Use analysis field for the main text content
+          newStepData.rca_workflow_steps[2] = resolutionSteps.root_cause.analysis || resolutionSteps.root_cause.title || ''
+          // Store additional root cause data
+          if (resolutionSteps.root_cause.supportingEvidences) {
+            newStepData.rootCauseAnalysis = {
+              ...newStepData.rootCauseAnalysis,
+              supportingEvidences: resolutionSteps.root_cause.supportingEvidences
+            }
+          }
+        }
+        
+        // Corrective Actions (Step 4)
+        if (resolutionSteps.corrective_actions?.completed) {
+          // Convert stepsToResolve array to text format
+          let correctiveActionsText = resolutionSteps.corrective_actions.shortDes || resolutionSteps.corrective_actions.title || ''
+          if (resolutionSteps.corrective_actions.stepsToResolve && resolutionSteps.corrective_actions.stepsToResolve.length > 0) {
+            const stepsText = resolutionSteps.corrective_actions.stepsToResolve
+              .map((step, index) => `${index + 1}. ${step.title}: ${step.description}`)
+              .join('\n')
+            correctiveActionsText = correctiveActionsText ? `${correctiveActionsText}\n\n${stepsText}` : stepsText
+          }
+          newStepData.rca_workflow_steps[3] = correctiveActionsText
+          // Store structured corrective actions data
+          newStepData.correctiveActions = {
+            ...newStepData.correctiveActions,
+            stepsToResolve: resolutionSteps.corrective_actions.stepsToResolve || []
+          }
+        }
+        
+        setStepData(newStepData)
+        
+        // Set current step based on progress - find first incomplete step
+        const stepsStatus = response.progress?.stepsStatus
+        let targetStep = 1
+        if (stepsStatus) {
+          if (!stepsStatus.problem_statement) {
+            targetStep = 1
+          } else if (!stepsStatus.impact_analysis) {
+            targetStep = 2
+          } else if (!stepsStatus.root_cause) {
+            targetStep = 3
+          } else if (!stepsStatus.corrective_actions) {
+            targetStep = 4
+          } else {
+            targetStep = 4 // All completed, stay on last step
+          }
+        }
+        
+        console.log('Setting RCA step to:', targetStep, 'based on progress status:', stepsStatus)
+        setRcaStep(targetStep)
+        
+        // Set the response for the current step
+        const stepResponse = newStepData.rca_workflow_steps[targetStep - 1] || ''
+        if (stepResponse && stepResponse.trim().length > 0) {
+          console.log(`Loading existing data for step ${targetStep}:`, stepResponse)
+          setAnalysisResponse(stepResponse)
+        }
+      } else {
+        console.log('No RCA resolved data found for ticket:', ticketId)
+        setHasExistingRcaData(false)
+        
+        // If no existing RCA data found, trigger AI generation for steps that need it
+        if (ticketData) {
+          console.log('No existing RCA data found. Triggering AI generation for steps that need it.')
+          
+          // Generate problem statement if not already generated
+          if (!hasAttemptedGeneration) {
+            console.log('Triggering problem statement generation...')
+            generateProblemStatement(ticketData)
+          } else {
+            console.log('Problem statement generation already attempted, skipping...')
+          }
+          
+          // Generate impact assessment if not already generated  
+          if (!hasAttemptedImpactGeneration) {
+            console.log('Triggering impact assessment generation...')
+            generateImpactAssessment(ticketData)
+          } else {
+            console.log('Impact assessment generation already attempted, skipping...')
+          }
+        }
+      }
+    } catch (err) {
+      console.log('RCA resolved data not found or error:', err.message)
+      setRcaDataError(err.message)
+      setHasExistingRcaData(false)
+      
+      // If no existing RCA data found (likely a 404), trigger AI generation for steps that need it
+      if (ticketData) {
+        console.log('RCA resolved data not found. Triggering AI generation for steps that need it.')
+        
+        // Generate problem statement if not already generated
+        if (!hasAttemptedGeneration) {
+          console.log('Triggering problem statement generation...')
+          generateProblemStatement(ticketData)
+        } else {
+          console.log('Problem statement generation already attempted, skipping...')
+        }
+        
+        // Generate impact assessment if not already generated  
+        if (!hasAttemptedImpactGeneration) {
+          console.log('Triggering impact assessment generation...')
+          generateImpactAssessment(ticketData)
+        } else {
+          console.log('Impact assessment generation already attempted, skipping...')
+        }
+      }
+    } finally {
+      setIsLoadingRcaData(false)
+    }
+  }
 
   // Fetch similar cases
   const fetchSimilarCases = async (ticketData) => {
@@ -185,26 +348,18 @@ const Analysis = () => {
             console.log('Restoring impact assessments from step2 field:', existingStepData.impact_assessments_step2)
           }
           
-          // Generate problem statement if not already generated
-          if (!hasAttemptedGeneration) {
-            console.log('Triggering problem statement generation...')
-            generateProblemStatement(ticket)
-          } else {
-            console.log('Problem statement generation already attempted, skipping...')
-          }
-          
-          // Generate impact assessment if not already generated
-          if (!hasAttemptedImpactGeneration) {
-            console.log('Triggering impact assessment generation...')
-            generateImpactAssessment(ticket)
-          } else {
-            console.log('Impact assessment generation already attempted, skipping...')
-          }
+          // Don't generate AI content immediately - wait for RCA resolved data to be checked first
+          // This prevents race conditions where AI generation starts before we know if data exists
+          console.log('Ticket data loaded. RCA resolved data will be checked separately before AI generation.')
         }
         
-        // Start fetching similar cases after ticket data is loaded
+        // Start fetching similar cases and RCA resolved data after ticket data is loaded
         if (ticket) {
           fetchSimilarCases(ticket)
+          // Fetch RCA resolved data immediately if ticketId is available
+          if (ticketId) {
+            fetchRcaResolvedData(ticketId)
+          }
         }
       } catch (err) {
         console.error('Error fetching ticket data:', err)
@@ -218,6 +373,68 @@ const Analysis = () => {
       fetchTicketData()
     }
   }, [id])
+
+  // Backup: Fetch RCA resolved data when ticketId and ticketData are available (in case ticketId wasn't available during initial fetch)
+  useEffect(() => {
+    if (ticketId && ticketData && !hasExistingRcaData && !isLoadingRcaData) {
+      fetchRcaResolvedData(ticketId)
+    }
+  }, [ticketId, ticketData, hasExistingRcaData, isLoadingRcaData])
+
+  // Set response data when existing RCA data is loaded and current step data exists
+  useEffect(() => {
+    if (hasExistingRcaData && rcaResolvedData && stepData.rca_workflow_steps) {
+      const currentStepIndex = rcaStep - 1
+      const currentStepData = stepData.rca_workflow_steps[currentStepIndex]
+      
+      if (currentStepData && currentStepData.trim().length > 0 && (!analysisResponse || analysisResponse.trim().length === 0)) {
+        console.log(`Loading existing data for step ${rcaStep}:`, currentStepData)
+        setAnalysisResponse(currentStepData)
+      }
+    }
+  }, [hasExistingRcaData, rcaResolvedData, stepData.rca_workflow_steps, rcaStep, analysisResponse])
+
+  // Populate stepData from RCA resolved data when available
+  useEffect(() => {
+    if (hasExistingRcaData && rcaResolvedData?.ticket?.resolution_steps) {
+      console.log('Populating stepData from RCA resolved data')
+
+      const resolutionSteps = rcaResolvedData.ticket.resolution_steps
+      const newWorkflowSteps = [...stepData.rca_workflow_steps]
+
+      // Populate step 1 (Problem Statement)
+      if (resolutionSteps.problem_statement?.completed && resolutionSteps.problem_statement.problemStatement) {
+        newWorkflowSteps[0] = resolutionSteps.problem_statement.problemStatement
+      }
+
+      // Populate step 2 (Impact Assessment)
+      if (resolutionSteps.impact_analysis?.completed && resolutionSteps.impact_analysis.impacts) {
+        newWorkflowSteps[1] = resolutionSteps.impact_analysis.impacts.join('\n')
+      }
+
+      // Populate step 3 (Root Cause Analysis)
+      if (resolutionSteps.root_cause?.completed && resolutionSteps.root_cause.analysis) {
+        newWorkflowSteps[2] = resolutionSteps.root_cause.analysis
+      }
+
+      // Populate step 4 (Corrective Actions)
+      if (resolutionSteps.corrective_actions?.completed && resolutionSteps.corrective_actions.stepsToResolve) {
+        const actionsText = resolutionSteps.corrective_actions.stepsToResolve
+          .map(step => `${step.title}\n${step.description}`)
+          .join('\n\n')
+        newWorkflowSteps[3] = actionsText
+      }
+
+      // Update stepData if any steps were populated
+      if (JSON.stringify(newWorkflowSteps) !== JSON.stringify(stepData.rca_workflow_steps)) {
+        console.log('Updating stepData with RCA resolved data:', newWorkflowSteps)
+        setStepData(prev => ({
+          ...prev,
+          rca_workflow_steps: newWorkflowSteps
+        }))
+      }
+    }
+  }, [hasExistingRcaData, rcaResolvedData, stepData.rca_workflow_steps, setStepData])
 
   // Generate problem statement function
   const generateProblemStatement = async (ticket) => {
@@ -235,6 +452,12 @@ const Analysis = () => {
     // Check if problem statement data already exists
     if (problemStatementData.generatedProblemStatement && problemStatementData.generatedProblemStatement.trim().length > 0) {
       console.log('Problem statement already exists, skipping generation')
+      return
+    }
+    
+    // Check if RCA resolved data already has problem statement
+    if (hasExistingRcaData && rcaResolvedData?.ticket?.resolution_steps?.problem_statement?.completed) {
+      console.log('Problem statement already exists in RCA resolved data, skipping generation')
       return
     }
     
@@ -331,33 +554,73 @@ const Analysis = () => {
           }
           
            // Update step data with problem statement and dropdown values
-           setStepData(prevData => {
-             const updatedStepData = {
-               ...prevData,
-               rca_workflow_steps: [
-                 firstDefinition,
-                 prevData.rca_workflow_steps[1] || '',
-                 prevData.rca_workflow_steps[2] || '',
-                 prevData.rca_workflow_steps[3] || ''
-               ],
-               issueType: issueTypeMap[problemStatement.issueType] || '',
-               severity: severityMap[problemStatement.severity] || '',
-               businessImpactCategory: impactMap[problemStatement.businessImpact] || ''
+           const updatedStepData = {
+             ...stepData,
+             rca_workflow_steps: [
+               firstDefinition,
+               stepData.rca_workflow_steps[1] || '',
+               stepData.rca_workflow_steps[2] || '',
+               stepData.rca_workflow_steps[3] || ''
+             ],
+             issueType: issueTypeMap[problemStatement.issueType] || '',
+             severity: severityMap[problemStatement.severity] || '',
+             businessImpactCategory: impactMap[problemStatement.businessImpact] || ''
+           }
+           
+           setStepData(updatedStepData)
+           
+           console.log('Auto-populating dropdowns with values:', {
+             issueType: updatedStepData.issueType,
+             severity: updatedStepData.severity,
+             businessImpactCategory: updatedStepData.businessImpactCategory,
+             originalValues: {
+               issueType: problemStatement.issueType,
+               severity: problemStatement.severity,
+               businessImpact: problemStatement.businessImpact
              }
-             
-             console.log('Auto-populating dropdowns with values:', {
-               issueType: updatedStepData.issueType,
-               severity: updatedStepData.severity,
-               businessImpactCategory: updatedStepData.businessImpactCategory,
-               originalValues: {
-                 issueType: problemStatement.issueType,
-                 severity: problemStatement.severity,
-                 businessImpact: problemStatement.businessImpact
-               }
-             })
-             
-             return updatedStepData
            })
+           
+           // Save generated problem statement to database immediately
+           if (ticketId && !hasExistingRcaData && !rcaResolvedData?.ticket?.resolution_steps?.problem_statement?.completed) {
+             console.log('Saving generated problem statement to database...')
+             try {
+               const dummyUserInfo = {
+                 id: "user123",
+                 name: "John Doe"
+               }
+               
+               const ticketInfo = {
+                 source: ticket.source || "ServiceNow",
+                 short_description: ticket.short_description || "",
+                 description: ticket.description || "",
+                 category: ticket.category || "",
+                 status: ticket.status || "In Progress"
+               }
+               
+               const problemStatementData = {
+                 issueType: updatedStepData.issueType,
+                 severity: updatedStepData.severity,
+                 problemStatement: firstDefinition,
+                 ticketInfo,
+                 userInfo: dummyUserInfo
+               }
+               
+               const saveResponse = await rcaService.updateProblemStatement({
+                 ticketId,
+                 data: problemStatementData
+               })
+               
+               console.log('Problem statement saved to database:', saveResponse)
+               
+               // Update local RCA resolved data state
+               if (saveResponse.success && saveResponse.ticket) {
+                 setRcaResolvedData(saveResponse)
+                 setHasExistingRcaData(true)
+               }
+             } catch (error) {
+               console.error('Error saving generated problem statement:', error)
+             }
+           }
         }
         
         console.log('Problem statement generated successfully:', newProblemStatementData)
@@ -391,6 +654,12 @@ const Analysis = () => {
       return
     }
     
+    // Check if RCA resolved data already has impact analysis
+    if (hasExistingRcaData && rcaResolvedData?.ticket?.resolution_steps?.impact_analysis?.completed) {
+      console.log('Impact analysis already exists in RCA resolved data, skipping generation')
+      return
+    }
+    
     console.log('Generating impact assessment...')
 
     try {
@@ -411,12 +680,79 @@ const Analysis = () => {
           setImpactAssessments(response.data.impactAssessments)
           
           // Save impact assessments to stepData for persistence
-          setStepData((prevData) => ({
-            ...prevData,
+          const updatedStepData = {
+            ...stepData,
             impact_assessments_step2: response.data.impactAssessments
-          }))
+          }
+          setStepData(updatedStepData)
           
           console.log('Impact assessments generated successfully:', response.data.impactAssessments)
+          
+          // Save generated impact assessment to database immediately
+          if (ticketId && !hasExistingRcaData && !rcaResolvedData?.ticket?.resolution_steps?.impact_analysis?.completed && response.data.impactAssessments.length > 0) {
+            console.log('Saving generated impact assessment to database...')
+            try {
+              const firstAssessment = response.data.impactAssessments[0]
+              
+              // Map AI values to our dropdown values
+              const impactLevelMap = {
+                'Sev 1 - Critical Impact': 'Critical',
+                'Sev 2 - Major Impact': 'Major',
+                'Sev 3 - Normal Impact': 'Normal',
+                'Sev 4 - Minor Impact': 'Minor'
+              }
+              
+              const departmentMap = {
+                'Customer Support': 'Customer Support',
+                'Sales': 'Sales',
+                'IT Operations': 'IT Operations',
+                'Finance': 'Finance',
+                'Human Resources': 'Human Resources',
+                'Engineering': 'Engineering',
+                'Other': 'Other'
+              }
+              
+              const impactAnalysisData = {
+                impactLevel: impactLevelMap[firstAssessment.severity] || firstAssessment.severity || 'Critical',
+                departmentAffected: departmentMap[firstAssessment.departmentAffected] || firstAssessment.departmentAffected || 'Engineering',
+                impacts: [firstAssessment.impactAssessment] || response.data.impactAssessments.map(ia => ia.impactAssessment)
+              }
+              
+              const saveResponse = await rcaService.updateImpactAnalysis({
+                ticketId,
+                data: impactAnalysisData
+              })
+              
+              console.log('Impact assessment saved to database:', saveResponse)
+              
+              // Update local RCA resolved data state
+              if (saveResponse.success && saveResponse.ticket) {
+                setRcaResolvedData(saveResponse)
+                setHasExistingRcaData(true)
+              }
+              
+              // Also update the step data with the mapped values
+              setStepData(prevData => ({
+                ...prevData,
+                impact_level_step2: impactAnalysisData.impactLevel,
+                department_affected_step2: impactAnalysisData.departmentAffected,
+                rca_workflow_steps: [
+                  prevData.rca_workflow_steps[0] || '',
+                  firstAssessment.impactAssessment,
+                  prevData.rca_workflow_steps[2] || '',
+                  prevData.rca_workflow_steps[3] || ''
+                ]
+              }))
+              
+              // Set the response for the UI
+              if (firstAssessment.impactAssessment) {
+                setAnalysisResponse(firstAssessment.impactAssessment)
+              }
+              
+            } catch (error) {
+              console.error('Error saving generated impact assessment:', error)
+            }
+          }
         } else {
           console.warn('Impact assessment API returned unsuccessful response:', response)
         }
@@ -486,6 +822,262 @@ const Analysis = () => {
     }
   ]
 
+  // Generic function to save any step data - can be called from any step component
+  const saveStepToDatabase = async (stepNumber, stepSpecificData) => {
+    if (!ticketId) return
+    
+    try {
+      console.log(`Saving step ${stepNumber} data to database:`, stepSpecificData)
+      
+      const dummyUserInfo = {
+        id: "user123",
+        name: "John Doe"
+      }
+      
+      const ticketInfo = ticketData ? {
+        source: ticketData.source || "ServiceNow",
+        short_description: ticketData.short_description || "",
+        description: ticketData.description || "",
+        category: ticketData.category || "",
+        status: ticketData.status || "In Progress"
+      } : undefined
+      
+      let response
+      
+      switch (stepNumber) {
+        case 3: // Root Cause Analysis
+          const rootCauseData = {
+            title: stepSpecificData.title || "Root Cause Analysis",
+            analysis: stepSpecificData.analysis || "",
+            supportingEvidences: stepSpecificData.supportingEvidences || [],
+            confidencePercentage: stepSpecificData.confidencePercentage || 85,
+            ticketInfo,
+            userInfo: dummyUserInfo
+          }
+          response = await rcaService.updateRootCause({
+            ticketId,
+            data: rootCauseData
+          })
+          break
+        
+        case 4: // Corrective Actions
+          const correctiveActionsData = {
+            title: stepSpecificData.title || "Corrective Actions",
+            shortDes: stepSpecificData.shortDes || "Resolution steps to address the root cause",
+            stepsToResolve: stepSpecificData.stepsToResolve || [],
+            ticketInfo,
+            userInfo: dummyUserInfo
+          }
+          response = await rcaService.updateCorrectiveActions({
+            ticketId,
+            data: correctiveActionsData
+          })
+          break
+        
+        default:
+          console.warn('Unknown step number for database save:', stepNumber)
+          return
+      }
+      
+      console.log(`Step ${stepNumber} data saved successfully:`, response)
+      
+      // Update local state with the response
+      if (response.success && response.ticket) {
+        setRcaResolvedData(response)
+        setHasExistingRcaData(true)
+      }
+      
+      return response
+      
+    } catch (error) {
+      console.error(`Error saving step ${stepNumber} data:`, error)
+      throw error
+    }
+  }
+
+  // Save RCA step data to backend
+  const saveRcaStepData = async (currentStepNumber, stepDataToSave) => {
+    if (!ticketId) return
+    
+    try {
+      console.log('Saving RCA step data for step:', currentStepNumber, 'Ticket:', ticketId)
+      console.log('Step data to save:', stepDataToSave)
+      
+      let response
+      const dummyUserInfo = {
+        id: "user123",
+        name: "John Doe"
+      }
+      
+      const ticketInfo = ticketData ? {
+        source: ticketData.source || "ServiceNow",
+        short_description: ticketData.short_description || "",
+        description: ticketData.description || "",
+        category: ticketData.category || "",
+        status: ticketData.status || "In Progress"
+      } : undefined
+      
+      switch (currentStepNumber) {
+        case 1: // Problem Statement
+          const problemStatementData = {
+            issueType: stepDataToSave.issueType || '',
+            severity: stepDataToSave.severity || '',
+            problemStatement: stepDataToSave.rca_workflow_steps?.[0] || analysisResponse,
+            ticketInfo,
+            userInfo: dummyUserInfo
+          }
+          response = await rcaService.updateProblemStatement({
+            ticketId,
+            data: problemStatementData
+          })
+          break
+        
+        case 2: // Impact Assessment
+          const impactAnalysisData = {
+            impactLevel: stepDataToSave.impact_level_step2 || '',
+            departmentAffected: stepDataToSave.department_affected_step2 || '',
+            impacts: stepDataToSave.rca_workflow_steps?.[1] ? 
+              stepDataToSave.rca_workflow_steps[1].split('\n').filter(impact => impact.trim()) : 
+              analysisResponse.split('\n').filter(impact => impact.trim())
+          }
+          response = await rcaService.updateImpactAnalysis({
+            ticketId,
+            data: impactAnalysisData
+          })
+          break
+        
+        case 3: // Root Cause Analysis
+          console.log('Processing Root Cause Analysis step data:', {
+            hasRootCauseAnalysis: !!stepDataToSave.rootCauseAnalysis,
+            rootCauses: stepDataToSave.rootCauseAnalysis?.rootCauses,
+            workflowStep: stepDataToSave.rca_workflow_steps?.[2],
+            analysisResponse
+          })
+          
+          // Use structured data from rootCauseAnalysis if available (from Save button)
+          // Otherwise fall back to text-based data (from Next button without save)
+          let rootCauseTitle = "Root Cause Analysis"
+          let rootCauseAnalysisText = ""
+          let supportingEvidences = []
+          let confidencePercentage = 85
+          
+          if (stepDataToSave.rootCauseAnalysis?.rootCauses?.length > 0) {
+            // Use structured data from the component's save functionality
+            console.log('Using structured root cause data')
+            const topRootCause = stepDataToSave.rootCauseAnalysis.rootCauses[0]
+            rootCauseTitle = topRootCause.rootCause || "Root Cause Analysis"
+            rootCauseAnalysisText = topRootCause.analysis || ""
+            supportingEvidences = topRootCause.evidence || []
+            confidencePercentage = topRootCause.confidence || 85
+          } else {
+            // Fall back to text-based data
+            console.log('Using fallback text-based data')
+            rootCauseAnalysisText = stepDataToSave.rca_workflow_steps?.[2] || analysisResponse
+          }
+          
+          const rootCauseData = {
+            title: rootCauseTitle,
+            analysis: rootCauseAnalysisText,
+            supportingEvidences: supportingEvidences,
+            confidencePercentage: confidencePercentage,
+            ticketInfo,
+            userInfo: dummyUserInfo
+          }
+          
+          console.log('Final root cause data being sent:', rootCauseData)
+          
+          response = await rcaService.updateRootCause({
+            ticketId,
+            data: rootCauseData
+          })
+          break
+        
+        case 4: // Corrective Actions
+          // Prepare corrective actions data according to schema
+          let correctiveActionsSteps = []
+          
+          // Try to get structured data first
+          if (stepDataToSave.correctiveActions?.generatedSolutions?.solutions?.length > 0) {
+            const firstSolution = stepDataToSave.correctiveActions.generatedSolutions.solutions[0]
+            correctiveActionsSteps = firstSolution.steps.map(step => ({
+              title: step.title,
+              description: step.description
+            }))
+          }
+          
+          // Fallback: Parse from text if no structured data
+          if (correctiveActionsSteps.length === 0 && (stepDataToSave.rca_workflow_steps?.[3] || analysisResponse)) {
+            const textContent = stepDataToSave.rca_workflow_steps?.[3] || analysisResponse
+            // Simple parsing for steps - look for numbered items
+            const lines = textContent.split('\n')
+            let currentStep = null
+            
+            lines.forEach(line => {
+              const trimmedLine = line.trim()
+              // Check if line starts with a number followed by a period
+              const stepMatch = trimmedLine.match(/^(\d+)\.\s*(.+)/)
+              if (stepMatch) {
+                if (currentStep) {
+                  correctiveActionsSteps.push(currentStep)
+                }
+                currentStep = {
+                  title: stepMatch[2],
+                  description: ""
+                }
+              } else if (currentStep && trimmedLine.length > 0 && !trimmedLine.startsWith('-')) {
+                // Add to description if it's not a sub-bullet
+                currentStep.description = currentStep.description ? 
+                  `${currentStep.description} ${trimmedLine}` : trimmedLine
+              }
+            })
+            
+            // Add the last step
+            if (currentStep) {
+              correctiveActionsSteps.push(currentStep)
+            }
+            
+            // If no steps found, create a single step with the entire content
+            if (correctiveActionsSteps.length === 0) {
+              correctiveActionsSteps = [{
+                title: "Implement Corrective Actions",
+                description: textContent
+              }]
+            }
+          }
+          
+          const correctiveActionsData = {
+            title: stepDataToSave.correctiveActions?.generatedSolutions?.solutions?.[0]?.title || "Corrective Actions",
+            shortDes: stepDataToSave.correctiveActions?.generatedSolutions?.solutions?.[0]?.description || "Resolution steps to address the root cause",
+            stepsToResolve: correctiveActionsSteps,
+            ticketInfo,
+            userInfo: dummyUserInfo
+          }
+          
+          console.log('Saving corrective actions with schema format:', correctiveActionsData)
+          response = await rcaService.updateCorrectiveActions({
+            ticketId,
+            data: correctiveActionsData
+          })
+          break
+        
+        default:
+          console.warn('Unknown step number:', currentStepNumber)
+          return
+      }
+      
+      console.log('RCA step data saved successfully:', response)
+      
+      // Update local state with the response
+      if (response.success && response.ticket) {
+        setRcaResolvedData(response)
+      }
+      
+    } catch (error) {
+      console.error('Error saving RCA step data:', error)
+      // Don't throw error, just log it so user can continue
+    }
+  }
+
   // Mock similar cases data (will be replaced by API data)
   const mockSimilarCases = [
     { id: 'RCA-087', title: 'Payment timeout issues', match: 89 },
@@ -496,104 +1088,47 @@ const Analysis = () => {
   // RCA Workflow Handlers
   const handleRcaNext = async () => {
     try {
-      if (!ticketData) {
-        console.error('No ticket data available')
+      // Validation: Only save and proceed if there's data to save or if data already exists
+      const currentStepIndex = rcaStep - 1
+      const hasCurrentStepData = stepData.rca_workflow_steps?.[currentStepIndex]?.trim()
+      const hasAnalysisResponse = analysisResponse?.trim()
+      
+      if (!hasCurrentStepData && !hasAnalysisResponse) {
+        alert('Please enter some information before proceeding to the next step.')
         return
       }
 
-      // Add validation to prevent empty submissions
-      if (!analysisResponse || analysisResponse.trim().length === 0) {
-        alert('Please enter some text before proceeding to the next step.')
-        return
-      }
-
-      // Update the current step data in the array
-      console.log('=== DEBUGGING RCA DATA ===');
-      console.log('stepData:', stepData);
-      console.log('rcaStep:', rcaStep);
-      console.log('analysisResponse:', analysisResponse);
-      console.log('stepData.rca_workflow_steps:', stepData.rca_workflow_steps);
-      
-      // Ensure rca_workflow_steps array exists and has proper length
-      const currentSteps = stepData.rca_workflow_steps || ['', '', '', '']
-      console.log('currentSteps before update:', currentSteps);
-      
-      // Get the current step data from the response or from stepData
-      // For step 1, we need to get the problemSummary from the RCAWorkflow component
-      let currentStepData
-      if (rcaStep === 1) {
-        // For step 1, we need to get the problemSummary from the RCAWorkflow component
-        // Since we can't access it directly, we'll use analysisResponse which should be set by the textarea
-        currentStepData = analysisResponse || currentSteps[rcaStep - 1] || ''
-      } else {
-        currentStepData = analysisResponse || currentSteps[rcaStep - 1] || ''
+      // Always save current step data before proceeding if we have data
+      // This ensures that any modifications made by the user are saved to the database
+      if (hasAnalysisResponse || hasCurrentStepData) {
+        // Update stepData with current response before saving
+        const updatedStepData = {
+          ...stepData,
+          rca_workflow_steps: stepData.rca_workflow_steps.map((step, index) => 
+            index === currentStepIndex ? (analysisResponse || step) : step
+          )
+        }
+        setStepData(updatedStepData)
+        
+        await saveRcaStepData(rcaStep, updatedStepData)
       }
       
-      // Update the current step with the current data
-      const updatedSteps = currentSteps.map((step, index) => 
-        index === rcaStep - 1 ? currentStepData : step
-      )
-      console.log('updatedSteps after mapping:', updatedSteps);
-      
-      const updatedStepData = {
-        ...stepData, // Preserve all existing stepData
-        rca_workflow_steps: updatedSteps,
-        status: rcaStep === 4 ? 'Resolved' : 'In Progress'
-      }
-
-      // Call API to update ticket with step data
-      console.log('Sending to backend:', updatedStepData)
-      await ticketService.updateTicketSteps({
-        ticketId: ticketData._id,
-        stepData: updatedStepData
-      })
-
-      // Update local step data state
-      setStepData(updatedStepData)
-
       if (rcaStep < 4) {
-        // Move to next step
         setRcaStep(rcaStep + 1)
-        // Clear response for next step
         setAnalysisResponse('')
       } else {
-        // Complete RCA - check if all previous steps are complete
-        if (!areAllPreviousStepsComplete()) {
-          // Show alert about incomplete steps
-          const incompleteSteps = []
-          if (!stepData.rca_workflow_steps[0] || stepData.rca_workflow_steps[0].trim().length === 0) {
-            incompleteSteps.push('Problem Definition (Step 1)')
-          }
-          if (!stepData.rca_workflow_steps[1] || stepData.rca_workflow_steps[1].trim().length === 0) {
-            incompleteSteps.push('Impact Assessment (Step 2)')
-          }
-          if (!stepData.rca_workflow_steps[2] || stepData.rca_workflow_steps[2].trim().length === 0) {
-            incompleteSteps.push('Root Cause Analysis (Step 3)')
-          }
-          
-          alert(`Cannot complete RCA. The following steps are not completed:\n\n${incompleteSteps.join('\n')}\n\nPlease complete these steps first.`)
-          return
-        }
-        
-        // All steps complete - navigate to RCA completion page
-        console.log('All RCA steps completed, navigating to completion page')
-        
-        // Navigate to RCA completion page with all the data
+        // Final step completed
+        console.log('RCA workflow completed')
+        // Navigate to completion page or handle completion
         navigate(`/rca-completion/${id}/${ticketId}`, {
           state: {
             ticketData: ticketData,
-            stepData: {
-              ...stepData,
-              rca_workflow_steps: stepData.rca_workflow_steps.map((step, index) => 
-                index === rcaStep - 1 ? analysisResponse : step
-              )
-            }
+            stepData: stepData
           }
         })
       }
     } catch (error) {
-      console.error('Error saving step data:', error)
-      alert(`Error saving step data: ${error.message}`)
+      console.error('Error in RCA next step:', error)
     }
   }
 
@@ -732,10 +1267,10 @@ const Analysis = () => {
   }
 
   // Show loading state with skeleton loaders instead of full page spinner
-  if (loading) {
+  if (loading || (isLoadingRcaData && !ticketData)) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ">
           
           
 
@@ -790,7 +1325,7 @@ const Analysis = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* RCA Workflow */}
         <RCAWorkflow
@@ -808,7 +1343,7 @@ const Analysis = () => {
           similarCasesLoading={similarCasesLoading}
           nextButtonText={rcaStep === 4 ? "Complete RCA →" : "Next Step →"}
           showPrevious={rcaStep > 1}
-          canProceed={analysisResponse.trim().length > 0}
+          canProceed={analysisResponse.trim().length > 0 || (stepData.rca_workflow_steps?.[rcaStep - 1]?.trim().length > 0)}
           onSaveProgress={handleSaveProgress}
           onGenerateReport={handleGenerateReport}
           ticketData={ticketData}
@@ -817,6 +1352,10 @@ const Analysis = () => {
           isGeneratingProblemStatement={isGeneratingProblemStatement}
           setIsGeneratingProblemStatement={setIsGeneratingProblemStatement}
           hasAttemptedGeneration={hasAttemptedGeneration}
+          rcaResolvedData={rcaResolvedData}
+          hasExistingRcaData={hasExistingRcaData}
+          isLoadingRcaData={isLoadingRcaData}
+          saveStepToDatabase={saveStepToDatabase}
         />
       </div>
     </div>

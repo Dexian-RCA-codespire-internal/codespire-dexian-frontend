@@ -3,7 +3,7 @@ import { Textarea } from '../../ui/Textarea'
 import { Button } from '../../ui/Button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select'
 import { IoIosColorWand } from "react-icons/io"
-import { FiLoader } from "react-icons/fi"
+import { FiLoader, FiEdit3 } from "react-icons/fi"
 import { BsStars } from "react-icons/bs"
 import { RiRobot2Line } from "react-icons/ri"
 import { Skeleton } from '../../ui/skeleton'
@@ -21,13 +21,17 @@ const ImpactAssessmentStep = ({
   setIsGeneratingImpactAssessment,
   hasAttemptedImpactGeneration,
   setHasAttemptedImpactGeneration,
-  currentStep = 2 // Default to step 2 since this component is only rendered for step 2
+  currentStep = 2, // Default to step 2 since this component is only rendered for step 2
+  rcaResolvedData = null,
+  hasExistingRcaData = false,
+  isLoadingRcaData = false
 }) => {
   const [impactLevel, setImpactLevel] = useState('')
   const [departmentAffected, setDepartmentAffected] = useState('')
   const [isEnhancementModalOpen, setIsEnhancementModalOpen] = useState(false)
   const [enhancementOptions, setEnhancementOptions] = useState([])
   const [impactAssessments, setImpactAssessments] = useState([])
+  const [isEditMode, setIsEditMode] = useState(false)
   
   // Use ref to track if API has been called to prevent loops
   const hasCalledAPI = useRef(false)
@@ -133,11 +137,25 @@ const ImpactAssessmentStep = ({
   // Generate impact assessment when component mounts (only for step 2)
   useEffect(() => {
     const generateImpactAssessment = async () => {
+      // Don't proceed if we're still loading ticket data or RCA resolved data
+      if (!ticketData || isLoadingRcaData) {
+        console.log('ImpactAssessmentStep: Waiting for data to load...', {
+          hasTicketData: !!ticketData,
+          isLoadingRcaData
+        });
+        return;
+      }
+      
+      // Check if RCA resolved data already has impact analysis
+      const hasExistingRcaImpactData = hasExistingRcaData && 
+        rcaResolvedData?.ticket?.resolution_steps?.impact_analysis?.completed
+      
       // Check if impact assessment data already exists
       const hasExistingData = response && response.trim().length > 0
       const hasExistingDataInStepData = stepData?.rca_workflow_steps?.[1] && stepData.rca_workflow_steps[1].trim().length > 0
       const hasExistingImpactAssessments = impactAssessments.length > 0 || (stepData?.impact_assessments_step2 && stepData.impact_assessments_step2.length > 0)
       
+      console.log('ImpactAssessmentStep: hasExistingRcaImpactData:', hasExistingRcaImpactData);
       console.log('ImpactAssessmentStep: hasExistingData:', hasExistingData);
       console.log('ImpactAssessmentStep: hasExistingDataInStepData:', hasExistingDataInStepData);
       console.log('ImpactAssessmentStep: hasExistingImpactAssessments:', hasExistingImpactAssessments);
@@ -145,9 +163,15 @@ const ImpactAssessmentStep = ({
       console.log('ImpactAssessmentStep: isGeneratingImpactAssessment:', isGeneratingImpactAssessment);
       console.log('ImpactAssessmentStep: hasAttemptedImpactGeneration:', hasAttemptedImpactGeneration);
       
-       // Only call API if no impact assessments exist yet
-       if (currentStep === 2 && stepData && !isGeneratingImpactAssessment && !hasCalledAPI.current && impactAssessments.length === 0 && (!stepData.impact_assessments_step2 || stepData.impact_assessments_step2.length === 0)) {
-        console.log('ImpactAssessmentStep: Calling API to get impact assessments (no existing data found)');
+      // Skip API call if we have existing RCA data for this step
+      if (hasExistingRcaImpactData) {
+        console.log('ImpactAssessmentStep: Skipping API call - existing RCA data found');
+        return
+      }
+      
+       // Only call API if no impact assessments exist yet and we have ticket data
+       if (currentStep === 2 && stepData && ticketData && !isGeneratingImpactAssessment && !hasCalledAPI.current && impactAssessments.length === 0 && (!stepData.impact_assessments_step2 || stepData.impact_assessments_step2.length === 0)) {
+        console.log('ImpactAssessmentStep: Calling API to get impact assessments (no existing data found, ticket data available)');
         hasCalledAPI.current = true
         try {
           setIsGeneratingImpactAssessment(true)
@@ -237,7 +261,7 @@ const ImpactAssessmentStep = ({
     }
     
      generateImpactAssessment()
-   }, [currentStep, stepData, isGeneratingImpactAssessment, hasAttemptedImpactGeneration, onResponseChange, setStepData, response])
+   }, [currentStep, stepData, isGeneratingImpactAssessment, hasAttemptedImpactGeneration, onResponseChange, setStepData, response, hasExistingRcaData, rcaResolvedData, ticketData, isLoadingRcaData])
 
   // Handle opening enhancement modal
   const handleEnhanceImpactAssessment = async () => {
@@ -271,6 +295,11 @@ const ImpactAssessmentStep = ({
   const handleCloseModal = () => {
     setIsEnhancementModalOpen(false);
     setEnhancementOptions([]);
+  };
+
+  // Handle edit mode toggle
+  const handleEditModeToggle = () => {
+    setIsEditMode(!isEditMode);
   };
 
   // Handle clicking on impact assessment
@@ -324,38 +353,45 @@ const ImpactAssessmentStep = ({
       {/* Left Column - Main Content */}
       <div className="lg:col-span-2">
         <div className="space-y-6">
-          {/* AI Guidance */}
-          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="flex items-center gap-2 mb-2">
-              <BsStars className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-medium text-blue-800">AI Guidance</span>
+          {/* AI Guidance Section - Keep unchanged */}
+        <div className="relative">
+          <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-5 h-5 rounded bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center">
+                <BsStars className="w-3 h-3 text-white" />
+              </div>
+              <span className="text-xs font-semibold text-gray-900 tracking-wide">AI Guidance</span>
             </div>
-            <p className="text-sm text-blue-700">
-              {isGeneratingImpactAssessment 
-                ? "Analyzing the problem statement to generate impact assessment..." 
-                : "Based on the problem statement, AI has analyzed the potential impact. Review and adjust the assessment below."
-              }
-            </p>
+            <div className="text-xs text-gray-700 line-clamp-4 leading-relaxed font-medium">
+              Have you previously set up alternative recovery methods like a recovery email or phone number for this account?
+            </div>
           </div>
+          <Button
+            onClick={() => setIsEditMode(!isEditMode)}
+            className="absolute top-3 right-3 p-1.5 bg-white/80 hover:bg-white border border-gray-200 rounded-md shadow-sm transition-all duration-200"
+          >
+            <FiEdit3 className="w-4 h-4 text-gray-600" />
+          </Button>
+        </div>
 
       {/* Skeleton Loader for Generating State */}
       {isGeneratingImpactAssessment ? (
         <div className="space-y-6">
           {/* Dropdown Fields Skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Skeleton className="h-4 w-24 mb-2" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-20" />
               <Skeleton className="h-10 w-full" />
             </div>
-            <div>
-              <Skeleton className="h-4 w-32 mb-2" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-32" />
               <Skeleton className="h-10 w-full" />
             </div>
           </div>
           
           {/* Textarea Skeleton */}
-          <div>
-            <Skeleton className="h-4 w-48 mb-2" />
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-48" />
             <Skeleton className="h-32 w-full" />
           </div>
         </div>
@@ -363,19 +399,23 @@ const ImpactAssessmentStep = ({
         <>
 
       {/* Dropdown Fields Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-2">
+          <label className="block text-sm font-semibold text-gray-700 tracking-wide">
             Impact Level
           </label>
-          <Select value={impactLevel} onValueChange={(value) => {
-            setImpactLevel(value)
-            setStepData((prevData) => ({
-              ...prevData,
-              impact_level_step2: value
-            }))
-          }}>
-            <SelectTrigger>
+          <Select 
+            value={impactLevel} 
+            onValueChange={(value) => {
+              setImpactLevel(value)
+              setStepData((prevData) => ({
+                ...prevData,
+                impact_level_step2: value
+              }))
+            }}
+            disabled={!isEditMode && !isGeneratingImpactAssessment}
+          >
+            <SelectTrigger className={`h-10 text-sm font-medium shadow-sm ${!isEditMode && !isGeneratingImpactAssessment ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'}`}>
               <SelectValue placeholder="Select impact level" />
             </SelectTrigger>
             <SelectContent>
@@ -386,18 +426,22 @@ const ImpactAssessmentStep = ({
             </SelectContent>
           </Select>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="space-y-2">
+          <label className="block text-sm font-semibold text-gray-700 tracking-wide">
             Department Affected
           </label>
-          <Select value={departmentAffected} onValueChange={(value) => {
-            setDepartmentAffected(value)
-            setStepData((prevData) => ({
-              ...prevData,
-              department_affected_step2: value
-            }))
-          }}>
-            <SelectTrigger>
+          <Select 
+            value={departmentAffected} 
+            onValueChange={(value) => {
+              setDepartmentAffected(value)
+              setStepData((prevData) => ({
+                ...prevData,
+                department_affected_step2: value
+              }))
+            }}
+            disabled={!isEditMode && !isGeneratingImpactAssessment}
+          >
+            <SelectTrigger className={`h-10 text-sm font-medium shadow-sm ${!isEditMode && !isGeneratingImpactAssessment ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'}`}>
               <SelectValue placeholder="Select department" />
             </SelectTrigger>
             <SelectContent>
@@ -413,48 +457,57 @@ const ImpactAssessmentStep = ({
       </div>
 
       {/* Impact Assessment Description */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-gray-700">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-semibold text-gray-700 tracking-wide">
             Impact Assessment Description
           </label>
+      
         </div>
         <div className="relative">
-          <Textarea
-            value={response}
-            onChange={(e) => {
-              onResponseChange(e.target.value)
-            }}
-            placeholder={isGeneratingImpactAssessment ? "Generating AI impact assessment..." : "Describe the business and technical impact of this issue..."}
-            rows={6}
-            className="w-full"
-            disabled={isGeneratingImpactAssessment}
-          />
-          <div className="absolute bottom-1 right-1 flex gap-1">
-            <Button
-              onClick={() => {
-                onResponseChange("");
+          {isEditMode ? (
+            <Textarea
+              value={response}
+              onChange={(e) => {
+                onResponseChange(e.target.value)
               }}
-              disabled={isGeneratingImpactAssessment || !response.trim()}
-              className="bg-white border border-gray-300 text-black hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded shadow-sm text-sm"
-              size="sm"
-            >
-              Clear
-            </Button>
-            <Button
-              onClick={handleEnhanceImpactAssessment}
-              disabled={isGeneratingImpactAssessment || isEnhancing}
-              className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-3 py-1 h-auto rounded shadow-sm flex items-center gap-1"
-              size="sm"
-            >
-              {isEnhancing ? (
-                <FiLoader className="w-4 h-4 animate-spin" />
-              ) : (
-                <IoIosColorWand className="w-4 h-4 text-green-600" />
-              )}
-              <span className="text-sm text-green-600">{isEnhancing ? 'Enhancing...' : 'Enhance'}</span>
-            </Button>
-          </div>
+              placeholder={isGeneratingImpactAssessment ? "Generating AI impact assessment..." : "Describe the business and technical impact of this issue..."}
+              rows={6}
+              className={`w-full text-sm font-medium pr-32 resize-none leading-relaxed shadow-sm ${!isEditMode && !isGeneratingImpactAssessment ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'}`}
+              disabled={!isEditMode && !isGeneratingImpactAssessment}
+            />
+          ) : (
+            <div className="min-h-[120px] p-3 border border-gray-300 rounded-md bg-gray-50 text-sm text-gray-700 font-medium leading-relaxed shadow-sm">
+              {response || "No impact assessment provided"}
+            </div>
+          )}
+          {isEditMode && (
+            <div className="absolute bottom-3 right-3 flex gap-2">
+              <Button
+                onClick={() => {
+                  onResponseChange("");
+                }}
+                disabled={isGeneratingImpactAssessment || !response.trim()}
+                className="bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400 px-3 py-1.5 h-auto rounded-md shadow-sm text-xs font-medium transition-colors"
+                size="sm"
+              >
+                Clear
+              </Button>
+              <Button
+                onClick={handleEnhanceImpactAssessment}
+                disabled={isGeneratingImpactAssessment || isEnhancing}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-3 py-1.5 h-auto rounded-md shadow-sm flex items-center gap-1.5 transition-colors"
+                size="sm"
+              >
+                {isEnhancing ? (
+                  <FiLoader className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <IoIosColorWand className="w-3.5 h-3.5" />
+                )}
+                <span className="text-xs font-semibold">{isEnhancing ? 'Enhancing...' : 'Enhance'}</span>
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -466,60 +519,80 @@ const ImpactAssessmentStep = ({
       {/* Right Column - Suggested Impact Assessments */}
       <div className="lg:col-span-1">
         <div className="sticky top-4">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <RiRobot2Line className="w-5 h-5 text-green-500" />
-              <h3 className="text-lg font-semibold text-gray-900">AI Impact Assessments</h3>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="flex items-center gap-3 mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 rounded-t-xl">
+              <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                <RiRobot2Line className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 tracking-wide">AI Suggestions</h3>
+                <p className="text-xs text-gray-600 font-medium">Click to apply assessment</p>
+              </div>
             </div>
             
             {isGeneratingImpactAssessment ? (
-              <div className="space-y-3">
+              <div className="space-y-4" style={{ padding: '0 16px 16px 16px' }}>
                 {[1, 2, 3].map((index) => (
-                  <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
                     <div className="animate-pulse">
-                      <div className="h-4 bg-gray-300 rounded mb-2"></div>
-                      <div className="h-4 bg-gray-300 rounded mb-2 w-3/4"></div>
-                      <div className="h-4 bg-gray-300 rounded w-1/2"></div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="h-5 bg-gray-300 rounded-full w-16"></div>
+                        <div className="h-5 bg-gray-300 rounded-full w-20"></div>
+                      </div>
+                      <div className="space-y-2 mb-3">
+                        <div className="h-3 bg-gray-300 rounded w-full"></div>
+                        <div className="h-3 bg-gray-300 rounded w-4/5"></div>
+                        <div className="h-3 bg-gray-300 rounded w-3/5"></div>
+                      </div>
+                      <div className="h-3 bg-gray-300 rounded w-20"></div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : impactAssessments.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4" style={{ padding: '0 16px 16px 16px' }}>
                 {impactAssessments.map((assessment, index) => (
                   <div
                     key={index}
-                    className={`p-3 rounded-lg border transition-colors cursor-pointer ${
+                    className={`p-4 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-md ${
                       index === 0 
-                        ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-200' 
-                        : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                        ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-400 ring-2 ring-blue-300 shadow-md' 
+                        : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm'
                     }`}
                     onClick={() => handleImpactAssessmentClick(assessment)}
                   >
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                        <span className="text-xs font-semibold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full">
                           {assessment.impactLevel}
                         </span>
-                        <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded">
+                        <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full">
                           {assessment.department}
                         </span>
                       </div>
+
                     </div>
-                    <div className="text-sm text-gray-700 line-clamp-3 overflow-hidden">
+                    <div className="text-sm text-gray-700 leading-relaxed mb-3 line-clamp-3 font-medium">
                       {assessment.impactAssessment}
-                      {assessment.impactAssessment.split('\n').length > 3 && '...'}
                     </div>
-                    <div className="mt-2 text-xs text-gray-500">
-                      Confidence: {assessment.confidence}%
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-gray-500">
+                        Confidence: <span className="font-semibold text-gray-700">{assessment.confidence}%</span>
+                      </div>
+                      <div className="text-xs text-blue-600 font-semibold">
+                        Click to apply
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center text-gray-500 py-8">
-                <RiRobot2Line className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                <p className="text-sm">AI impact assessments will appear here</p>
+              <div className="text-center text-gray-500 py-12" style={{ padding: '48px 16px' }}>
+                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                  <RiRobot2Line className="w-6 h-6 text-gray-400" />
+                </div>
+                <p className="text-sm font-semibold text-gray-900 mb-1">No AI suggestions yet</p>
+                <p className="text-xs text-gray-500 font-medium">AI-generated impact assessments will appear here</p>
               </div>
             )}
           </div>

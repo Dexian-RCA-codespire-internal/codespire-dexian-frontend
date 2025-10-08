@@ -73,18 +73,7 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
         query = query.substring(0, 100)
       }
     }
-    
-    console.log('🔍 Generated AI guidance search query:')
-    console.log('📋 Ticket ID:', ticket.ticket_id)
-    console.log('📋 Short description:', ticket.short_description)
-    console.log('📋 Description:', ticket.description?.substring(0, 200) + '...')
-    console.log('📋 Final query:', query)
-    console.log('📋 Query length:', query.length)
-    console.log('📋 Query parts count:', queryParts.length)
-    console.log('🔍 Query for ticket:', ticket.ticket_id, '->', query)
-    console.log('🔍 Query hash (first 50 chars):', query.substring(0, 50))
-    console.log('🔍 Query hash (last 50 chars):', query.substring(Math.max(0, query.length - 50)))
-    
+
     return query
   }
 
@@ -161,11 +150,6 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
         console.log(`📊 ${processedPlaybooks.length > 1 ? 'Top matching playbooks' : 'Best match playbook'}:`)
         processedPlaybooks.forEach((playbook, index) => {
           console.log(`  ${index === 0 ? '🏆' : '🥈'} #${index + 1} ${playbook.title}`)
-          console.log(`      Playbook ID: ${playbook.playbook_id}`)
-          console.log(`      Match: ${playbook.match_percentage}%`)
-          console.log(`      Description: ${playbook.description?.substring(0, 100)}...`)
-          console.log(`      Tags: ${JSON.stringify(playbook.tags)}`)
-          console.log(`      Similarity Score: ${playbook.similarity_score}`)
         })
         
         console.log(`🏆 ${processedPlaybooks.length > 1 ? 'Top matches' : 'Best match'}:`, processedPlaybooks.map(p => `${p.title} (${p.match_percentage}%)`).join(', '))
@@ -399,12 +383,7 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
       const usageBonus = Math.min(newUsage * 2, 45) // 2% per usage, max 45%
       const newConfidence = Math.min(baseConfidence + usageBonus, 95)
       
-      console.log(`📊 Updating confidence for specific playbook:`)
-      console.log(`   Playbook ID: ${playbookId}`)
-      console.log(`   Playbook Title: ${playbook.title}`)
-      console.log(`   Current usage: ${currentUsage}`)
-      console.log(`   New usage: ${newUsage}`)
-      console.log(`   New confidence: ${newConfidence}%`)
+
       
       // Update ONLY the specific playbook in the local state
       setPlaybooks(prev => prev.map(p => 
@@ -546,9 +525,7 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
       setGuidanceLoading(true)
       setError(null)
       
-      console.log('🔍 Starting AI guidance search in playbook triggers...')
-      console.log('📋 Available playbooks:', playbooks.length)
-      console.log('🎫 Ticket data:', ticketData)
+    
       
       // Extract playbook IDs from current recommendations
       const playbookIds = playbooks.map(p => p.playbook_id || p._id)
@@ -577,11 +554,7 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
       }
       
       // Debug: Log detailed information
-      console.log('🔍 AI Guidance Debug Info:');
-      console.log('📋 Playbook IDs:', playbookIds);
-      console.log('❓ Guidance Question:', guidanceQuestion);
-      console.log('🌐 API Endpoint:', '/v1/ai/playbook-recommender/search-guidance');
-      
+
       // Debug: Log request payload
       const requestPayload = {
         playbookIds: playbookIds,
@@ -598,12 +571,7 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
         guidanceQuestion
       })
       
-      // Debug: Log detailed response
-      console.log('✅ AI guidance search response:', response)
-      console.log('📊 AI Guidance Response:', response.data);
-      console.log('✅ Success:', response.data?.success);
-      console.log('📋 Total Results:', response.data?.total);
-      console.log('🎯 Data:', response.data?.data);
+     
       
       if (response.success && response.data) {
         setAiGuidanceResults(response.data)
@@ -686,190 +654,175 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
   }
 
   return (
-    <Card className="bg-white shadow-sm" key={ticketData?.ticket_id || 'default'}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
-              <FiBookOpen className="w-5 h-5 mr-2 text-green-500" />
-              {playbooks.length > 1 ? 'Top Matching Playbooks' : 'Best Match Playbook'}
-            </CardTitle>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1"
-              onClick={handleRegenerateBasedOnPlaybooks}
-              disabled={guidanceLoading || selectedPlaybooks.size === 0}
-            >
-              {guidanceLoading ? 'Regenerating...' : 'Regenerate based on Playbook'}
-            </Button>
-          </div>
-        </div>
-        {playbooks.length > 0 && (
-          <p className="text-xs text-gray-500 flex items-center">
-            <FiBookOpen className="w-3 h-3 mr-1" />
-            ID: {playbooks[0]?.playbook_id}
-          </p>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {loading ? (
-          // Skeleton loader
-          Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex-1">
-                  <Skeleton className="h-4 w-3/4 mb-2" />
-                  <Skeleton className="h-3 w-full mb-1" />
-                  <Skeleton className="h-3 w-2/3" />
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <Skeleton className="h-5 w-16" />
-                  <Skeleton className="h-4 w-12" />
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-20" />
-              </div>
-            </div>
-          ))
-        ) : error ? (
-          // Error state
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center mb-2">
-              <FiAlertCircle className="w-4 h-4 text-red-600 mr-2" />
-              <span className="text-sm font-medium text-red-800">Search Error</span>
-            </div>
-            <p className="text-sm text-red-700">{error}</p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              className="mt-2 text-red-700 border-red-300 hover:bg-red-100"
-            >
-              Try Again
-            </Button>
-          </div>
-        ) : playbooks.length === 0 ? (
-          // No results state
-          <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center">
-            <FiBookOpen className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-600 mb-2">No matching playbooks found</p>
-            <p className="text-xs text-gray-500">
-              Try adding more details to the ticket description
-            </p>
-          </div>
-        ) : (
-          // Playbook results
-          playbooks.map((playbook, index) => {
-            console.log(`🎨 Rendering playbook ${index}:`, playbook)
-            const searchTypeInfo = getSearchTypeIndicator(playbook.search_type)
-            
-            return (
-              <div 
-                key={playbook.playbook_id || playbook._id || index} 
-                className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+    <div style={{ width: '30%', minWidth: '280px' }}>
+      <Card className="bg-white shadow-sm h-full">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold text-gray-900 flex items-center">
+                <FiBookOpen className="w-4 h-4 mr-1 text-green-500" />
+                {playbooks.length > 1 ? 'Top Matches' : 'Best Match'}
+              </CardTitle>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 text-xs"
+                onClick={handleRegenerateBasedOnPlaybooks}
+                disabled={guidanceLoading || selectedPlaybooks.size === 0}
               >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-start gap-3 flex-1 min-w-0">
-                    <Checkbox
-                      checked={selectedPlaybooks.has(playbook.playbook_id || playbook._id)}
-                      onCheckedChange={(checked) => 
-                        handlePlaybookSelection(playbook.playbook_id || playbook._id, checked)
-                      }
-                      className="mt-1 bg-white"
-                    />
-                    <div 
-                      className="flex-1 min-w-0 cursor-pointer"
-                      onClick={() => handlePlaybookClick(playbook)}
-                    >
-                      <h4 className="text-sm font-medium text-gray-900 mb-1 line-clamp-2">
-                        {playbook.title}
-                      </h4>
-                      <p className="text-xs text-black mb-1">
-                        ID: {playbook.playbook_id}
-                      </p>
-                      <p className="text-xs text-gray-600 mb-2 line-clamp-2">
-                        {playbook.description}
-                      </p>
+                {guidanceLoading ? '...' : 'Regenerate'}
+              </Button>
+            </div>
+          </div>
+          {playbooks.length > 0 && (
+            <p className="text-xs text-gray-500 flex items-center">
+              <FiBookOpen className="w-3 h-3 mr-1" />
+              ID: {playbooks[0]?.playbook_id}
+            </p>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-2 pt-0">
+          {loading ? (
+            // Skeleton loader
+            Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="p-2 bg-gray-50 rounded border">
+                <div className="flex items-start justify-between mb-1">
+                  <div className="flex-1">
+                    <Skeleton className="h-3 w-3/4 mb-1" />
+                    <Skeleton className="h-2 w-full mb-1" />
+                    <Skeleton className="h-2 w-2/3" />
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <Skeleton className="h-4 w-12" />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <Skeleton className="h-2 w-12" />
+                  <Skeleton className="h-2 w-16" />
+                </div>
+              </div>
+            ))
+          ) : error ? (
+            // Error state
+            <div className="p-2 bg-red-50 border border-red-200 rounded">
+              <div className="flex items-center mb-1">
+                <FiAlertCircle className="w-3 h-3 text-red-600 mr-1" />
+                <span className="text-xs font-medium text-red-800">Error</span>
+              </div>
+              <p className="text-xs text-red-700">{error}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                className="mt-1 text-red-700 border-red-300 hover:bg-red-100 text-xs px-2 py-1"
+              >
+                Retry
+              </Button>
+            </div>
+          ) : playbooks.length === 0 ? (
+            // No results state
+            <div className="p-2 bg-gray-50 border rounded text-center">
+              <FiBookOpen className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+              <p className="text-xs text-gray-600 mb-1">No matches found</p>
+              <p className="text-xs text-gray-500">
+                Add more details
+              </p>
+            </div>
+          ) : (
+            // Playbook results
+            playbooks.map((playbook, index) => {
+              console.log(`🎨 Rendering playbook ${index}:`, playbook)
+              const searchTypeInfo = getSearchTypeIndicator(playbook.search_type)
+
+              return (
+                <div
+                  key={playbook.playbook_id || playbook._id || index}
+                  className="p-2 bg-gray-50 rounded border hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-start justify-between mb-1">
+                    <div className="flex items-start gap-2 flex-1 min-w-0">
+                      <Checkbox
+                        checked={selectedPlaybooks.has(playbook.playbook_id || playbook._id)}
+                        onCheckedChange={(checked) =>
+                          handlePlaybookSelection(playbook.playbook_id || playbook._id, checked)
+                        }
+                        className="mt-0.5 w-3 h-3"
+                      />
+                      <div
+                        className="flex-1 min-w-0 cursor-pointer"
+                        onClick={() => handlePlaybookClick(playbook)}
+                      >
+                        <h4 className="text-xs font-medium text-gray-900 mb-0.5 line-clamp-2">
+                          {playbook.title}
+                        </h4>
+                        <p className="text-xs text-gray-600 mb-0.5 line-clamp-1">
+                          {playbook.description}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-0.5 ml-1">
+                      {playbook.match_percentage && (
+                        <Badge className="bg-green-100 text-green-800 font-bold text-xs px-1 py-0">
+                          {playbook.match_percentage}%
+                        </Badge>
+                      )}
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-1 ml-2">
-                    {playbook.match_percentage && (
-                      <Badge className="bg-green-100 text-green-800 font-bold">
-                        {playbook.match_percentage}% Match
-                      </Badge>
-                    )}
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-2 text-xs ml-6">
-                  <span className={searchTypeInfo.color}>
-                    {searchTypeInfo.icon}
-                  </span>
-                  <span className="text-gray-500">{searchTypeInfo.label}</span>
-                  {playbook.match_percentage && (
-                    <span className="text-green-600 font-semibold">
-                      • {playbook.match_percentage}% match
+                  <div className="flex items-center gap-1 text-xs ml-5">
+                    <span className={searchTypeInfo.color}>
+                      {searchTypeInfo.icon}
                     </span>
+                    <span className="text-gray-500">{searchTypeInfo.label}</span>
+                    {playbook.match_percentage && (
+                      <span className="text-green-600 font-semibold">
+                        • {playbook.match_percentage}%
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Tags */}
+                  {playbook.tags && playbook.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-0.5 ml-5 mt-1">
+                      {playbook.tags.slice(0, 2).map((tag, tagIndex) => (
+                        <Badge
+                          key={tagIndex}
+                          variant="secondary"
+                          className="text-xs bg-blue-100 text-blue-800 px-1 py-0"
+                        >
+                          {tag}
+                        </Badge>
+                      ))}
+                      {playbook.tags.length > 2 && (
+                        <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600 px-1 py-0">
+                          +{playbook.tags.length - 2}
+                        </Badge>
+                      )}
+                    </div>
                   )}
-                  {playbook.combined_score && !playbook.match_percentage && (
-                    <span className="text-gray-500">
-                      • {Math.round(playbook.combined_score * 100)}% match
-                    </span>
+
+                  {/* Steps preview */}
+                  {playbook.steps && playbook.steps.length > 0 && (
+                    <div className="mt-1 text-xs text-gray-500 ml-5">
+                      <span className="font-medium">{playbook.steps.length}</span> step{playbook.steps.length !== 1 ? 's' : ''}
+                    </div>
                   )}
-                  {playbook.similarity_score && !playbook.match_percentage && (
-                    <span className="text-gray-500">
-                      • {Math.round(playbook.similarity_score * 100)}% similarity
-                    </span>
-                  )}
+
                 </div>
-                
-                {/* Tags */}
-                {playbook.tags && playbook.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 ml-6">
-                    {playbook.tags.slice(0, 3).map((tag, tagIndex) => (
-                      <Badge 
-                        key={tagIndex} 
-                        variant="secondary" 
-                        className="text-xs bg-blue-100 text-blue-800"
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                    {playbook.tags.length > 3 && (
-                      <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">
-                        +{playbook.tags.length - 3} more
-                      </Badge>
-                    )}
-                  </div>
-                )}
-                
-                {/* Steps preview */}
-                {playbook.steps && playbook.steps.length > 0 && (
-                  <div className="mt-2 text-xs text-gray-500 ml-6">
-                    <span className="font-medium">{playbook.steps.length}</span> step{playbook.steps.length !== 1 ? 's' : ''}
-                    {playbook.outcome && (
-                      <span className="ml-2">• Expected: {playbook.outcome}</span>
-                    )}
-                  </div>
-                )}
-                
-              </div>
-            )
-          })
-        )}
-        
-        
-      </CardContent>
-      
-      {/* Playbook Detail Modal */}
-      <PlaybookDetailModal
-        playbook={selectedPlaybook}
-        isOpen={showPlaybookModal}
-        onClose={handleCloseModal}
-      />
-    </Card>
+              )
+            })
+          )}
+
+
+        </CardContent>
+
+        {/* Playbook Detail Modal */}
+        <PlaybookDetailModal
+          playbook={selectedPlaybook}
+          isOpen={showPlaybookModal}
+          onClose={handleCloseModal}
+        />
+      </Card>
+    </div>
   )
 }
 

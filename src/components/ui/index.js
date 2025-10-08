@@ -11,6 +11,7 @@ export { Badge } from "./Badge";
 export { Input } from "./Input";
 export { Textarea } from "./Textarea";
 export { StreamingTextarea } from "./StreamingTextarea";
+export { FormattedReport } from "./FormattedReport";
 export {
   Dialog,
   DialogPortal,
