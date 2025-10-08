@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import usePingStatusUpdater from '../../hooks/usePingStatusUpdater';
 import { motion } from 'framer-motion'
 import { integrationService } from "../../api"
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, Cell } from 'recharts';
 import { IoSettingsOutline } from "react-icons/io5";
 import IntegrationSettingsModal from '../../components/ui/IntegrationSettingsModal';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
@@ -192,9 +192,9 @@ const AddIntegration = () => {
                     </div>
                     <span className="font-medium text-gray-900">{integration.name}</span>
                   </div>
-                  <div className='cursor-pointer text-xl text-gray-600' onClick={() => handleSettingsClick(index)} title="Integration Settings">
+                  {/* <div className='cursor-pointer text-xl text-gray-600' onClick={() => handleSettingsClick(index)} title="Integration Settings">
                     <IoSettingsOutline />
-                  </div>
+                  </div> */}
                 </div>
 
                 <div className="space-y-2">
@@ -242,7 +242,7 @@ const AddIntegration = () => {
             <h3 className="text-md font-semibold text-gray-900 mb-4"> Network Status</h3>
             <div className='flex justify-between mt-4 p-2 rounded bg-gray-50'>
               <div className='flex justify-between items-center gap-1'>
-                <div className='w-2 h-2 rounded bg-green-400'></div>Service Now</div>
+                <div className={`w-2 h-2 rounded bg-green-400 ${pingData?.serviceNow <= 100 ? 'bg-green-400' : pingData?.serviceNow < 500 ? 'bg-yellow-400' : 'bg-red-400'}`}></div>Service Now</div>
               <div>{pingData?.serviceNow || 0} ms</div>
             </div>
             <div className='flex justify-between mt-4 p-2 rounded bg-gray-100'>
@@ -288,7 +288,21 @@ const AddIntegration = () => {
                     fontSize: "13px",
                   }}
                 />
-                <Bar dataKey="ServiceNow" fill={COLORS.ServiceNow} radius={[4, 4, 0, 0]} />
+                {/* <Bar dataKey="ServiceNow" fill={COLORS.ServiceNow} radius={[4, 4, 0, 0]} /> */}
+                <Bar dataKey="ServiceNow" radius={[4, 4, 0, 0]}>
+                  {data.map((entry, index) => (
+                    <Cell
+                      key={`ServiceNow-${index}`}
+                      fill={
+                        entry.ServiceNow <= 100
+                          ? '#4ade80' // Tailwind bg-green-400
+                          : entry.ServiceNow < 500
+                            ? '#facc15' // Tailwind bg-yellow-400
+                            : '#f87171' // Tailwind bg-red-400
+                      }
+                    />
+                  ))}
+                </Bar>
                 {/* <Bar dataKey="Jira" fill={COLORS.Jira} radius={[4, 4, 0, 0]} /> */}
                 {/* <Bar dataKey="Remedy" fill={COLORS.Remedy} radius={[4, 4, 0, 0]} /> */}
                 {/* <Bar dataKey="Zendesk" fill={COLORS.Zendesk} radius={[4, 4, 0, 0]} /> */}
@@ -297,19 +311,12 @@ const AddIntegration = () => {
           </div>
         </div>
       </motion.div>
-      {/* Integration Settings Modal */}
-      <IntegrationSettingsModal
-        isOpen={settingsModalOpen}
-        onClose={handleCloseSettingsModal}
-        integration={selectedIntegrationIndex !== null ? integrations[selectedIntegrationIndex] : null}
-        setIntegrations={setIntegrations}
-      />
       {/* Confirmation Modal */}
       <ConfirmationModal
         isOpen={showConfirmationModal}
         onClose={() => setShowConfirmationModal(false)}
         onConfirm={confirmDisconnect}
-        message="If you proceed, your system will no longer receive ticket updates from ServiceNow. Do you still want to continue?"
+        message="If you proceed, your system will no longer receive ticket updates from ServiceNow. Do you still want to Disconnect?"
       />
     </div>
   )
