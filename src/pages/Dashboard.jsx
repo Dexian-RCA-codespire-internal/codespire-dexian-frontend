@@ -12,7 +12,7 @@ import useWebSocketOnly from '../hooks/useWebSocketOnly'
 import useSLAWebSocket from '../hooks/useSLAWebSocket'
 import { calculateSLATimeLeft } from '../utils/slaUtils'
 import { slaService } from '../api/services/slaService'
-import { integrationService } from '../api/services/integrationService'
+import { integrationService, authService } from '../api'
 import useNotifications from '../hooks/useNotifications';
 import { BiServer } from 'react-icons/bi';
 import { useSelector, useDispatch } from 'react-redux'
@@ -449,13 +449,9 @@ const Dashboard = () => {
     const pingInterval = setInterval(async () => {
       try {
         const startTime = performance.now()
-        // Ping the server by making a simple request
-        const pingResponse = await fetch('http://localhost:8081/api/v1/health', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        })
+        
+        // Measure actual ping to server
+        const pingResponse = await authService.ping(); 
         const endTime = performance.now()
         const pingMs = Math.round(endTime - startTime)
         if (pingResponse.ok) {

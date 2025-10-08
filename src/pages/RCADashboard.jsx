@@ -57,7 +57,7 @@ const RCADashboard = () => {
     prevPage: wsPrevPage,
     goToPage: wsGoToPage,
     changePageSize: wsChangePageSize
-  } = useWebSocketOnly(import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081')
+  } = useWebSocketOnly(import.meta.env.VITE_BACKEND_URL)
 
   // Handle click outside to close filter dropdown and info popup
   useEffect(() => {

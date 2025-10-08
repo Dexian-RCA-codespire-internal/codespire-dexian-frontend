@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { FiClock, FiAlertTriangle, FiCheckCircle, FiAlertCircle, FiTrendingUp, FiActivity, FiWifi } from 'react-icons/fi'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/Badge'
+import { slaService } from '../../api/services/slaService'
 import { useSLAWebSocket } from '../../hooks/useSLAWebSocket'
 import { 
   calculateSLATimeLeft, 
@@ -83,12 +84,8 @@ const SLADashboardWidget = () => {
   // Fetch initial data
   useEffect(() => {
     dispatch(fetchSLADashboardData())
-  }, [dispatch])
-      }
-    } catch (error) {
-      console.error('Error fetching critical tickets:', error)
-    }
-  }
+  }, [dispatch]);
+    
 
   // Fetch SLA metrics for dashboard
   const fetchSLAMetrics = async () => {

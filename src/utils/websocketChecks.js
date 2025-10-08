@@ -31,7 +31,7 @@ window.fetch = async function (...args) {
   const url = args[0];
   
   // Check if this is an API call to our backend
-  if (typeof url === 'string' && (url.startsWith('/api') || url.includes('localhost:8081/api'))) {
+  if (typeof url === 'string' && (url.startsWith('/api') || url.includes(`${import.meta.env.VITE_BACKEND_URL}/api`))) {
     console.warn(`🚨 REST API CALL DETECTED (fetch): ${url}`);
     console.warn('This should be replaced with WebSocket communication!');
     console.trace('API call stack trace:');
@@ -43,7 +43,7 @@ window.fetch = async function (...args) {
 // Monitor XMLHttpRequest calls
 const originalXHRopen = XMLHttpRequest.prototype.open;
 XMLHttpRequest.prototype.open = function (method, url) {
-  if (typeof url === 'string' && (url.startsWith('/api') || url.includes('localhost:8081/api'))) {
+  if (typeof url === 'string' && (url.startsWith('/api') || url.includes(`${import.meta.env.VITE_BACKEND_URL}/api`))) {
     console.warn(`🚨 REST API CALL DETECTED (XHR): ${method} ${url}`);
     console.warn('This should be replaced with WebSocket communication!');
     console.trace('API call stack trace:');
@@ -57,7 +57,7 @@ if (window.axios) {
   const originalAxiosRequest = window.axios.request;
   window.axios.request = function (config) {
     const url = config.url;
-    if (typeof url === 'string' && (url.startsWith('/api') || url.includes('localhost:8081/api'))) {
+    if (typeof url === 'string' && (url.startsWith('/api') || url.includes(`${import.meta.env.VITE_BACKEND_URL}/api`))) {
       console.warn(`🚨 REST API CALL DETECTED (axios): ${config.method?.toUpperCase()} ${url}`);
       console.warn('This should be replaced with WebSocket communication!');
       console.trace('API call stack trace:');

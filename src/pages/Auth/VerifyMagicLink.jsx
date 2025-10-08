@@ -27,7 +27,7 @@ const VerifyMagicLink = () => {
       console.log('Verifying magic link token:', token);
       
       // Call the backend verify-email endpoint
-      const response = await fetch(`http://localhost:8081/verify-email?token=${token}`, {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/verify-email?token=${token}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -64,7 +64,7 @@ const VerifyMagicLink = () => {
   const handleRedirectToLogin = () => {
     navigate('/login', { 
       state: { 
-        message: 'Email verified successfully! Please log in to continue.' 
+        message: '' 
       }
     });
   };

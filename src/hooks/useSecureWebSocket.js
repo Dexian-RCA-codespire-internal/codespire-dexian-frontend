@@ -173,7 +173,7 @@ export const useSecureWebSocket = () => {
     if (wsConnected) {
       healthCheckIntervalRef.current = setInterval(async () => {
         try {
-          const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'http://localhost:8081'}/api/v1/servicenow-polling/health-check`, {
+          const response = await fetch(`${import.meta.env.REACT_APP_BACKEND_URL}/api/v1/servicenow-polling/health-check`, {
             headers: {
               'Authorization': `Bearer ${await getAccessToken()}`
             }
