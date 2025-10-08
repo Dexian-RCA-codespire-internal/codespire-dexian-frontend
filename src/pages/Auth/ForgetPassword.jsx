@@ -156,7 +156,7 @@ export default function ForgetPassword() {
                         We've sent a password reset link to <strong>{email}</strong>
                       </p>
                       <p className="text-gray-500 text-xs">
-                        Please follow the instructions in the email to reset your password. If you don't see it, check your spam or junk folder.
+                        We’ve sent your reset email. If it isn’t in your inbox, check spam/junk.
                       </p>
                     </div>
 

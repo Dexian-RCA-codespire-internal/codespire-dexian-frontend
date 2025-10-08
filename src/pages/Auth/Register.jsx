@@ -49,7 +49,7 @@ export default function Register() {
   const strengthBarClass =
   passwordStrength.level === 'weak' ? 'bg-red-500' :
   passwordStrength.level === 'fair' ? 'bg-orange-500' :
-  passwordStrength.level === 'good' ? 'bg-blue-500' :
+  passwordStrength.level === 'good' ? 'bg-green-500' :
   passwordStrength.level === 'strong' ? 'bg-green-500' :
   passwordStrength.level === 'invalid' ? 'bg-red-500' :
   'bg-gray-300';
@@ -426,7 +426,7 @@ export default function Register() {
                     <span className={`text-xs sm:text-sm font-medium ${
                       passwordStrength.level === 'weak' ? 'text-red-600' :
                       passwordStrength.level === 'fair' ? 'text-orange-600' :
-                      passwordStrength.level === 'good' ? 'text-blue-600' : 'text-green-600'
+                      passwordStrength.level === 'good' ? 'text-green-600' : 'text-green-600'
                     }`}>
                       {passwordStrength.text}
                     </span>
