@@ -250,6 +250,7 @@ const Header = () => {
         {/* before proofile I want a notification icon 2 as notification number*/}
 
         <div className="flex items-center space-x-4 gap-4">
+          {/* Global search removed per request */}
           {/* New Notification Bell */}
           <NotificationBell
             count={unread}

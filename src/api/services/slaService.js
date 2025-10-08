@@ -1,25 +1,43 @@
-// SLA management API services
 import moment from 'moment-timezone'
 import api from '../index.js'
+import { calculateSLATimeLeft } from '../../utils/slaUtils'
+
+// Helper to handle API errors consistently
+const handleApiError = (error) => {
+  const errorMessage = error.response?.data?.message || error.message
+  throw new Error(errorMessage)
+}
 
 export const slaService = {
   // Fetch SLA records from backend API with pagination and filtering
   getSLAs: async (params = {}) => {
     try {
+      const {
+        page = 1,
+        limit = 15,
+        search = '',
+        priority = 'All',
+        status = 'All',
+        source = 'All',
+        slaStatus = 'All',
+        sortBy = 'opened_time',
+        sortOrder = 'desc'
+      } = params
+
+      // Construct API parameters
       const apiParams = {
-        page: params.page || 1,
-        limit: params.limit || 15, // Default to 15 items per page
-        ...(params.priority && params.priority !== 'All' && { priority: params.priority }),
-        ...(params.status && params.status !== 'All' && { status: params.status }),
-        ...(params.source && params.source !== 'All' && { source: params.source }),
-        ...(params.slaStatus && params.slaStatus !== 'All' && { slaStatus: params.slaStatus }),
-        ...(params.assignedTo && params.assignedTo !== 'All' && { assignedTo: params.assignedTo }),
-        ...(params.searchTerm && { searchTerm: params.searchTerm }),
-        ...(params.sortBy && { sortBy: params.sortBy }),
-        ...(params.sortOrder && { sortOrder: params.sortOrder }),
+        page,
+        limit,
+        ...(search && { search }),
+        ...(priority !== 'All' && { priority }),
+        ...(status !== 'All' && { status }),
+        ...(source !== 'All' && { source }),
+        ...(slaStatus !== 'All' && { slaStatus }),
+        sortBy,
+        sortOrder,
         ...(params.startDate && { startDate: params.startDate }),
         ...(params.endDate && { endDate: params.endDate })
-      };
+      }
       
       console.log('📡 SLA API call params:', apiParams); // Debug log
       
@@ -206,28 +224,37 @@ const calculateSLAStatus = (openedTime, priority, status, currentTime = new Date
   const slaDeadline = openedMoment.clone().add(slaHours, 'hours');
   
   // Calculate time elapsed and remaining
-  const timeElapsedMs = currentMoment.diff(openedMoment);
-  const totalSLATimeMs = slaHours * 60 * 60 * 1000;
-  
+  const timeElapsedMs = currentMoment.diff(openedMoment)
+  const totalSLATimeMs = slaHours * 60 * 60 * 1000
+
   // Calculate percentage of time that has elapsed
-  const timeElapsedPercentage = timeElapsedMs / totalSLATimeMs;
-  
+  const timeElapsedPercentage = timeElapsedMs / totalSLATimeMs
+
   // If more than 100% time has elapsed, it's breached
   if (timeElapsedPercentage >= 1.0) {
-    const overdueDuration = currentMoment.diff(slaDeadline);
-    const hoursOverdue = Math.floor(overdueDuration / (1000 * 60 * 60));
+    const overdueDuration = currentMoment.diff(slaDeadline)
+    const hoursOverdue = Math.floor(overdueDuration / (1000 * 60 * 60))
+    const minutesOverdue = Math.floor((overdueDuration % (1000 * 60 * 60)) / (1000 * 60))
+
+    let overdueString = ''
+    if (hoursOverdue > 0) {
+      overdueString = `${hoursOverdue}h ${minutesOverdue}m overdue`
+    } else {
+      overdueString = `${minutesOverdue}m overdue`
+    }
+
     return {
-      timeLeft: `Overdue by ${hoursOverdue}h`,
+      timeLeft: overdueString,
       isBreached: true,
-      hoursLeft: -(hoursOverdue),
+      hoursLeft: -hoursOverdue,
       status: 'breached'
-    };
+    }
   }
 
   // Calculate time remaining
-  const timeRemaining = totalSLATimeMs - timeElapsed;
-  const hoursLeft = Math.floor(timeRemaining / (1000 * 60 * 60));
-  const minutesLeft = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+  const timeRemainingMs = totalSLATimeMs - timeElapsedMs
+  const hoursLeft = Math.floor(timeRemainingMs / (1000 * 60 * 60))
+  const minutesLeft = Math.floor((timeRemainingMs % (1000 * 60 * 60)) / (1000 * 60))
   
   // Format time left
   let timeLeftString = '';

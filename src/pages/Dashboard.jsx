@@ -1,3 +1,4 @@
+ 
 import React, { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
@@ -8,35 +9,121 @@ import { IoSpeedometerOutline } from "react-icons/io5";
 import { FaServer } from "react-icons/fa";
 import { Button } from '../components/ui/Button'
 import useWebSocketOnly from '../hooks/useWebSocketOnly'
+import useSLAWebSocket from '../hooks/useSLAWebSocket'
+import { calculateSLATimeLeft } from '../utils/slaUtils'
 import { slaService } from '../api/services/slaService'
 import { integrationService } from '../api/services/integrationService'
 import useNotifications from '../hooks/useNotifications';
 import { BiServer } from 'react-icons/bi';
+import { useSelector, useDispatch } from 'react-redux'
+import { selectSLAMetrics, fetchSLAMetrics as fetchSLAMetricsThunk, selectSLAData, fetchSLAs } from '../store/slaSlice'
+// ...existing imports
 const Dashboard = () => {
   const navigate = useNavigate()
-  
+  // Prefer breached count from global store when available
+  const globalSlaMetrics = useSelector(selectSLAMetrics)
+  const dispatch = useDispatch()
+
+  // If store doesn't have SLA metrics yet (e.g. right after login), fetch them
+  useEffect(() => {
+    if (!globalSlaMetrics) {
+      dispatch(fetchSLAMetricsThunk())
+    }
+    // run on mount only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // WebSocket connectivity state
   const {
     isConnected: wsConnected,
     wsError,
     pollingStatus,
     lastPollingEvent,
-    addNotification
+    addNotification,
+    tickets: wsTickets,
+    dataStatistics: wsDataStatistics
   } = useWebSocketOnly(import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081')
+
+  // Debounce ref for websocket-driven refreshes
+  const wsRefreshTimerRef = useRef(null)
+
+  // When websocket tickets or stats change, refresh SLA list in Redux so chart updates from store
+  useEffect(() => {
+    if (!wsTickets && !wsDataStatistics) return
+    // debounce to avoid multiple rapid refreshes
+    if (wsRefreshTimerRef.current) clearTimeout(wsRefreshTimerRef.current)
+    wsRefreshTimerRef.current = setTimeout(() => {
+      dispatch(fetchSLAs({ limit: 1000 }))
+    }, 1000)
+
+    return () => {
+      if (wsRefreshTimerRef.current) clearTimeout(wsRefreshTimerRef.current)
+    }
+  }, [wsTickets, wsDataStatistics, dispatch])
   
   // Info popup state
   const [showInfoPopup, setShowInfoPopup] = useState(false)
   const [autoShowReason, setAutoShowReason] = useState(null)
   const [userManuallyClosed, setUserManuallyClosed] = useState(false)
   const infoPopupRef = useRef(null)
+
+  // Small reusable hover-info icon used in each card header
+  const InfoIcon = ({ content }) => {
+    const [show, setShow] = useState(false)
+
+    return (
+      <div
+        className="relative inline-block"
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        onFocus={() => setShow(true)}
+        onBlur={() => setShow(false)}
+      >
+        <div
+          tabIndex={0}
+          className="w-5 h-5 bg-gray-600 rounded-full flex items-center justify-center cursor-pointer"
+          aria-label="More info"
+          role="button"
+        >
+          <span className="text-xs text-gray-300">i</span>
+        </div>
+
+        {show && (
+          // positioned to overlap / come out of the card header area so it's visually inside the card
+          <div className="absolute left-0 top-full -translate-y-2 w-56 bg-white border border-gray-200 rounded shadow p-3 text-sm text-gray-900 font-sans pointer-events-auto z-50">
+            {content}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Provide descriptive tooltip text per card
+  const getCardInfoText = (title) => {
+    switch (title) {
+      case 'TOTAL RCAs':
+        return 'Total number of root cause analysis records.'
+      case 'ACTIVE INVESTIGATIONS':
+        return 'Total number of tickets which are in investigation stage.'
+      case 'SYSTEM HEALTH':
+        return 'System service health details.'
+      case 'SLA BREACHED':
+        return 'Total no tickets breached sla.'
+      case 'CRITICAL ISSUES':
+        return 'Tickets which are priortirised as p1 and p2.'
+      
+    }
+  }
   
   // Dynamic SLA data state
   const [slaMetrics, setSlaMetrics] = useState({
     totalTickets: 0,
     activeInvestigations: 0,
     criticalIssues: 0,
+    breached: 0,
     teamMembers: 12 // Keep static for now
   })
+  // Derived counts computed from Redux slaData
+  const [derivedSlaCounts, setDerivedSlaCounts] = useState({ breached: 0 })
   const [slaLoading, setSlaLoading] = useState(true)
   const [slaError, setSlaError] = useState(null)
   
@@ -58,8 +145,22 @@ const Dashboard = () => {
     totalTickets: 0,
     resolvedTickets: 0,
     percentageChange: 0,
+    compliancePercent: 0,
+    avgResolutionHours: 0,
     timeRange: '30 Days'
   })
+
+  // Series for the big resolutions chart (daily buckets based on timeRange)
+  const [seriesDaily, setSeriesDaily] = useState([])
+
+  const RANGE_TO_DAYS = {
+    '7 Days': 7,
+    '30 Days': 30,
+    '90 Days': 90,
+    '1 Year': 365,
+  }
+
+  
   
   // Chart data from SLA endpoints
   const [chartLoading, setChartLoading] = useState(true)
@@ -70,8 +171,12 @@ const Dashboard = () => {
     totalRcas: { value: 0, trend: 0, dailyData: [] },
     activeInvestigations: { value: 0, trend: 0, dailyData: [] },
     systemHealth: { value: 0, trend: 0, dailyData: [] },
-    criticalIssues: { value: 0, trend: 0, dailyData: [] }
+    criticalIssues: { value: 0, trend: 0, dailyData: [] },
+    // Added dedicated SLA breached slot so we can compute proper breached trends
+    slaBreached: { value: 0, trend: 0, dailyData: [] }
   })
+
+  // (debug state removed)
   
   // Ping status data
   const [pingStatusData, setPingStatusData] = useState(null)
@@ -80,173 +185,255 @@ const Dashboard = () => {
   const [currentTime, setCurrentTime] = useState(new Date())
   
   // Update statsWithTrends when pingStatusData changes
+  // Use Redux SLA data for charting. If store is empty, request a full fetch.
+  const slaData = useSelector(selectSLAData)
+  // Prefer authoritative metrics from Redux slice (may be updated by server/websocket)
+  const globalSlaMetricsForCard = useSelector(selectSLAMetrics)
+
   useEffect(() => {
-    if (pingStatusData) {
-      console.log('Updating statsWithTrends with ping data:', pingStatusData.uptime)
-      setStatsWithTrends(prevStats => ({
-        ...prevStats,
-        systemHealth: {
-          ...prevStats.systemHealth,
-          value: pingStatusData.uptime,
-          trend: pingStatusData.trend || 0,
-          dailyData: pingStatusData.dailyData || prevStats.systemHealth.dailyData
+    // If we don't have SLA records in the store, fetch them once (large limit for dashboard)
+    if ((!slaData || slaData.length === 0) && !chartLoading) {
+      dispatch(fetchSLAs({ limit: 1000 }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Build seriesDaily and chartData from `slaData` whenever data or timeRange changes
+  useEffect(() => {
+    try {
+      setChartLoading(true)
+      setChartError(null)
+
+      const slas = Array.isArray(slaData) ? slaData : []
+      const days = RANGE_TO_DAYS[chartData.timeRange] || 30
+      const end = new Date()
+      const start = new Date()
+      start.setDate(end.getDate() - (days - 1))
+
+      // Initialize daily map (also track breached per day)
+      const dailyMap = {}
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        dailyMap[d.toDateString()] = { totalCreated: 0, totalResolved: 0, breached: 0 }
+      }
+
+  // Aggregate (only count tickets within the selected range)
+  let totalCreated = 0
+  let totalResolved = 0
+  const resolvedDates = []
+  const breachedDates = []
+  let resolvedWithSlaCount = 0
+  let totalResolutionMs = 0
+  let resolvedCountForAvg = 0
+
+      const parseDate = (val) => {
+        if (!val) return null
+        try { return new Date(val) } catch (err) { return null }
+      }
+
+      slas.forEach(ticket => {
+        const created = parseDate(ticket.createdAt || ticket.created_at || ticket.created)
+        const updated = parseDate(ticket.updatedAt || ticket.updated_at || ticket.updated)
+        const resolved = parseDate(ticket.resolvedAt || ticket.resolved_at || ticket.closedAt || ticket.closed_at) || updated || created
+        const status = (ticket.status || '').toLowerCase()
+
+        // Only count created tickets if they fall within the chart window
+        if (created && created >= start && created <= end) {
+          const key = created.toDateString()
+          totalCreated++
+          if (dailyMap[key]) dailyMap[key].totalCreated++
+        }
+
+        // Only count resolved tickets if status is 'closed' or 'resolved' and resolved date is in the window
+        if (
+          resolved &&
+          resolved >= start &&
+          resolved <= end &&
+          (status === 'closed' || status === 'resolved')
+        ) {
+          totalResolved++
+          const key = resolved.toDateString()
+          if (dailyMap[key]) dailyMap[key].totalResolved++
+          resolvedDates.push(resolved)
+
+          // Count for SLA compliance (consider non-'breached' statuses as compliant)
+          if (ticket.slaInfo && ticket.slaInfo.status && ticket.slaInfo.status !== 'breached') {
+            resolvedWithSlaCount++
+          }
+
+          // Accumulate resolution time for average calculation
+          if (created) {
+            const delta = resolved.getTime() - created.getTime()
+            if (!isNaN(delta) && delta >= 0) {
+              totalResolutionMs += delta
+              resolvedCountForAvg++
+            }
+          }
+        }
+
+        // Detect breached tickets and bucket them by resolved date (or created date if resolved is missing)
+        try {
+          let slaInfo = ticket.slaInfo
+          if (!slaInfo) {
+            const createdForCalc = new Date(ticket.createdAt || ticket.created_at || ticket.created || ticket.openedTime || ticket.opened_time)
+            slaInfo = calculateSLATimeLeft(createdForCalc, ticket.priority, ticket.status)
+          }
+          if (slaInfo && slaInfo.status === 'breached') {
+            // Use resolved (if available) to bucket the breach, otherwise created
+            const breachDate = resolved || created
+            if (breachDate && breachDate >= start && breachDate <= end) {
+              breachedDates.push(breachDate)
+              const key = breachDate.toDateString()
+              if (dailyMap[key]) dailyMap[key].breached++
+            }
+          }
+        } catch (e) {
+          // ignore per-ticket slaInfo errors
+        }
+      })
+
+      // Build daily array
+      const dailyArray = Object.keys(dailyMap).map(dateStr => {
+        const d = new Date(dateStr)
+        return { day: d.toLocaleDateString(undefined, { weekday: 'short' }), totalCreated: dailyMap[dateStr].totalCreated, totalResolved: dailyMap[dateStr].totalResolved }
+      })
+
+    // Compute WoW: previous window (same length) resolved counts
+      const prevStart = new Date(start)
+      prevStart.setDate(start.getDate() - days)
+      const prevEnd = new Date(start)
+      prevEnd.setDate(start.getDate() - 1)
+      let resolvedPrev = 0
+      resolvedDates.forEach(d => { if (d >= prevStart && d <= prevEnd) resolvedPrev++ })
+      const resolvedCurrent = resolvedDates.filter(d => d >= start && d <= end).length
+  const percentageChange = resolvedPrev === 0 ? (resolvedCurrent === 0 ? 0 : 100) : Math.round(((resolvedCurrent - resolvedPrev) / Math.abs(resolvedPrev)) * 100)
+
+  // Compute SLA compliance and average resolution time (hours)
+  const compliancePercent = resolvedCurrent === 0 ? 0 : Math.round((resolvedWithSlaCount / resolvedCurrent) * 100)
+  const avgResolutionHours = resolvedCountForAvg === 0 ? 0 : Math.round(((totalResolutionMs / resolvedCountForAvg) / 3600000) * 10) / 10
+
+      // Build breached daily array as part of seriesDaily (so the large chart can optionally use it)
+      const dailyArrayWithBreached = Object.keys(dailyMap).map(dateStr => {
+        const d = new Date(dateStr)
+        return {
+          dateISO: dateStr,
+          day: d.toLocaleDateString(undefined, { weekday: 'short' }),
+          totalCreated: dailyMap[dateStr].totalCreated,
+          totalResolved: dailyMap[dateStr].totalResolved,
+          breached: dailyMap[dateStr].breached || 0
+        }
+      })
+
+      // Update states
+      setSeriesDaily(dailyArrayWithBreached)
+      setChartData(prev => ({ ...prev, totalTickets: totalCreated, resolvedTickets: totalResolved, percentageChange, compliancePercent, avgResolutionHours }))
+
+      // Compute derived counts: breached, active investigations, critical issues
+      const breachedCount = slas.reduce((acc, ticket) => {
+        let slaInfo = ticket.slaInfo
+        if (!slaInfo) {
+          // Best-effort compute slaInfo when missing
+          try {
+            const created = new Date(ticket.createdAt || ticket.created_at || ticket.created || ticket.openedTime || ticket.opened_time)
+            slaInfo = calculateSLATimeLeft(created, ticket.priority, ticket.status)
+          } catch (e) {
+            slaInfo = null
+          }
+        }
+        const status = (ticket.status || '').toLowerCase()
+        if (
+          slaInfo &&
+          slaInfo.status === 'breached' &&
+          (status === 'closed' || status === 'resolved')
+        ) {
+          return acc + 1
+        }
+        return acc
+      }, 0)
+
+      // Compute active count. Prefer the slice-level metric when available (server-side computed)
+      // Otherwise, fall back to counting tickets whose status indicates 'in progress' (case-insensitive)
+      let activeCount = 0
+      if (globalSlaMetricsForCard && typeof globalSlaMetricsForCard.activeInvestigations === 'number') {
+        activeCount = globalSlaMetricsForCard.activeInvestigations
+      } else {
+        activeCount = slas.reduce((acc, ticket) => {
+          const status = (ticket.status || '').toLowerCase()
+          // Treat any status containing 'in progress' as active. This keeps the definition narrow and dynamic.
+          if (status.includes('in progress') || status.includes('in-progress') || status === 'inprogress') return acc + 1
+          return acc
+        }, 0)
+      }
+
+      const criticalCount = slas.reduce((acc, ticket) => {
+        if (ticket.priority === 'P1' || ticket.priority === 'Critical') return acc + 1
+        return acc
+      }, 0)
+
+  setDerivedSlaCounts({ breached: breachedCount })
+
+      // Also sync these into statsWithTrends so small cards show derived values
+      setStatsWithTrends(prev => ({
+        ...prev,
+        activeInvestigations: {
+          ...prev.activeInvestigations,
+          value: activeCount,
+          dailyData: prev.activeInvestigations?.dailyData || []
+        },
+        criticalIssues: {
+          ...prev.criticalIssues,
+          value: criticalCount,
+          dailyData: prev.criticalIssues?.dailyData || []
         }
       }))
+
+      // Compute last-7-days mini-graphs and week-over-week percent change per user request
+      const WEEK_DAYS = 7
+      const orderedDaily = dailyArrayWithBreached // already ordered from start..end
+      // Take the last 7 days (or fewer if not available)
+      const lastNDays = orderedDaily.slice(Math.max(0, orderedDaily.length - WEEK_DAYS))
+      const prevNDays = orderedDaily.slice(Math.max(0, orderedDaily.length - WEEK_DAYS - WEEK_DAYS), Math.max(0, orderedDaily.length - WEEK_DAYS))
+
+      const buildPoints = (arr, valueKey) => arr.map(d => ({ day: d.day, value: d[valueKey] || 0 }))
+
+      const miniGraphPoints = buildPoints(lastNDays, 'totalCreated')
+      const activeGraphPoints = buildPoints(lastNDays, null).map((d, i) => ({ day: d.day, value: Math.max(0, (lastNDays[i].totalCreated || 0) - (lastNDays[i].totalResolved || 0)) }))
+      const breachedGraphPoints = buildPoints(lastNDays, 'breached')
+
+      const sumValues = (arr) => arr.reduce((s, v) => s + (v.value || 0), 0)
+
+      const currentWeekSum = sumValues(miniGraphPoints)
+      const prevWeekSum = sumValues(buildPoints(prevNDays, 'totalCreated'))
+  // Use previous week's sum directly when computing percent (no dummy fallback)
+  const weeklyPercent = prevWeekSum === 0 ? (currentWeekSum === 0 ? 0 : 100) : Math.round(((currentWeekSum - prevWeekSum) / Math.abs(prevWeekSum)) * 100)
+
+      // Active weekly sums
+      const currentActiveWeekSum = sumValues(activeGraphPoints)
+      const prevActiveWeekSum = sumValues(prevNDays.map(d => ({ value: Math.max(0, (d.totalCreated || 0) - (d.totalResolved || 0)) })))
+  const activeWeeklyPercent = prevActiveWeekSum === 0 ? (currentActiveWeekSum === 0 ? 0 : 100) : Math.round(((currentActiveWeekSum - prevActiveWeekSum) / Math.abs(prevActiveWeekSum)) * 100)
+
+      // Breached weekly sums
+      const currentBreachedWeekSum = sumValues(breachedGraphPoints)
+      const prevBreachedWeekSum = sumValues(prevNDays.map(d => ({ value: d.breached || 0 })))
+  const breachedWeeklyPercent = prevBreachedWeekSum === 0 ? (currentBreachedWeekSum === 0 ? 0 : 100) : Math.round(((currentBreachedWeekSum - prevBreachedWeekSum) / Math.abs(prevBreachedWeekSum)) * 100)
+
+      // debug state removed
+
+      setStatsWithTrends(prev => ({
+        ...prev,
+        totalRcas: { value: totalCreated, trend: weeklyPercent, dailyData: miniGraphPoints },
+        activeInvestigations: { value: activeCount, trend: activeWeeklyPercent, dailyData: activeGraphPoints },
+        criticalIssues: { value: criticalCount, trend: prev.criticalIssues?.trend || 0, dailyData: prev.criticalIssues?.dailyData || [] },
+        slaBreached: { value: breachedCount, trend: breachedWeeklyPercent, dailyData: breachedGraphPoints }
+      }))
+    } catch (error) {
+      console.error('Error building chart from Redux SLA data:', error)
+      setChartError('Failed to build chart from data')
+    } finally {
+      setChartLoading(false)
     }
-  }, [pingStatusData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slaData, chartData.timeRange])
   
-  // Fetch chart data from SLA endpoints
-  useEffect(() => {
-    const fetchChartData = async () => {
-      try {
-        setChartLoading(true)
-        setChartError(null)
-        
-        // Get SLA data (same as used for stats)
-        const slaResponse = await slaService.getSLAs({ limit: 1000 })
-        
-        // Measure actual ping latency to server
-        try {
-          const startTime = performance.now()
-          
-          // Ping the server by making a simple request
-          const pingResponse = await fetch('http://localhost:8081/api/v1/health', {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          })
-          
-          const endTime = performance.now()
-          const pingMs = Math.round(endTime - startTime)
-          if (pingResponse.ok) {
-            setPingStatusData({
-              uptime: pingMs, // Real measured ping in ms
-              trend: 0,
-              dailyData: null
-            })
-          } else {
-            // If server responds but with error, still measure ping
-            setPingStatusData({
-              uptime: pingMs,
-              trend: 0,
-              dailyData: null
-            })
-          }
-        } catch (pingError) {
-          console.log('Ping measurement failed, using fallback')
-          // Fallback to WebSocket status
-          setPingStatusData({
-            uptime: wsConnected ? 50 : 0, // Show 50ms if connected, 0 if not
-            trend: 0,
-            dailyData: null
-          })
-        }
-        
-        if (slaResponse.success && slaResponse.slas) {
-          const slas = slaResponse.slas
-          
-          // Calculate total tickets (Total RCAs)
-          const totalTickets = slas.length
-          
-          // Calculate resolved tickets (Total RCAs - Active Investigations)
-          const activeInvestigations = slas.filter(ticket =>
-            ticket.status && !['Closed', 'Resolved', 'Cancelled'].includes(ticket.status)
-          ).length
-          
-          const resolvedTickets = totalTickets - activeInvestigations
-          
-          // Calculate percentage change (mock for now)
-          const percentageChange = Math.floor(Math.random() * 20) + 5
-          
-          setChartData({
-            totalTickets,
-            resolvedTickets,
-            percentageChange,
-            timeRange: '30 Days'
-          })
-          
-          // Calculate trends and generate daily data with realistic patterns
-          const dailyData = Array.from({ length: 7 }, (_, i) => {
-            // Create realistic patterns: low on weekends, peak mid-week
-            let baseValue = 5
-            if (i === 1 || i === 2) baseValue = 15 // Tue, Wed peak
-            if (i === 0 || i === 6) baseValue = 3  // Mon, Sun low
-            if (i === 3 || i === 4) baseValue = 12  // Thu, Fri medium
-            
-            return {
-              day: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i],
-              value: baseValue + Math.floor(Math.random() * 8) - 4
-            }
-          })
-          
-          // Calculate trend percentage (daily ticket flow)
-          const incomingDaily = Math.floor(Math.random() * 15) + 5
-          const resolvingDaily = Math.floor(Math.random() * 12) + 3
-          const trendPercentage = Math.round(((incomingDaily - resolvingDaily) / Math.max(incomingDaily, resolvingDaily)) * 100)
-          
-          setStatsWithTrends({
-            totalRcas: { 
-              value: totalTickets, 
-              trend: trendPercentage, 
-              dailyData: dailyData 
-            },
-            activeInvestigations: { 
-              value: activeInvestigations, 
-              trend: Math.round(Math.random() * 20) - 10, 
-              dailyData: Array.from({ length: 7 }, (_, i) => {
-                // Different pattern for Active Investigations: higher mid-week, lower weekends
-                let baseValue = 8
-                if (i === 1 || i === 2) baseValue = 18 // Tue, Wed peak
-                if (i === 0 || i === 6) baseValue = 5  // Mon, Sun low
-                if (i === 3 || i === 4) baseValue = 14  // Thu, Fri medium
-                
-                return {
-                  day: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i],
-                  value: baseValue + Math.floor(Math.random() * 6) - 3
-                }
-              })
-            },
-            systemHealth: { 
-              value: pingStatusData?.uptime || 0, // Use ping status uptime percentage
-              trend: pingStatusData?.trend || 0, // Use ping status trend
-              dailyData: pingStatusData?.dailyData || Array.from({ length: 7 }, (_, i) => {
-                // System health: consistent based on ping status
-                const healthValue = pingStatusData?.uptime || 0
-                
-                return {
-                  day: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i],
-                  value: healthValue // Same value for all days
-                }
-              })
-            },
-            criticalIssues: { 
-              value: slaResponse.metrics?.critical || 0, 
-              trend: Math.round(Math.random() * 30) - 15, 
-              dailyData: Array.from({ length: 7 }, (_, i) => {
-                // Critical issues: sporadic pattern (reduced values)
-                let baseValue = 1
-                if (i === 2 || i === 4) baseValue = 3  // Wed, Fri higher (reduced)
-                if (i === 6) baseValue = 0  // Sunday lowest (reduced)
-                
-                return {
-                  day: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i],
-                  value: baseValue + Math.floor(Math.random() * 2)
-                }
-              })
-            }
-          })
-        }
-      } catch (error) {
-        console.error('Error fetching chart data:', error)
-        setChartError('Failed to load chart data')
-      } finally {
-        setChartLoading(false)
-      }
-    }
-    
-    fetchChartData()
-  }, [])
   
   // Update time every minute for dynamic time display
   useEffect(() => {
@@ -257,38 +444,44 @@ const Dashboard = () => {
     return () => clearInterval(timeInterval)
   }, [])
   
-  // Periodic ping measurement to update ping status dynamically
+  // Periodic ping measurement to update ping status dynamically (using /api/v1/health)
   useEffect(() => {
     const pingInterval = setInterval(async () => {
       try {
         const startTime = performance.now()
-        
-        // Measure actual ping to server
-        const pingResponse = await fetch('http://localhost:8081/health', {
+        // Ping the server by making a simple request
+        const pingResponse = await fetch('http://localhost:8081/api/v1/health', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
           }
         })
-        
         const endTime = performance.now()
         const pingMs = Math.round(endTime - startTime)
-        
-        setPingStatusData({
-          uptime: pingMs, // Real measured ping in ms
-          trend: 0,
-          dailyData: null
-        })
-      } catch (error) {
+        if (pingResponse.ok) {
+          setPingStatusData({
+            uptime: pingMs, // Real measured ping in ms
+            trend: 0,
+            dailyData: null
+          })
+        } else {
+          // If server responds but with error, still measure ping
+          setPingStatusData({
+            uptime: pingMs,
+            trend: 0,
+            dailyData: null
+          })
+        }
+      } catch (pingError) {
         console.log('Ping measurement failed, using fallback')
+        // Fallback to WebSocket status
         setPingStatusData({
           uptime: wsConnected ? 50 : 0, // Show 50ms if connected, 0 if not
           trend: 0,
           dailyData: null
         })
       }
-    }, 10000) // Ping every 10 seconds for more frequent updates
-    
+  }, 1000) // Ping every 1 second for more frequent updates
     return () => clearInterval(pingInterval)
   }, [wsConnected])
   
@@ -317,7 +510,7 @@ const Dashboard = () => {
     },
     { 
       title: 'SYSTEM HEALTH', 
-      value: slaLoading ? '...' : slaError ? 'Error' : statsWithTrends.systemHealth.value.toString() + 'ms', 
+      value: pingStatusData && typeof pingStatusData.uptime === 'number' ? `${pingStatusData.uptime}ms` : (slaLoading ? '...' : slaError ? 'Error' : '0ms'),
       trend: statsWithTrends.systemHealth.trend,
       dailyData: statsWithTrends.systemHealth.dailyData,
       icon: BiServer, 
@@ -326,14 +519,15 @@ const Dashboard = () => {
       barType: 'horizontal'
     },
     { 
-      title: 'CRITICAL ISSUES', 
-      value: slaLoading ? '...' : slaError ? 'Error' : statsWithTrends.criticalIssues.value.toString(), 
-      trend: statsWithTrends.criticalIssues.trend,
-      dailyData: statsWithTrends.criticalIssues.dailyData,
+      title: 'SLA BREACHED', 
+      // Prefer breached count from Redux metrics when available, then derived counts, then local websocket metrics
+      value: (globalSlaMetrics?.breached ?? derivedSlaCounts?.breached ?? slaMetrics?.breached ?? statsWithTrends.slaBreached.value) ?? 0,
+      trend: statsWithTrends.slaBreached.trend,
+      dailyData: statsWithTrends.slaBreached.dailyData,
       icon: FiAlertTriangle, 
       color: 'text-red-500',
       showBars: true,
-      barType: 'horizontal'
+      barType: 'vertical'
     }
   ]
 
@@ -400,7 +594,7 @@ const Dashboard = () => {
         setSlaLoading(true)
         setSlaError(null)
         
-        console.log('📊 Fetching SLA metrics for Dashboard...')
+        console.log(' Fetching SLA metrics for Dashboard...')
         
         // Get SLA data with metrics (same as SLA page)
         const slaResponse = await slaService.getSLAs({ limit: 1000 })
@@ -421,6 +615,16 @@ const Dashboard = () => {
             criticalIssues: metrics.critical || 0, // Use SLA page critical
             teamMembers: 12
           })
+
+          // Keep the small-card trends in sync with fetched SLA metrics
+          setStatsWithTrends(prev => ({
+            ...prev,
+            activeInvestigations: {
+              ...prev.activeInvestigations,
+              value: activeTickets,
+              dailyData: prev.activeInvestigations?.dailyData || []
+            }
+          }))
           
           setSlaLoading(false)
           return
@@ -453,6 +657,16 @@ const Dashboard = () => {
             criticalIssues: critical,
             teamMembers: 12
           })
+        
+          // Also sync into statsWithTrends so the card updates
+          setStatsWithTrends(prev => ({
+            ...prev,
+            activeInvestigations: {
+              ...prev.activeInvestigations,
+              value: active,
+              dailyData: prev.activeInvestigations?.dailyData || []
+            }
+          }))
         } else {
           setSlaError('Failed to fetch SLA data')
         }
@@ -465,6 +679,66 @@ const Dashboard = () => {
     }
 
     fetchSLAMetrics()
+  }, [])
+
+  // --- SLA WebSocket: receive live metrics (including breached) ---
+  const handleSLAUpdate = (event) => {
+    try {
+      if (!event) return
+      if (event.type === 'metrics' && event.metrics) {
+        // merge metrics into state
+        setSlaMetrics(prev => ({ ...prev, ...event.metrics }))
+        console.log('SLA WebSocket metrics update:', event.metrics)
+        // also update statsWithTrends.criticalIssues value so card shows updated breached/critical
+        setStatsWithTrends(prev => ({
+          ...prev,
+          criticalIssues: {
+            ...prev.criticalIssues,
+            value: event.metrics.critical ?? prev.criticalIssues.value,
+            dailyData: prev.criticalIssues.dailyData
+          }
+        }))
+        // sync active investigations if the metrics payload includes it
+        if (typeof event.metrics.activeInvestigations !== 'undefined') {
+          setStatsWithTrends(prev => ({
+            ...prev,
+            activeInvestigations: {
+              ...prev.activeInvestigations,
+              value: event.metrics.activeInvestigations
+            }
+          }))
+        }
+      }
+      if (event.type === 'breach') {
+        // increment breached count locally if a breach event arrives
+        setSlaMetrics(prev => ({ ...prev, breached: (prev.breached || 0) + 1 }))
+        console.log('SLA breach event received:', event.ticket)
+      }
+    } catch (err) {
+      console.error('Error handling SLA WebSocket event:', err)
+    }
+  }
+
+  const { connect: connectSLA, disconnect: disconnectSLA, getCurrentMetrics } = useSLAWebSocket(handleSLAUpdate, null, { enableDebugLogging: false })
+
+  useEffect(() => {
+    // connect WebSocket for SLA updates
+    try {
+      connectSLA()
+      // log current metrics snapshot after connect
+      const snapshot = getCurrentMetrics()
+      console.log('Initial SLA WebSocket metrics snapshot:', snapshot)
+    } catch (err) {
+      console.error('Error connecting SLA WebSocket:', err)
+    }
+
+    return () => {
+      try {
+        disconnectSLA()
+      } catch (err) {
+        console.error('Error disconnecting SLA WebSocket:', err)
+      }
+    }
   }, [])
 
 
@@ -610,28 +884,24 @@ const Dashboard = () => {
           const IconComponent = stat.icon
           const maxValue = Math.max(...stat.dailyData.map(d => d.value), 1) // Ensure minimum value of 1
           
-          // Debug: Log each card's data to verify uniqueness
-          console.log(`${stat.title} - Max Value: ${maxValue}, Daily Data:`, stat.dailyData)
+          
            
           return (
             <motion.div
               key={stat.title}
                className={`rounded-lg shadow-sm border p-6 ${
-                 'bg-gray-10 border-gray-700 flex flex-col justify-between'
+                 'bg-gray-10 border-gray-700 flex flex-col justify-between overflow-visible'
                }`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
-            >
-               {stat.title === 'TOTAL RCAs' ? (
-                 // Same layout as other cards for TOTAL RCAs
+        >
+          {stat.title === 'TOTAL RCAs' || stat.title === 'SLA BREACHED' ? (
                  <>
                    <div className="flex items-center justify-between mb-4">
                      <div className="flex items-center space-x-2">
                        <h3 className="text-sm font-medium text-gray-800">{stat.title}</h3>
-                       <div className="w-4 h-4 bg-gray-600 rounded-full flex items-center justify-center">
-                         <span className="text-xs text-gray-300">i</span>
-                       </div>
+                      <InfoIcon content={getCardInfoText(stat.title)} />
                      </div>
                      <div className={`${stat.color} p-2 rounded-lg`}>
                        <IconComponent className="w-5 h-5" />
@@ -670,7 +940,7 @@ const Dashboard = () => {
                      )}
                    </div>
                    
-                   {stat.showBars && (
+                  {stat.showBars && (
                      <div className="space-y-2">
                        
                        {/* Line Chart for TOTAL RCAs */}
@@ -729,6 +999,7 @@ const Dashboard = () => {
                    {slaError && (
                      <p className="text-xs text-red-400 mt-2">SLA data unavailable</p>
                    )}
+                  {/* debug UI removed */}
                  </>
                ) : (
                  // Full dark theme for other cards (matching TOTAL RCAs)
@@ -736,9 +1007,7 @@ const Dashboard = () => {
                    <div className="flex items-center justify-between mb-4">
                      <div className="flex items-center space-x-2">
                        <h3 className="text-sm font-medium text-gray-800">{stat.title}</h3>
-                       <div className="w-4 h-4 bg-gray-600 rounded-full flex items-center justify-center">
-                         <span className="text-xs text-gray-300">i</span>
-                       </div>
+                       <InfoIcon content={getCardInfoText(stat.title)} />
                      </div>
                      <div className={`${stat.color} p-2 rounded-lg`}>
                        <IconComponent className="w-5 h-5" />
@@ -823,36 +1092,20 @@ const Dashboard = () => {
                            </svg>
                          </div>
                          ) : stat.title === 'SYSTEM HEALTH' ? (
-                           // System Health Progress Bar (aligned with Critical Issues)
+                           // Simpler System Health display: text + single-color small bar
                            <div className="w-full">
                              <div className="flex items-center justify-between mb-2">
                                <span className="text-xs text-gray-700">Ping Status</span>
                                <span className="text-xs text-gray-700">{stat.value}</span>
                              </div>
-                             <div className="w-full bg-gray-700 rounded-full h-3">
-                               <div 
-                                 className={`h-3 rounded-full shadow-lg ${
-                                   (() => {
-                                     const pingValue = parseInt(stat.value.toString().replace('ms', ''));
-                                     return pingValue <= 30 ? 'bg-gradient-to-r from-green-500 to-green-400' :  // Excellent: ≤30ms
-                                            pingValue <= 60 ? 'bg-gradient-to-r from-lime-500 to-lime-400' :  // Good: 31-60ms
-                                            pingValue <= 100 ? 'bg-gradient-to-r from-yellow-500 to-yellow-400' :  // Fair: 61-100ms
-                                            pingValue <= 150 ? 'bg-gradient-to-r from-orange-500 to-orange-400' :  // Poor: 101-150ms
-                                            'bg-gradient-to-r from-red-500 to-red-400';  // Bad: >150ms
-                                   })()
-                                 }`}
-                                 style={{ 
-                                   width: `${Math.min(100, Math.max(0, 100 - (parseInt(stat.value.toString().replace('ms', '')) / 2.5)))}%`,
-                                   boxShadow: (() => {
-                                     const pingValue = parseInt(stat.value.toString().replace('ms', ''));
-                                     return pingValue <= 30 ? '0 0 8px rgba(34, 197, 94, 0.6)' :
-                                            pingValue <= 60 ? '0 0 8px rgba(132, 204, 22, 0.6)' :
-                                            pingValue <= 100 ? '0 0 8px rgba(234, 179, 8, 0.6)' :
-                                            pingValue <= 150 ? '0 0 8px rgba(249, 115, 22, 0.6)' :
-                                            '0 0 8px rgba(239, 68, 68, 0.6)';
-                                   })()
-                                 }}
-                               ></div>
+                             <div className="w-full bg-gray-200 rounded h-2">
+                               <div
+                                 className={`h-2 rounded ${(() => {
+                                   const pingValue = parseInt(stat.value.toString().replace('ms', '')) || 0
+                                   return pingValue <= 60 ? 'bg-green-500' : pingValue <= 120 ? 'bg-yellow-500' : 'bg-red-500'
+                                 })()}`}
+                                 style={{ width: `${Math.min(100, Math.max(0, 100 - (parseInt(stat.value.toString().replace('ms', '')) / 2.5)))}%` }}
+                               />
                              </div>
                              <div className="flex justify-between text-xs text-gray-600 mt-1">
                                <span>0ms</span>
@@ -890,7 +1143,7 @@ const Dashboard = () => {
                      </div>
                    )}
                    
-                   {slaError && (stat.title === 'ACTIVE INVESTIGATIONS' || stat.title === 'CRITICAL ISSUES') && (
+                   {slaError && (stat.title === 'ACTIVE INVESTIGATIONS' || stat.title === 'SLA BREACHED') && (
                      <p className="text-xs text-red-400 mt-2">SLA data unavailable</p>
                    )}
                  </>
@@ -1030,11 +1283,11 @@ const Dashboard = () => {
                   
                   <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
+                      <div className="w-3 h-3 bg-gray-300 rounded-sm"></div>
                       <span className="text-sm text-gray-600">resolved</span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-gray-300 rounded-sm"></div>
+                      <div className="w-3 h-3 bg-green-500 rounded-sm"></div>
                       <span className="text-sm text-gray-600">total tickets</span>
                     </div>
                     
@@ -1073,7 +1326,7 @@ const Dashboard = () => {
                     <div className="bg-gray-10 rounded-lg p-3 border border-gray-700">
                       <div className="text-xs text-gray-800 font-medium mb-1">SLA Compliance</div>
                       <div className="text-lg font-bold text-gray-900">
-                        {chartData.totalTickets > 0 ? Math.round((chartData.resolvedTickets / chartData.totalTickets) * 100) : 0}%
+                        {typeof chartData.compliancePercent === 'number' ? chartData.compliancePercent : 0}%
                       </div>
                       <div className="text-xs text-gray-600">
                         On-time delivery
@@ -1084,7 +1337,7 @@ const Dashboard = () => {
                     <div className="bg-gray-10 rounded-lg p-3 border border-gray-700">
                       <div className="text-xs text-gray-800 font-medium mb-1">Avg Resolution</div>
                       <div className="text-lg font-bold text-gray-900">
-                        {Math.floor(Math.random() * 8) + 2}h
+                        {chartData.avgResolutionHours ? `${chartData.avgResolutionHours}h` : '—'}
                       </div>
                       <div className="text-xs text-gray-600">
                         Mean time
@@ -1095,82 +1348,128 @@ const Dashboard = () => {
                   {/* Graph Area */}
                   <div className="flex-1 relative h-64">
                     <svg className="w-full h-full" viewBox="0 0 800 200">
-                    {/* Grid lines */}
-                    {[100, 75, 50, 25, 0].map((y, index) => (
-                      <g key={index}>
-                        <line
-                          x1="60"
-                          y1={40 + ((100 - y) * 1.2)}
-                          x2="740"
-                          y2={40 + ((100 - y) * 1.2)}
-                          stroke="#f3f4f6"
-                          strokeWidth="1"
-                        />
-                        <text
-                          x="50"
-                          y={45 + ((100 - y) * 1.2)}
-                          textAnchor="end"
-                          className="text-xs fill-gray-500"
-                        >
-                          {y}
-                        </text>
-                      </g>
-                    ))}
+                    {/* Dynamic y-axis ticks and x-axis labels based on seriesDaily */}
+                    {(() => {
+                      const daily = seriesDaily && seriesDaily.length ? seriesDaily : []
+                      const plotWidth = 680
+                      const plotHeight = 120
+                      const xStart = 60
+                      const yBase = 40
+
+                      const totals = daily.map(d => d.totalCreated || 0)
+                      const resolved = daily.map(d => d.totalResolved || 0)
+                      const maxVal = Math.max(...totals, ...resolved, 1)
+
+                      // y ticks: choose 5 ticks from max down to 0
+                      const numYTicks = 5
+                      const yStep = Math.ceil(maxVal / (numYTicks - 1))
+                      const yTicks = Array.from({ length: numYTicks }, (_, i) => maxVal - (i * yStep)).map(v => Math.max(0, v))
+
+                      return (
+                        <>
+                          {yTicks.map((val, i) => {
+                            const y = yBase + Math.round((1 - (val / Math.max(1, maxVal))) * plotHeight)
+                            return (
+                              <g key={`yt-${i}`}>
+                                <line x1={xStart} y1={y} x2={xStart + plotWidth} y2={y} stroke="#f3f4f6" strokeWidth="1" />
+                                <text x={xStart - 8} y={y + 4} textAnchor="end" className="text-xs fill-gray-500">{val}</text>
+                              </g>
+                            )
+                          })}
+
+                          {/* x labels: show up to 7 labels evenly spaced */}
+                          {daily.length > 0 && (() => {
+                            // For longer ranges (90 Days, 1 Year) show month names (deduped).
+                            if (chartData.timeRange === '90 Days' || chartData.timeRange === '1 Year') {
+                              const monthMap = {}
+                              daily.forEach((d, idx) => {
+                                const dt = new Date(d.dateISO)
+                                const key = `${dt.getFullYear()}-${dt.getMonth()}`
+                                if (!monthMap[key]) {
+                                  monthMap[key] = { label: dt.toLocaleDateString(undefined, { month: 'short' }), idx }
+                                }
+                              })
+                              const months = Object.values(monthMap)
+                              return months.map((m, i) => {
+                                const x = xStart + Math.round((m.idx / Math.max(1, daily.length - 1)) * plotWidth)
+                                return <text key={`xl-month-${i}`} x={x} y="190" textAnchor="middle" className="text-xs fill-gray-500">{m.label}</text>
+                              })
+                            }
+
+                            // Shorter ranges: show up to 7 date labels (month + day)
+                            const maxLabels = 7
+                            const step = Math.max(1, Math.floor((daily.length - 1) / (maxLabels - 1)))
+                            return daily.map((d, idx) => {
+                              if (idx % step !== 0 && idx !== daily.length - 1) return null
+                              const x = xStart + Math.round((idx / Math.max(1, daily.length - 1)) * plotWidth)
+                              const label = new Date(d.dateISO).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                              return (
+                                <text key={`xl-${idx}`} x={x} y="190" textAnchor="middle" className="text-xs fill-gray-500">{label}</text>
+                              )
+                            })
+                          })()}
+                        </>
+                      )
+                    })()}
                     
-                    {/* Month labels */}
-                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((month, index) => (
-                      <text
-                        key={index}
-                        x={60 + (index * 120)}
-                        y="190"
-                        textAnchor="middle"
-                        className="text-xs fill-gray-500"
-                      >
-                        {month}
-                      </text>
-                    ))}
-                    
-                    {/* Total tickets line (green) */}
-                    <polyline
-                      points={`60,${40 + ((chartData.totalTickets / 10) * 1.2)} 180,${40 + ((chartData.totalTickets / 8) * 1.2)} 300,${40 + ((chartData.totalTickets / 6) * 1.2)} 420,${40 + ((chartData.totalTickets / 4) * 1.2)} 540,${40 + ((chartData.totalTickets / 3) * 1.2)} 660,${40 + ((chartData.totalTickets / 2) * 1.2)}`}
-                      fill="none"
-                      stroke="#10b981"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    
-                    {/* Resolved tickets line (gray) */}
-                    <polyline
-                      points={`60,${40 + ((chartData.resolvedTickets / 10) * 1.2)} 180,${40 + ((chartData.resolvedTickets / 8) * 1.2)} 300,${40 + ((chartData.resolvedTickets / 6) * 1.2)} 420,${40 + ((chartData.resolvedTickets / 4) * 1.2)} 540,${40 + ((chartData.resolvedTickets / 3) * 1.2)} 660,${40 + ((chartData.resolvedTickets / 2) * 1.2)}`}
-                      fill="none"
-                      stroke="#d1d5db"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    
-                    {/* Data points for total tickets */}
-                    {[0, 1, 2, 3, 4, 5].map((index) => (
-                      <circle
-                        key={`total-${index}`}
-                        cx={60 + (index * 120)}
-                        cy={40 + ((chartData.totalTickets / (10 - index * 2)) * 1.2)}
-                        r="4"
-                        fill="#10b981"
-                      />
-                    ))}
-                    
-                    {/* Data points for resolved tickets */}
-                    {[0, 1, 2, 3, 4, 5].map((index) => (
-                      <circle
-                        key={`resolved-${index}`}
-                        cx={60 + (index * 120)}
-                        cy={40 + ((chartData.resolvedTickets / (10 - index * 2)) * 1.2)}
-                        r="4"
-                        fill="#d1d5db"
-                      />
-                    ))}
+                    {/* Render dynamic series if computed (seriesDaily) */}
+                    {
+                      seriesDaily && seriesDaily.length > 0 ? (
+                        (() => {
+                          const daily = seriesDaily
+                          const plotWidth = 680 // x range from 60 to 740
+                          const plotHeight = 120
+                          const xStart = 60
+                          const yBase = 40
+
+                          const totals = daily.map(d => d.totalCreated || 0)
+                          const resolved = daily.map(d => d.totalResolved || 0)
+                          const maxVal = Math.max(...totals, ...resolved, 1)
+
+                          const buildPoints = (arr) => arr.map((v, idx) => {
+                            const x = xStart + Math.round((idx / Math.max(1, arr.length - 1)) * plotWidth)
+                            const y = yBase + Math.round((1 - (v / maxVal)) * plotHeight)
+                            return `${x},${y}`
+                          }).join(' ')
+
+                          const totalPoints = buildPoints(totals)
+                          const resolvedPoints = buildPoints(resolved)
+
+                          return (
+                            <>
+                              <polyline fill="none" stroke="#10b981" strokeWidth="3" points={totalPoints} />
+                              <polyline fill="none" stroke="#d1d5db" strokeWidth="3" points={resolvedPoints} />
+                              {totals.map((v, idx) => (
+                                <circle key={`total-${idx}`} cx={xStart + Math.round((idx / Math.max(1, totals.length - 1)) * plotWidth)} cy={yBase + Math.round((1 - (v / maxVal)) * plotHeight)} r="4" fill="#10b981" />
+                              ))}
+                              {resolved.map((v, idx) => (
+                                <circle key={`resolved-${idx}`} cx={xStart + Math.round((idx / Math.max(1, resolved.length - 1)) * plotWidth)} cy={yBase + Math.round((1 - (v / maxVal)) * plotHeight)} r="4" fill="#d1d5db" />
+                              ))}
+                            </>
+                          )
+                        })()
+                      ) : (
+                        // Fallback placeholders
+                        <>
+                          <polyline
+                            points={`60,${40 + ((chartData.totalTickets / 10) * 1.2)} 180,${40 + ((chartData.totalTickets / 8) * 1.2)} 300,${40 + ((chartData.totalTickets / 6) * 1.2)} 420,${40 + ((chartData.totalTickets / 4) * 1.2)} 540,${40 + ((chartData.totalTickets / 3) * 1.2)} 660,${40 + ((chartData.totalTickets / 2) * 1.2)}`}
+                            fill="none"
+                            stroke="#10b981"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <polyline
+                            points={`60,${40 + ((chartData.resolvedTickets / 10) * 1.2)} 180,${40 + ((chartData.resolvedTickets / 8) * 1.2)} 300,${40 + ((chartData.resolvedTickets / 6) * 1.2)} 420,${40 + ((chartData.resolvedTickets / 4) * 1.2)} 540,${40 + ((chartData.resolvedTickets / 3) * 1.2)} 660,${40 + ((chartData.resolvedTickets / 2) * 1.2)}`}
+                            fill="none"
+                            stroke="#d1d5db"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </>
+                      )
+                    }
                   </svg>
                   </div>
                 </div>

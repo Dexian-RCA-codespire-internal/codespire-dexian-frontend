@@ -1,23 +1,26 @@
 import React, { useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import { FiFilter, FiX, FiChevronDown, FiArrowUp, FiArrowDown } from 'react-icons/fi'
 import { Button } from '../ui/Button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Card, CardContent } from '../ui/card'
 import { Badge } from '../ui/Badge'
+import {
+  setFilters,
+  selectSLAFilters
+} from '../../store/slaSlice'
 
-const SLAFilters = ({
-  selectedPriority,
-  selectedStatus,
-  selectedSource,
-  selectedSLAStatus,
-  onPriorityChange,
-  onStatusChange,
-  onSourceChange,
-  onSLAStatusChange,
-  sortField,
-  sortDirection,
-  onSortChange
-}) => {
+const SLAFilters = () => {
+  const dispatch = useDispatch()
+  const {
+    priority: selectedPriority,
+    status: selectedStatus,
+    source: selectedSource,
+    slaStatus: selectedSLAStatus,
+    sortField,
+    sortDirection
+  } = useSelector(selectSLAFilters)
+
   const [showFilters, setShowFilters] = useState(false)
 
   // Filter options
@@ -75,36 +78,7 @@ const SLAFilters = ({
           <FiChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
         </Button>
 
-        {/* Sort Controls */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">Sort by:</span>
-          <Select value={sortField} onValueChange={(value) => onSortChange(value, sortDirection)}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {sortOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={toggleSortDirection}
-            className="flex items-center gap-1"
-          >
-            {sortDirection === 'asc' ? (
-              <FiArrowUp className="w-4 h-4" />
-            ) : (
-              <FiArrowDown className="w-4 h-4" />
-            )}
-            {sortDirection === 'asc' ? 'Asc' : 'Desc'}
-          </Button>
-        </div>
+        {/* Sort controls moved to table headers for per-column sorting */}
       </div>
 
       {/* Filters Panel */}

@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import webSocketService from '../services/websocketService';
+import { webSocketManager } from '../utils/websocketManager'
+import { webSocketManager } from '../utils/websocketManager'
 
 /**
  * Secure WebSocket hook with authentication
@@ -15,6 +17,7 @@ export const useSecureWebSocket = () => {
   const [lastPollingEvent, setLastPollingEvent] = useState(null);
   const reconnectTimeoutRef = useRef(null);
   const healthCheckIntervalRef = useRef(null);
+  const componentIdRef = useRef(Math.random().toString(36).substr(2, 9));
 
   /**
    * Connect to WebSocket with authentication
@@ -37,8 +40,19 @@ export const useSecureWebSocket = () => {
       setConnectionError(null);
       setAuthError(null);
 
-      // Connect with authentication token
-      webSocketService.connect(process.env.REACT_APP_BACKEND_URL || 'http://localhost:8081', token);
+      const serverUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8081'
+
+      // Subscribe to global manager and initialize if needed
+      webSocketManager.subscribe(componentIdRef.current)
+      const shouldInitialize = webSocketManager.init(serverUrl)
+      if (shouldInitialize) {
+        webSocketService.connect(serverUrl, token)
+      } else {
+        // If not initialized, ensure connection with token
+        if (!webSocketService.getConnectionStatus()) {
+          webSocketService.connect(serverUrl, token)
+        }
+      }
     } catch (error) {
       console.error('❌ Failed to get access token for WebSocket:', error);
       setAuthError('Failed to get access token');
@@ -49,7 +63,19 @@ export const useSecureWebSocket = () => {
    * Disconnect from WebSocket
    */
   const disconnect = useCallback(() => {
-    webSocketService.disconnect();
+    // Cleanup via manager - unsubscribe and only disconnect if no subscribers
+    try {
+      // Attempt to find and remove a subscriber - best-effort since we didn't store id earlier
+      // This will be a no-op if not present
+      // Use a random id unsub rather than trying to remove unknown id
+      webSocketManager.unsubscribe(undefined)
+    } catch (e) {
+      // ignore
+    }
+
+    if (webSocketManager.cleanup()) {
+      webSocketService.disconnect();
+    }
     setWsConnected(false);
     setConnectionError(null);
     setAuthError(null);
@@ -115,6 +141,12 @@ export const useSecureWebSocket = () => {
       webSocketService.off('auth_error', handleAuthError);
       webSocketService.off('polling_status', handlePollingStatus);
       
+      // Unsubscribe from manager and possibly disconnect
+      try { webSocketManager.unsubscribe(componentIdRef.current) } catch (e) { /* ignore */ }
+      if (webSocketManager.cleanup()) {
+        webSocketService.disconnect();
+      }
+
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
