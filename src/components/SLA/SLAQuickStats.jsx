@@ -37,22 +37,6 @@ const SLAQuickStats = ({ refreshTrigger = 0 }) => {
     // Update stats automatically by fetching fresh stats
     dispatch(fetchSLAStats())
   }, [dispatch])
-            newStats.warning = Math.max(0, (newStats.warning || 0) + (action === 'new' ? 1 : 0))
-            break
-          case 'safe':
-            newStats.safe = Math.max(0, (newStats.safe || 0) + (action === 'new' ? 1 : 0))
-            break
-        }
-        
-        // Recalculate breach rate
-        newStats.breachRate = newStats.totalTickets > 0 
-          ? Math.round((newStats.breached / newStats.totalTickets) * 100) 
-          : 0
-        
-        return newStats
-      })
-    }
-  }, [])
 
   // Initialize WebSocket connection
   const { isConnected, connect, disconnect } = useSLAWebSocket(

@@ -334,7 +334,7 @@ export const useWebSocketOnly = (serverUrl = import.meta.env.VITE_BACKEND_URL) =
    * Navigate to specific page (WebSocket only)
    */
   const goToPage = useCallback((page, filters = {}) => {
-    if (page >= 1 && page <= pagination.totalPages) {
+  if (page >= 1 && (page === 1 || page <= pagination.totalPages)) {
       fetchTickets(page, pagination.limit, filters);
     }
   }, [pagination, fetchTickets]);
