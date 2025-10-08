@@ -654,7 +654,7 @@ const RCADashboard = () => {
         {/* Summary Cards Section - only Total Tickets and Active Tickets, responsive 1/2 layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           {summaryData.map((item, index) => (
-            <Card key={index} className={`bg-white border border-gray-100 shadow-sm rounded-lg hover:shadow-md transition-shadow duration-200`}>
+            <Card key={index} className={`bg-white border border-black shadow-sm rounded-lg hover:shadow-md transition-shadow duration-200`}>
               <CardContent className="p-6 flex flex-col items-center justify-center min-h-[160px]">
                 {/* Title centered */}
                 <p className="font-semibold text-gray-700 text-lg text-center">{item.title}</p>

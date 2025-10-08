@@ -477,7 +477,7 @@ const Dashboard = () => {
           dailyData: null
         })
       }
-  }, 1000) // Ping every 1 second for more frequent updates
+  }, 5000) // Ping every 1 second for more frequent updates
     return () => clearInterval(pingInterval)
   }, [wsConnected])
   
@@ -505,16 +505,6 @@ const Dashboard = () => {
       barType: 'vertical'
     },
     { 
-      title: 'SYSTEM HEALTH', 
-      value: pingStatusData && typeof pingStatusData.uptime === 'number' ? `${pingStatusData.uptime}ms` : (slaLoading ? '...' : slaError ? 'Error' : '0ms'),
-      trend: statsWithTrends.systemHealth.trend,
-      dailyData: statsWithTrends.systemHealth.dailyData,
-      icon: BiServer, 
-      color: 'text-black',
-      showBars: true,
-      barType: 'horizontal'
-    },
-    { 
       title: 'SLA BREACHED', 
       // Prefer breached count from Redux metrics when available, then derived counts, then local websocket metrics
       value: (globalSlaMetrics?.breached ?? derivedSlaCounts?.breached ?? slaMetrics?.breached ?? statsWithTrends.slaBreached.value) ?? 0,
@@ -524,7 +514,17 @@ const Dashboard = () => {
       color: 'text-red-500',
       showBars: true,
       barType: 'vertical'
-    }
+    },
+    { 
+      title: 'SYSTEM HEALTH', 
+      value: pingStatusData && typeof pingStatusData.uptime === 'number' ? `${pingStatusData.uptime}ms` : (slaLoading ? '...' : slaError ? 'Error' : '0ms'),
+      trend: statsWithTrends.systemHealth.trend,
+      dailyData: statsWithTrends.systemHealth.dailyData,
+      icon: BiServer, 
+      color: 'text-black',
+      showBars: true,
+      barType: 'horizontal'
+    },
   ]
 
   const integrations = [
@@ -813,10 +813,7 @@ const Dashboard = () => {
                   </div>
                   
                   <div className="space-y-4">
-                    <h3 className="font-semibold text-gray-900 text-sm border-b border-gray-200 pb-2">
-                      System Connectivity Status
-                    </h3>
-
+                   
                     {/* Backend Status */}
                     <div className="flex items-center justify-between py-2">
                       <span className="text-sm font-medium text-gray-700">Backend</span>
@@ -896,7 +893,7 @@ const Dashboard = () => {
                  <>
                    <div className="flex items-center justify-between mb-4">
                      <div className="flex items-center space-x-2">
-                       <h3 className="text-sm font-medium text-gray-800">{stat.title}</h3>
+                      <h3 className="text-sm font-medium text-gray-800">{stat.title}</h3>
                       <InfoIcon content={getCardInfoText(stat.title)} />
                      </div>
                      <div className={`${stat.color} p-2 rounded-lg`}>
@@ -1351,20 +1348,50 @@ const Dashboard = () => {
                       const plotHeight = 120
                       const xStart = 60
                       const yBase = 40
+                      // time span for x-axis
+                      const startMs = daily.length > 0 ? new Date(daily[0].dateISO).getTime() : Date.now()
+                      const endMs = daily.length > 0 ? new Date(daily[daily.length - 1].dateISO).getTime() : Date.now()
+                      // ensure positive span
+                      const timeSpan = Math.max(1, endMs - startMs)
 
-                      const totals = daily.map(d => d.totalCreated || 0)
-                      const resolved = daily.map(d => d.totalResolved || 0)
-                      const maxVal = Math.max(...totals, ...resolved, 1)
+                      // per-day counts
+                      const totalsDaily = daily.map(d => d.totalCreated || 0)
+                      const resolvedDaily = daily.map(d => d.totalResolved || 0)
+                      // cumulative sums so the axis and chart show growth over time
+                      const totalsCumulative = []
+                      const resolvedCumulative = []
+                      let tAcc = 0
+                      let rAcc = 0
+                      for (let i = 0; i < daily.length; i++) {
+                        tAcc += totalsDaily[i]
+                        rAcc += resolvedDaily[i]
+                        totalsCumulative.push(tAcc)
+                        resolvedCumulative.push(rAcc)
+                      }
+                      // include overall totals so y-axis expands when cumulative counts grow
+                      const maxVal = Math.max(...totalsCumulative, ...resolvedCumulative, chartData.totalTickets || 0, chartData.resolvedTickets || 0, 1)
 
-                      // y ticks: choose 5 ticks from max down to 0
+                      // y ticks: choose 5 ticks from 0..maxVal (inclusive) and render descending
                       const numYTicks = 5
-                      const yStep = Math.ceil(maxVal / (numYTicks - 1))
-                      const yTicks = Array.from({ length: numYTicks }, (_, i) => maxVal - (i * yStep)).map(v => Math.max(0, v))
+                      const yTicks = (() => {
+                        if (maxVal <= 0) return [0]
+                        // produce evenly spaced tick values from 0 to maxVal
+                        const ticks = []
+                        for (let i = 0; i < numYTicks; i++) {
+                          const val = Math.round((i / (numYTicks - 1)) * maxVal)
+                          ticks.push(val)
+                        }
+                        // ensure last tick equals maxVal exactly
+                        ticks[numYTicks - 1] = maxVal
+                        // render from largest to smallest (top -> bottom)
+                        return ticks.slice().reverse()
+                      })()
 
                       return (
                         <>
                           {yTicks.map((val, i) => {
-                            const y = yBase + Math.round((1 - (val / Math.max(1, maxVal))) * plotHeight)
+                            const safeMax = Math.max(1, maxVal)
+                            const y = yBase + Math.round((1 - (val / safeMax)) * plotHeight)
                             return (
                               <g key={`yt-${i}`}>
                                 <line x1={xStart} y1={y} x2={xStart + plotWidth} y2={y} stroke="#f3f4f6" strokeWidth="1" />
@@ -1386,21 +1413,30 @@ const Dashboard = () => {
                                 }
                               })
                               const months = Object.values(monthMap)
+                              // avoid overlapping month labels by enforcing min pixel spacing
+                              const minLabelPx = 60
+                              let lastX = -Infinity
                               return months.map((m, i) => {
-                                const x = xStart + Math.round((m.idx / Math.max(1, daily.length - 1)) * plotWidth)
-                                return <text key={`xl-month-${i}`} x={x} y="190" textAnchor="middle" className="text-xs fill-gray-500">{m.label}</text>
+                                const dtMs = new Date(daily[m.idx].dateISO).getTime()
+                                const x = xStart + Math.round(((dtMs - startMs) / timeSpan) * plotWidth)
+                                if (x - lastX < minLabelPx) return null
+                                lastX = x
+                                return <text key={`xl-month-${i}`} x={x} y={yBase + plotHeight + 30} textAnchor="middle" className="text-xs fill-gray-500">{m.label}</text>
                               })
                             }
 
                             // Shorter ranges: show up to 7 date labels (month + day)
-                            const maxLabels = 7
-                            const step = Math.max(1, Math.floor((daily.length - 1) / (maxLabels - 1)))
+                            // compute label spacing dynamically to avoid overlap
+                            const minLabelPx = 60
+                            let lastX = -Infinity
                             return daily.map((d, idx) => {
-                              if (idx % step !== 0 && idx !== daily.length - 1) return null
-                              const x = xStart + Math.round((idx / Math.max(1, daily.length - 1)) * plotWidth)
+                              const dtMs = new Date(d.dateISO).getTime()
+                              const x = xStart + Math.round(((dtMs - startMs) / timeSpan) * plotWidth)
+                              if (x - lastX < minLabelPx && idx !== daily.length - 1) return null
+                              lastX = x
                               const label = new Date(d.dateISO).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
                               return (
-                                <text key={`xl-${idx}`} x={x} y="190" textAnchor="middle" className="text-xs fill-gray-500">{label}</text>
+                                <text key={`xl-${idx}`} x={x} y={yBase + plotHeight + 30} textAnchor="middle" className="text-xs fill-gray-500">{label}</text>
                               )
                             })
                           })()}
@@ -1417,30 +1453,56 @@ const Dashboard = () => {
                           const plotHeight = 120
                           const xStart = 60
                           const yBase = 40
+                          const startMs2 = daily.length > 0 ? new Date(daily[0].dateISO).getTime() : Date.now()
+                          const endMs2 = daily.length > 0 ? new Date(daily[daily.length - 1].dateISO).getTime() : Date.now()
+                          const timeSpan2 = Math.max(1, endMs2 - startMs2)
 
-                          const totals = daily.map(d => d.totalCreated || 0)
-                          const resolved = daily.map(d => d.totalResolved || 0)
-                          const maxVal = Math.max(...totals, ...resolved, 1)
+                          const totalsDaily = daily.map(d => d.totalCreated || 0)
+                          const resolvedDaily = daily.map(d => d.totalResolved || 0)
+                          // cumulative arrays for plotting
+                          const totalsCumulative = []
+                          const resolvedCumulative = []
+                          let tAcc2 = 0
+                          let rAcc2 = 0
+                          for (let i = 0; i < daily.length; i++) {
+                            tAcc2 += totalsDaily[i]
+                            rAcc2 += resolvedDaily[i]
+                            totalsCumulative.push(tAcc2)
+                            resolvedCumulative.push(rAcc2)
+                          }
+                          const maxVal = Math.max(...totalsCumulative, ...resolvedCumulative, 1)
 
-                          const buildPoints = (arr) => arr.map((v, idx) => {
-                            const x = xStart + Math.round((idx / Math.max(1, arr.length - 1)) * plotWidth)
-                            const y = yBase + Math.round((1 - (v / maxVal)) * plotHeight)
-                            return `${x},${y}`
-                          }).join(' ')
+                          const buildPoints = (arr) => {
+                            const safeMax = Math.max(1, maxVal)
+                            return arr.map((v, idx) => {
+                              const dtMs = new Date(daily[idx]?.dateISO || startMs2).getTime()
+                              const x = xStart + Math.round(((dtMs - startMs2) / timeSpan2) * plotWidth)
+                              const y = yBase + Math.round((1 - ((v || 0) / safeMax)) * plotHeight)
+                              return `${x},${y}`
+                            }).join(' ')
+                          }
 
-                          const totalPoints = buildPoints(totals)
-                          const resolvedPoints = buildPoints(resolved)
+                          const totalPoints = buildPoints(totalsCumulative)
+                          const resolvedPoints = buildPoints(resolvedCumulative)
 
                           return (
                             <>
                               <polyline fill="none" stroke="#10b981" strokeWidth="3" points={totalPoints} />
                               <polyline fill="none" stroke="#d1d5db" strokeWidth="3" points={resolvedPoints} />
-                              {totals.map((v, idx) => (
-                                <circle key={`total-${idx}`} cx={xStart + Math.round((idx / Math.max(1, totals.length - 1)) * plotWidth)} cy={yBase + Math.round((1 - (v / maxVal)) * plotHeight)} r="4" fill="#10b981" />
-                              ))}
-                              {resolved.map((v, idx) => (
-                                <circle key={`resolved-${idx}`} cx={xStart + Math.round((idx / Math.max(1, resolved.length - 1)) * plotWidth)} cy={yBase + Math.round((1 - (v / maxVal)) * plotHeight)} r="4" fill="#d1d5db" />
-                              ))}
+                              {totalsCumulative.map((v, idx) => {
+                                const safeMax = Math.max(1, maxVal)
+                                const dtMsT = new Date(daily[idx]?.dateISO || startMs2).getTime()
+                                const cx = xStart + Math.round(((dtMsT - startMs2) / timeSpan2) * plotWidth)
+                                const cy = yBase + Math.round((1 - ((v || 0) / safeMax)) * plotHeight)
+                                return <circle key={`total-${idx}`} cx={cx} cy={cy} r="4" fill="#10b981" />
+                              })}
+                              {resolvedCumulative.map((v, idx) => {
+                                const safeMax = Math.max(1, maxVal)
+                                const dtMsR = new Date(daily[idx]?.dateISO || startMs2).getTime()
+                                const cx = xStart + Math.round(((dtMsR - startMs2) / timeSpan2) * plotWidth)
+                                const cy = yBase + Math.round((1 - ((v || 0) / safeMax)) * plotHeight)
+                                return <circle key={`resolved-${idx}`} cx={cx} cy={cy} r="4" fill="#d1d5db" />
+                              })}
                             </>
                           )
                         })()
