@@ -156,8 +156,7 @@ export default function ForgetPassword() {
                         We've sent a password reset link to <strong>{email}</strong>
                       </p>
                       <p className="text-gray-500 text-xs">
-                        Please check your email and click the link to reset your password. 
-                        The link will open in this application and expire in 1 hour.
+                        Please follow the instructions in the email to reset your password. If you don't see it, check your spam or junk folder.
                       </p>
                     </div>
 

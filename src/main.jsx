@@ -20,7 +20,7 @@ const isDevelopment = import.meta.env.DEV;
 
 const AppWrapper = ({ children }) => {
   if (isDevelopment) {
-    return <React.StrictMode>{children}</React.StrictMode>;
+    return <>{children}</>;
   }
   return children;
 };

@@ -173,13 +173,13 @@ export default function Register() {
         // Navigate to login page with success message
         navigate('/login', {
           state: {
-            message: 'Registration successful! Please check your email for verification instructions, then log in.',
+            message: 'Registration successful! Please check your inbox for verification email',
             email: formData.email
           }
         })
       } else {
         // Handle different error types
-        if (response.status === 'EMAIL_ALREADY_EXISTS_ERROR') {
+        if (response.status === 'FIELD_ERROR') {
           setError('An account with this email already exists')
         } else if (response.formFields) {
           // Handle field errors from SuperTokens
@@ -190,7 +190,8 @@ export default function Register() {
             }
           })
           setValidationErrors(fieldErrors)
-        } else {
+        } 
+        else {
           setError(response.message || 'Registration failed. Please try again.')
         }
       }
