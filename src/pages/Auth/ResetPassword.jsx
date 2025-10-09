@@ -187,7 +187,7 @@ export default function ResetPassword() {
                     alt="Dexian Logo" 
                     className="w-12 h-12 object-contain"
                   />
-                  <span className="text-2xl font-bold text-[#2b8f88]">AIResolve360</span>
+                  <span className="text-2xl font-bold text-blue-600">Dexian</span>
                 </div>
               </div>
               
@@ -236,7 +236,6 @@ export default function ResetPassword() {
                       type={showPassword ? "text" : "password"}
                       name="newPassword"
                       value={newPassword}
-                      maxLength={15}
                       onChange={handleInputChange}
                       onBlur={() => handleFieldBlur('newPassword')}
                       placeholder="New Password"
@@ -267,7 +266,7 @@ export default function ResetPassword() {
                   {passwordValidation.isValid === false && touchedFields.newPassword && (
                     <div className="flex items-center text-red-600 text-xs">
                       <AlertCircle className="h-3 w-3 mr-1" />
-                      Password must be between 8-15 characters with uppercase, lowercase, number, and special characters
+                      Password must be at least 8 characters with uppercase, lowercase, number, and special character
                     </div>
                   )}
 
@@ -280,7 +279,6 @@ export default function ResetPassword() {
                       type={showConfirmPassword ? "text" : "password"}
                       name="confirmPassword"
                       value={confirmPassword}
-                      maxLength={15}
                       onChange={handleInputChange}
                       onBlur={() => handleFieldBlur('confirmPassword')}
                       placeholder="Confirm New Password"
@@ -319,17 +317,17 @@ export default function ResetPassword() {
                   {newPassword && (
                     <div className="text-xs space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-gray-600">Password Strength</span>
-                        <span className={`font-medium text-xs sm:text-sm ${
-                          getPasswordStrength(newPassword).level === 'weak' ? 'text-red-600' :
-                          getPasswordStrength(newPassword).level === 'fair' ? 'text-orange-600' :
-                          getPasswordStrength(newPassword).level === 'good' ? 'text-blue-600' :
-                          getPasswordStrength(newPassword).level === 'strong' ? 'text-green-600' :
-                          'text-gray-600'
+                        <span className="text-gray-600">Password strength:</span>
+                        <span className={`font-medium ${
+                          passwordValidation.isValid ? 'text-green-600' : 
+                          passwordValidation.score >= 3 ? 'text-yellow-600' : 'text-red-600'
                         }`}>
-                          {getPasswordStrength(newPassword).text}
+                          {passwordValidation.isValid ? 'Strong' : 
+                           passwordValidation.score >= 3 ? 'Good' : 
+                           passwordValidation.score >= 2 ? 'Fair' : 'Weak'}
                         </span>
                       </div>
+                      
                       <div className="space-y-1">
                         {getPasswordRequirements(newPassword).map((req, index) => (
                           <div key={index} className="flex items-center">
