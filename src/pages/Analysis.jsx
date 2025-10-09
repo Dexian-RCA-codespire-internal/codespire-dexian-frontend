@@ -180,52 +180,18 @@ const Analysis = () => {
         console.log('No RCA resolved data found for ticket:', ticketId)
         setHasExistingRcaData(false)
         
-        // If no existing RCA data found, trigger AI generation for steps that need it
-        if (ticketData) {
-          console.log('No existing RCA data found. Triggering AI generation for steps that need it.')
-          
-          // Generate problem statement if not already generated
-          if (!hasAttemptedGeneration) {
-            console.log('Triggering problem statement generation...')
-            generateProblemStatement(ticketData)
-          } else {
-            console.log('Problem statement generation already attempted, skipping...')
-          }
-          
-          // Generate impact assessment if not already generated  
-          if (!hasAttemptedImpactGeneration) {
-            console.log('Triggering impact assessment generation...')
-            generateImpactAssessment(ticketData)
-          } else {
-            console.log('Impact assessment generation already attempted, skipping...')
-          }
-        }
+        // Don't trigger AI generation here to prevent infinite loops
+        // AI generation will be triggered by the RCAWorkflow component when user interacts with it
+        console.log('No existing RCA data found. AI generation will be triggered when user interacts with the workflow.')
       }
     } catch (err) {
       console.log('RCA resolved data not found or error:', err.message)
       setRcaDataError(err.message)
       setHasExistingRcaData(false)
       
-      // If no existing RCA data found (likely a 404), trigger AI generation for steps that need it
-      if (ticketData) {
-        console.log('RCA resolved data not found. Triggering AI generation for steps that need it.')
-        
-        // Generate problem statement if not already generated
-        if (!hasAttemptedGeneration) {
-          console.log('Triggering problem statement generation...')
-          generateProblemStatement(ticketData)
-        } else {
-          console.log('Problem statement generation already attempted, skipping...')
-        }
-        
-        // Generate impact assessment if not already generated  
-        if (!hasAttemptedImpactGeneration) {
-          console.log('Triggering impact assessment generation...')
-          generateImpactAssessment(ticketData)
-        } else {
-          console.log('Impact assessment generation already attempted, skipping...')
-        }
-      }
+      // Don't trigger AI generation here to prevent infinite loops
+      // AI generation will be triggered by the RCAWorkflow component when user interacts with it
+      console.log('RCA resolved data not found. AI generation will be triggered when user interacts with the workflow.')
     } finally {
       setIsLoadingRcaData(false)
     }
@@ -379,7 +345,7 @@ const Analysis = () => {
     if (ticketId && ticketData && !hasExistingRcaData && !isLoadingRcaData) {
       fetchRcaResolvedData(ticketId)
     }
-  }, [ticketId, ticketData, hasExistingRcaData, isLoadingRcaData])
+  }, [ticketId, ticketData]) // Removed hasExistingRcaData and isLoadingRcaData to prevent infinite loops
 
   // Set response data when existing RCA data is loaded and current step data exists
   useEffect(() => {
@@ -394,13 +360,59 @@ const Analysis = () => {
     }
   }, [hasExistingRcaData, rcaResolvedData, stepData.rca_workflow_steps, rcaStep, analysisResponse])
 
+  // Trigger AI generation for step 1 when appropriate
+  useEffect(() => {
+    // Only trigger if:
+    // 1. We have ticket data
+    // 2. We're on step 1
+    // 3. No existing RCA data
+    // 4. Haven't attempted generation yet
+    // 5. Not currently generating
+    // 6. Current step response is empty
+    if (
+      ticketData && 
+      rcaStep === 1 && 
+      !hasExistingRcaData && 
+      !hasAttemptedGeneration && 
+      !isGeneratingProblemStatement &&
+      (!analysisResponse || analysisResponse.trim().length === 0) &&
+      (!stepData.rca_workflow_steps?.[0] || stepData.rca_workflow_steps[0].trim().length === 0)
+    ) {
+      console.log('Triggering initial problem statement generation for new ticket')
+      generateProblemStatement(ticketData)
+    }
+  }, [ticketData, rcaStep, hasExistingRcaData, hasAttemptedGeneration, isGeneratingProblemStatement, analysisResponse, stepData.rca_workflow_steps])
+
+  // Trigger AI generation for step 2 when appropriate  
+  useEffect(() => {
+    // Only trigger if:
+    // 1. We have ticket data
+    // 2. We're on step 2
+    // 3. No existing RCA data
+    // 4. Haven't attempted impact generation yet
+    // 5. Not currently generating
+    // 6. Current step response is empty
+    if (
+      ticketData && 
+      rcaStep === 2 && 
+      !hasExistingRcaData && 
+      !hasAttemptedImpactGeneration && 
+      !isGeneratingImpactAssessment &&
+      (!analysisResponse || analysisResponse.trim().length === 0) &&
+      (!stepData.rca_workflow_steps?.[1] || stepData.rca_workflow_steps[1].trim().length === 0)
+    ) {
+      console.log('Triggering initial impact assessment generation for new ticket')
+      generateImpactAssessment(ticketData)
+    }
+  }, [ticketData, rcaStep, hasExistingRcaData, hasAttemptedImpactGeneration, isGeneratingImpactAssessment, analysisResponse, stepData.rca_workflow_steps])
+
   // Populate stepData from RCA resolved data when available
   useEffect(() => {
     if (hasExistingRcaData && rcaResolvedData?.ticket?.resolution_steps) {
       console.log('Populating stepData from RCA resolved data')
-
+      
       const resolutionSteps = rcaResolvedData.ticket.resolution_steps
-      const newWorkflowSteps = [...stepData.rca_workflow_steps]
+      const newWorkflowSteps = [...(stepData.rca_workflow_steps || ['', '', '', ''])]
 
       // Populate step 1 (Problem Statement)
       if (resolutionSteps.problem_statement?.completed && resolutionSteps.problem_statement.problemStatement) {
@@ -797,6 +809,52 @@ const Analysis = () => {
     // No navigation needed - user can complete resolution here
     console.log('Resolution completed for ticket:', ticketId)
   }
+
+  // Trigger AI generation for step 1 when appropriate
+  useEffect(() => {
+    // Only trigger if:
+    // 1. We have ticket data
+    // 2. We're on step 1
+    // 3. No existing RCA data
+    // 4. Haven't attempted generation yet
+    // 5. Not currently generating
+    // 6. Current step response is empty
+    if (
+      ticketData && 
+      rcaStep === 1 && 
+      !hasExistingRcaData && 
+      !hasAttemptedGeneration && 
+      !isGeneratingProblemStatement &&
+      (!analysisResponse || analysisResponse.trim().length === 0) &&
+      (!stepData.rca_workflow_steps?.[0] || stepData.rca_workflow_steps[0].trim().length === 0)
+    ) {
+      console.log('Triggering initial problem statement generation for new ticket')
+      generateProblemStatement(ticketData)
+    }
+  }, [ticketData, rcaStep, hasExistingRcaData, hasAttemptedGeneration, isGeneratingProblemStatement, analysisResponse, stepData.rca_workflow_steps])
+
+  // Trigger AI generation for step 2 when appropriate  
+  useEffect(() => {
+    // Only trigger if:
+    // 1. We have ticket data
+    // 2. We're on step 2
+    // 3. No existing RCA data
+    // 4. Haven't attempted impact generation yet
+    // 5. Not currently generating
+    // 6. Current step response is empty
+    if (
+      ticketData && 
+      rcaStep === 2 && 
+      !hasExistingRcaData && 
+      !hasAttemptedImpactGeneration && 
+      !isGeneratingImpactAssessment &&
+      (!analysisResponse || analysisResponse.trim().length === 0) &&
+      (!stepData.rca_workflow_steps?.[1] || stepData.rca_workflow_steps[1].trim().length === 0)
+    ) {
+      console.log('Triggering initial impact assessment generation for new ticket')
+      generateImpactAssessment(ticketData)
+    }
+  }, [ticketData, rcaStep, hasExistingRcaData, hasAttemptedImpactGeneration, isGeneratingImpactAssessment, analysisResponse, stepData.rca_workflow_steps])
 
   // RCA Workflow Data
   const rcaSteps = [
