@@ -375,22 +375,28 @@ const RCACompletion = () => {
   const updateProgress = (stage) => {
     const stages = ['starting', 'technical_rca', 'customer_summary']
     const currentIndex = stages.indexOf(stage)
-    // More granular progress updates for better UX
-    let progressValue = 0
-    switch (stage) {
-      case 'starting':
-        progressValue = 15
-        break
-      case 'technical_rca':
-        progressValue = 75  // Technical report in progress
-        break
-      case 'customer_summary':
-        progressValue = 100  // Customer summary in progress
-        break
-      default:
-        progressValue = ((currentIndex + 1) / stages.length) * 100
+    const progress = ((currentIndex + 1) / stages.length) * 100
+    setProgress(progress)
+  }
+
+  const handleStreamingData = (data) => {
+    console.log('Received streaming data:', data)
+    
+    if (data.type === 'progress') {
+      setStreamingProgress(data.message)
+    } else if (data.type === 'technical_report') {
+      setTechnicalReport(data.content)
+      setStreamingProgress('Technical report generated successfully!')
+    } else if (data.type === 'customer_summary') {
+      setCustomerSummary(data.content)
+      setStreamingProgress('Customer summary generated successfully!')
+    } else if (data.type === 'complete') {
+      setStreamingProgress('RCA reports generation completed!')
+      setWebsocketConnected(false)
+    } else if (data.error) {
+      setStreamingError(data.error)
+      setWebsocketConnected(false)
     }
-    setProgress(progressValue)
   }
 
   // WebSocket-based RCA generation using websocketService
@@ -462,6 +468,8 @@ const RCACompletion = () => {
     setGeneratingCustomer(false)
 
     try {
+      
+      // Make API call using rcaService
       const data = await rcaService.streamRCAGeneration({
         ticketData: ticketDataPayload,
         rcaFields: rcaFieldsPayload,

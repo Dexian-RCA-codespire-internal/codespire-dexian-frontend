@@ -10,8 +10,8 @@ export const initSuperTokens = () => {
   SuperTokens.init({
     appInfo: {
       appName: 'Dexian RCA Dashboard',
-      apiDomain: import.meta.env.VITE_API_URL || 'http://localhost:8081',
-      websiteDomain: import.meta.env.VITE_FRONTEND_URL || 'http://localhost:3001',
+      apiDomain: import.meta.env.VITE_API_URL,
+      websiteDomain: import.meta.env.VITE_FRONTEND_URL,
       apiBasePath: '/auth',
       websiteBasePath: '/'
     },
@@ -69,6 +69,11 @@ export const initSuperTokens = () => {
         autoAddCredentials: true,
         sessionScope: import.meta.env.VITE_SESSION_DOMAIN || 'localhost',
         // Remove aggressive session expiry handler to prevent loops
+        sessionExpiredStatusCode: 401,
+        invalidClaimStatusCode: 403,
+        autoAddCredentials: true,
+        sessionScope: import.meta.env.VITE_SESSION_DOMAIN || 'localhost',
+        // Remove aggressive session expiry handler to prevent loops
         onSessionExpired: () => {
           console.log('🔒 Session expired event triggered');
           // Only dispatch event, don't redirect immediately
@@ -82,6 +87,7 @@ export const initSuperTokens = () => {
             return {
               ...originalImplementation,
               // Handle session refresh with better error handling
+              // Handle session refresh with better error handling
               refreshSession: async function (input) {
                 try {
                   console.log('🔄 Attempting session refresh...');
@@ -91,14 +97,26 @@ export const initSuperTokens = () => {
                   // Dispatch refresh success event
                   window.dispatchEvent(new CustomEvent('sessionRefreshed', {
                     detail: { result }
+                    detail: { result }
                   }));
                   
                   return result;
                 } catch (error) {
-                  console.error('❌ Session refresh failed:', error);
+              
                   
                   // Dispatch refresh failed event
+                  // Dispatch refresh failed event
                   window.dispatchEvent(new CustomEvent('sessionRefreshFailed', {
+                    detail: { error: error.message }
+                  }));
+                  
+                  // Only redirect on specific errors
+                  if (error.message.includes('UNAUTHORISED') || error.message.includes('invalid refresh token')) {
+                    // Clear session and redirect
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    window.location.href = '/login?expired=true';
+                  }
                     detail: { error: error.message }
                   }));
                   
@@ -116,7 +134,10 @@ export const initSuperTokens = () => {
               
               // Handle session validation
               getSession: async function (input) {
+              // Handle session validation
+              getSession: async function (input) {
                 try {
+                  const result = await originalImplementation.getSession(input);
                   const result = await originalImplementation.getSession(input);
                   return result;
                 } catch (error) {
@@ -141,12 +162,11 @@ export const initSuperTokens = () => {
       location: {
         ...original.location,
         setHref: (href) => {
-          console.log('🔗 SuperTokens redirect:', href);
+   
           
-          // Fix redirect URLs that point to /auth/login
           if (href.includes('/auth/login')) {
             const fixedHref = href.replace('/auth/login', '/login');
-            console.log('🔧 Fixed redirect URL:', fixedHref);
+      
             window.location.href = fixedHref;
           } else {
             window.location.href = href;

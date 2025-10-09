@@ -27,7 +27,7 @@ const EmailVerificationSuccess = () => {
       console.log('🔍 Verifying email with token:', token);
       
       // Call the backend verify-email endpoint
-      const response = await fetch(`http://localhost:8081/verify-email?token=${token}`, {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/verify-email?token=${token}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -65,7 +65,7 @@ const EmailVerificationSuccess = () => {
   const handleRedirectToLogin = () => {
     navigate('/login', { 
       state: { 
-        message: 'Email verified successfully! Please log in to continue.',
+        message: '',
         email: email
       }
     });
@@ -128,13 +128,7 @@ const EmailVerificationSuccess = () => {
               >
                 Go to Login
               </Button>
-              <Button
-                onClick={handleTryAgain}
-                variant="outline"
-                className="w-full"
-              >
-                Try Registration Again
-              </Button>
+    
             </div>
           </>
         )}

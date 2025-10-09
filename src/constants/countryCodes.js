@@ -114,8 +114,6 @@ export const COUNTRY_CODES = [
   { code: 'CD', name: 'Democratic Republic of the Congo', dialCode: '+243', flag: '🇨🇩' },
   { code: 'AO', name: 'Angola', dialCode: '+244', flag: '🇦🇴' },
   { code: 'CM', name: 'Cameroon', dialCode: '+237', flag: '🇨🇲' },
-  { code: 'TD', name: 'Chad', dialCode: '+235', flag: '🇹🇩' },
-  { code: 'CF', name: 'Central African Republic', dialCode: '+236', flag: '🇨🇫' },
   { code: 'RU', name: 'Russia', dialCode: '+7', flag: '🇷🇺' },
   { code: 'TR', name: 'Turkey', dialCode: '+90', flag: '🇹🇷' },
   { code: 'IL', name: 'Israel', dialCode: '+972', flag: '🇮🇱' },
