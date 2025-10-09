@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   FiRefreshCw, 
@@ -48,15 +48,15 @@ const SLA = () => {
     hasNextPage: false,
     hasPrevPage: false
   })
-  
+  const searchTimeoutRef = useRef(null)
   const { addToast } = useToast()
-
+  
   // Fetch SLA data from backend
-  const fetchSLAData = async (page = currentPage, showRefreshMessage = false) => {
+  const fetchSLAData = async (page = currentPage, searchText = '') => {
     try {
-      const isRefresh = showRefreshMessage || refreshing
-      if (isRefresh) setRefreshing(true)
-      else if (page === 1) setLoading(true)
+      // const isRefresh = showRefreshMessage || refreshing
+      // if (isRefresh) setRefreshing(true)
+      // else if (page === 1) setLoading(true)
 
       const params = {
         page,
@@ -65,7 +65,7 @@ const SLA = () => {
         ...(selectedStatus !== 'All' && { status: selectedStatus }),
         ...(selectedSource !== 'All' && { source: selectedSource }),
         ...(selectedSLAStatus !== 'All' && { slaStatus: selectedSLAStatus }),
-        ...(searchTerm && { searchTerm }),
+        ...(searchTerm && { searchTerm : searchText}),
         sortBy: sortField,
         sortOrder: sortDirection
       }
@@ -115,12 +115,12 @@ const SLA = () => {
           setSlaMetrics(metrics)
         }
 
-        if (isRefresh && showRefreshMessage) {
-          addToast('SLA data refreshed successfully', 'success')
-        }
-      } else {
-        console.error('❌ SLA API returned error:', response)
-        addToast(`Failed to fetch SLA data: ${response.error}`, 'error')
+        // if (isRefresh && showRefreshMessage) {
+        //   addToast('SLA data refreshed successfully', 'success')
+        // }
+      // } else {
+      //   console.error('❌ SLA API returned error:', response)
+      //   addToast(`Failed to fetch SLA data: ${response.error}`, 'error')
       }
     } catch (error) {
       console.error('❌ Error fetching SLA data:', error)
@@ -137,23 +137,33 @@ const SLA = () => {
     }
   }
 
+const handleSearchChange = (term) => {
+  // Clear any pending debounce
+  console.log("qwertyuio", term);
+  setSearchTerm(term);
+  if (searchTimeoutRef.current) {
+    clearTimeout(searchTimeoutRef.current)
+  }
+
+  // Schedule the new search after 300ms
+  searchTimeoutRef.current = setTimeout(() => {
+    setCurrentPage(1) // Reset to page 1 on new search
+    fetchSLAData(1, term)
+  }, 300)
+}
+
   // Initial data load
   useEffect(() => {
     setCurrentPage(1) // Reset to page 1 when filters change
-    fetchSLAData(1)
-  }, [selectedPriority, selectedStatus, selectedSource, selectedSLAStatus, searchTerm, sortField, sortDirection])
+    fetchSLAData(1, searchTerm)
+  }, [selectedPriority, selectedStatus, selectedSource, selectedSLAStatus, sortField, sortDirection])
 
   // Handle page change
   useEffect(() => {
     if (currentPage !== 1) {
-      fetchSLAData(currentPage)
+      fetchSLAData(currentPage, searchTerm )
     }
   }, [currentPage])
-
-  // Manual refresh handler
-  const handleRefresh = () => {
-    fetchSLAData(currentPage, true)
-  }
 
   // Get status icon component
   const getStatusIcon = (status) => {
@@ -244,7 +254,7 @@ const SLA = () => {
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
+        {/* <div className="flex items-center gap-3">
           <Button 
             onClick={handleRefresh}
             disabled={refreshing}
@@ -254,7 +264,7 @@ const SLA = () => {
             <FiRefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             {refreshing ? 'Refreshing...' : 'Refresh'}
           </Button>
-        </div>
+        </div> */}
       </div>
 
       {/* Metrics Cards */}
@@ -336,7 +346,7 @@ const SLA = () => {
       <div className="space-y-4">
         <SLASearch 
           searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
+          onSearchChange={handleSearchChange}
         />
         
         <SLAFilters
