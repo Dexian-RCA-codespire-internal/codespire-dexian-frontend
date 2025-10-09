@@ -16,14 +16,10 @@ export const validatePassword = (password = "") => {
   const meetsMin = length >= MIN_LENGTH;
   const meetsMax = length <= MAX_LENGTH;
 
-  // Check for repeated characters (3 or more in a row)
-  const hasRepeatedChars = /(.)\1{2,}/.test(password);
-
-  // Check for overall diversity (not just repeated single char)
-  const uniqueChars = new Set(password.split('')).size;
-  const isDiverse = uniqueChars >= 5; // Require at least 5 unique chars for strong
-
-  const allCriteria = meetsMin && hasUpperCase && hasLowerCase && hasNumber && hasSpecialChar && isDiverse && !hasRepeatedChars;
+  const criteria = [meetsMin, hasUpperCase, hasLowerCase, hasNumber, hasSpecialChar];
+  const score = criteria.filter(Boolean).length;
+  const allCriteria = score === 5;          
+  const isValid = allCriteria && meetsMax;
 
   return {
     isValid: allCriteria && meetsMax,
@@ -36,9 +32,7 @@ export const validatePassword = (password = "") => {
     hasSpecialChar,
     length,
     allCriteria,
-    hasRepeatedChars,
-    isDiverse,
-    score: [meetsMin, hasUpperCase, hasLowerCase, hasNumber, hasSpecialChar, isDiverse, !hasRepeatedChars].filter(Boolean).length
+    score: [meetsMin, hasUpperCase, hasLowerCase, hasNumber, hasSpecialChar].filter(Boolean).length
   };
 };
 
@@ -52,23 +46,18 @@ export const getPasswordStrength = (password = "") => {
     return { level: 'invalid', color: 'red', text: 'Too long (max 15)' };
   }
 
-  if (len < 5) {
-    return { level: 'weak', color: 'red', text: 'Weak' };
+  switch (true) {
+    case (v.score <= 2):
+      return { level: 'weak',  color: 'red',    text: 'Weak' };
+    case (v.score === 3):
+      return { level: 'fair',  color: 'orange', text: 'Fair' };
+    case (v.score === 4):
+      return { level: 'good',  color: 'green',   text: 'Good' };
+    case (v.score === 5):
+      return { level: 'strong',color: 'green',  text: 'Strong' };
+    default:
+      return { level: 'weak',  color: 'red',    text: 'Weak' };
   }
-
-  if (len >= 5 && (v.hasNumber || v.hasSpecialChar) && !v.allCriteria) {
-    return { level: 'fair', color: 'orange', text: 'Fair' };
-  }
-
-  if (v.allCriteria && len <= 10) {
-    return { level: 'good', color: 'blue', text: 'Good' };
-  }
-
-  if (v.allCriteria && len >= 11) {
-    return { level: 'strong', color: 'green', text: 'Strong' };
-  }
-
-  return { level: 'weak', color: 'red', text: 'Weak' };
 };
 
 export const getPasswordRequirements = (password = "") => {
@@ -82,34 +71,34 @@ export const getPasswordRequirements = (password = "") => {
   ];
 };
 
-// Phone number validation (unchanged)
+// Phone number validation 
 export const validatePhoneNumber = (phone) => {
   const phoneRegex = /^\+?[\d\s\-\(\)]{10,15}$/;
   return phoneRegex.test(phone);
 };
 
-// Name validation (unchanged)
+// Name validation 
 export const validateName = (name) => {
   const nameRegex = /^[a-zA-Z\s]{2,50}$/;
   return nameRegex.test(name.trim());
 };
 
-// OTP validation (unchanged)
+// OTP validation 
 export const validateOTP = (otp) => {
   const otpRegex = /^\d{6}$/;
   return otpRegex.test(otp);
 };
 
-// Registration form validator (only tweak the error text to match new rules)
+// Registration form validator 
 export const validateRegistrationForm = (formData) => {
   const errors = {};
 
   if (!formData.firstName || !validateName(formData.firstName)) {
-    errors.firstName = 'First name must be 2-50 characters and contain only letters';
+    errors.firstName = 'Enter between 2-50 characters';
   }
 
   if (!formData.lastName || !validateName(formData.lastName)) {
-    errors.lastName = 'Last name must be 2-50 characters and contain only letters';
+    errors.lastName = 'Enter between 2-50 characters';
   }
 
   if (!formData.email || !validateEmail(formData.email)) {
@@ -140,8 +129,8 @@ export const validateLoginForm = (formData) => {
   if (!formData.email || !validateEmail(formData.email)) {
     errors.email = 'Please enter a valid email address';
   }
-  if (!formData.password || formData.password.length < 6) {
-    errors.password = 'Password must be at least 6 characters';
+  if (!formData.password || formData.password.length < 8) {
+    errors.password = 'Password must be at least 8 characters';
   }
   return {
     isValid: Object.keys(errors).length === 0,

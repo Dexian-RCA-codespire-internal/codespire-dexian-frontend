@@ -44,22 +44,23 @@ export default function Register() {
   }
 
   // Password strength calculation
-  const passwordStrength = getPasswordStrength(formData.password)
-  const passwordRequirements = getPasswordRequirements(formData.password)
+  const passwordStrength = getPasswordStrength(formData.password);
+  const passwordRequirements = getPasswordRequirements(formData.password);
+
   const strengthBarClass =
-  passwordStrength.level === 'weak' ? 'bg-red-500' :
-  passwordStrength.level === 'fair' ? 'bg-orange-500' :
-  passwordStrength.level === 'good' ? 'bg-green-500' :
-  passwordStrength.level === 'strong' ? 'bg-green-500' :
-  passwordStrength.level === 'invalid' ? 'bg-red-500' :
-  'bg-gray-300';
+    passwordStrength.level === 'weak'   ? 'bg-red-500'    :
+    passwordStrength.level === 'fair'   ? 'bg-orange-500' :
+    passwordStrength.level === 'good'   ? 'bg-amber-500'   : 
+    passwordStrength.level === 'strong' ? 'bg-green-500'  :
+    passwordStrength.level === 'invalid'? 'bg-red-500'    :
+    'bg-gray-300';
 
   const strengthPercent =
-    passwordStrength.level === 'weak' ? 25 :
-    passwordStrength.level === 'fair' ? 50 :
-    passwordStrength.level === 'good' ? 75 :
+    passwordStrength.level === 'weak'   ? 25  :
+    passwordStrength.level === 'fair'   ? 50  :
+    passwordStrength.level === 'good'   ? 75  :
     passwordStrength.level === 'strong' ? 100 :
-    passwordStrength.level === 'invalid' ? 'bg-red-500' :
+    passwordStrength.level === 'invalid'? 0   :            
     0;
 
   // Country dropdown functions
@@ -73,10 +74,9 @@ export default function Register() {
 
   const handlePhoneChange = (e) => {
     const value = e.target.value
-    // Limit to 15 digits total (including country code)
-    if (value.length <= 15) {
-      setFormData(prev => ({ ...prev, phone: value }))
-    }
+    const digitsOnly = value.replace(/\D+/g, '');
+    const LOCAL_MAX = 15; 
+    setFormData(prev => ({ ...prev, phone: digitsOnly.slice(0, LOCAL_MAX) }));
   }
 
   // Close dropdown when clicking outside
@@ -263,13 +263,14 @@ export default function Register() {
                     required
                   />
                   {validationErrors.firstName && touchedFields.firstName && (
-                    <div className="flex items-center mt-1 text-red-600 text-xs">
+                    <div className="flex items-center mt-1 text-red-600 text-xs mt-10 ">
+
                       <AlertCircle className="h-3 w-3 mr-1" />
                       {validationErrors.firstName}
                     </div>
                   )}
                 </div>
-                <div className="relative">
+                <div className="relative " >
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <User className="h-5 w-5 text-gray-400" />
                   </div>
@@ -288,8 +289,8 @@ export default function Register() {
                     required
                   />
                   {validationErrors.lastName && touchedFields.lastName && (
-                    <div className="flex items-center mt-1 text-red-600 text-xs">
-                      <AlertCircle className="h-3 w-3 mr-1" />
+                    <div className="flex items-center text-red-600 text-xs absolute">
+                      {/* <AlertCircle className="h-3 w-3 mr-1 " /> */}
                       {validationErrors.lastName}
                     </div>
                   )}
@@ -382,6 +383,10 @@ export default function Register() {
                       name="phone"
                       value={formData.phone}
                       onChange={handlePhoneChange}
+                      maxLength={15}
+                      inputMode="numeric"        
+                      pattern="[0-9]*"           
+                      autoComplete="tel"
                       placeholder="Phone Number"
                       className="pl-10 h-10 sm:h-12 border border-gray-200 rounded-r-lg rounded-l-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm sm:text-base"
                       required
@@ -424,12 +429,15 @@ export default function Register() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs sm:text-sm text-gray-600">Password Strength</span>
                     <span className={`text-xs sm:text-sm font-medium ${
-                      passwordStrength.level === 'weak' ? 'text-red-600' :
-                      passwordStrength.level === 'fair' ? 'text-orange-600' :
-                      passwordStrength.level === 'good' ? 'text-green-600' : 'text-green-600'
-                    }`}>
-                      {passwordStrength.text}
-                    </span>
+                        passwordStrength.level === 'weak'   ? 'text-red-600'    :
+                        passwordStrength.level === 'fair'   ? 'text-orange-600' :
+                        passwordStrength.level === 'good'   ? 'text-amber-600'   :
+                        passwordStrength.level === 'strong' ? 'text-green-600'  :
+                        passwordStrength.level === 'invalid'? 'text-red-600'    :
+                        'text-gray-600'
+                      }`}>
+                        {passwordStrength.text}
+                      </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2">
                     <div
