@@ -22,7 +22,12 @@ export const integrationService = {
 
   // Update integration
   updateIntegration: async ({ integrationId, integrationData }) => {
-    const response = await api.put(`/integrations/${integrationId}`, integrationData);
+    const response = await api.put(`/integrations/${encodeURIComponent(integrationId)}`, integrationData);
+    return response.data;
+  },
+
+  getPingStatus: async () =>{
+    const response = await api.get('/integrations/ping-all-itsm-platforms')
     return response.data;
   },
 
