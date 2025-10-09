@@ -175,15 +175,15 @@ const RCADashboard = () => {
 
   const totalTicketsValue = Array.isArray(slaData) && slaData.length > 0 ? slaData.length : (dataStatistics?.total || wsPagination.totalCount || 0)
 
-  // Active SLA tickets: treat 'new', 'in progress' and 'on hold' (and variants) as active
-  const activeSlaTickets = Array.isArray(slaData)
+  // New SLA tickets: treat status containing 'new' or 'pending' as new tickets
+  const newSlaTickets = Array.isArray(slaData)
     ? slaData.filter(t => {
         const s = (t.status || '').toString().toLowerCase()
-        return s.includes('progress') || s.includes('in progress') || s.includes('new') || s.includes('hold')
+        return s.includes('new') || s.includes('pending')
       })
     : []
 
-  const activeTicketsValue = activeSlaTickets.length > 0 ? activeSlaTickets.length : (dataStatistics?.open || wsTickets.filter(ticket => ticket.status && !['Closed', 'Resolved', 'Cancelled'].includes(ticket.status)).length)
+  const newTicketsValue = newSlaTickets.length > 0 ? newSlaTickets.length : (dataStatistics?.new || wsTickets.filter(ticket => ticket.status && (ticket.status.toString().toLowerCase().includes('new') || ticket.status.toString().toLowerCase().includes('pending'))).length)
 
   const normalize = (v) => (v || '').toString().toLowerCase()
 
@@ -200,15 +200,76 @@ const RCADashboard = () => {
     return p.includes('p3') || p.includes('moderate')
   }).length : 0
 
-  const activeP1 = activeSlaTickets.length ? activeSlaTickets.filter(t => {
+  const newP1 = newSlaTickets.length ? newSlaTickets.filter(t => {
     const p = normalize(t.priority)
     return p.includes('p1') || p.includes('critical')
   }).length : 0
-  const activeP2 = activeSlaTickets.length ? activeSlaTickets.filter(t => {
+  const newP2 = newSlaTickets.length ? newSlaTickets.filter(t => {
     const p = normalize(t.priority)
     return p.includes('p2') || p.includes('high')
   }).length : 0
-  const activeP3 = activeSlaTickets.length ? activeSlaTickets.filter(t => {
+  const newP3 = newSlaTickets.length ? newSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p3') || p.includes('moderate')
+  }).length : 0
+
+  // Open tickets: use SLA slice and count tickets whose status indicates 'in progress'
+  const openSlaTickets = Array.isArray(slaData) ? slaData.filter(t => {
+    const s = (t.status || '').toString().toLowerCase()
+    return s.includes('progress') || s.includes('in progress') || s.includes('in-progress') || s.includes('assigned')
+  }) : []
+
+  const openTicketsCount = openSlaTickets.length
+  const openP1 = openSlaTickets.length ? openSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p1') || p.includes('critical')
+  }).length : 0
+  const openP2 = openSlaTickets.length ? openSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p2') || p.includes('high')
+  }).length : 0
+  const openP3 = openSlaTickets.length ? openSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p3') || p.includes('moderate')
+  }).length : 0
+
+  // Resolved tickets: use SLA slice and count tickets whose status indicates 'resolved' or 'closed'
+  // Resolved tickets: use SLA slice and count tickets whose status indicates 'resolved' only
+  const resolvedSlaTickets = Array.isArray(slaData) ? slaData.filter(t => {
+    const s = (t.status || '').toString().toLowerCase()
+    return s.includes('resolved')
+  }) : []
+
+  const resolvedTicketsCount = resolvedSlaTickets.length
+  const resolvedP1 = resolvedSlaTickets.length ? resolvedSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p1') || p.includes('critical')
+  }).length : 0
+  const resolvedP2 = resolvedSlaTickets.length ? resolvedSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p2') || p.includes('high')
+  }).length : 0
+  const resolvedP3 = resolvedSlaTickets.length ? resolvedSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p3') || p.includes('moderate')
+  }).length : 0
+
+  // Closed tickets: use SLA slice and count tickets whose status indicates 'closed'
+  const closedSlaTickets = Array.isArray(slaData) ? slaData.filter(t => {
+    const s = (t.status || '').toString().toLowerCase()
+    return s.includes('closed')
+  }) : []
+
+  const closedTicketsCount = closedSlaTickets.length
+  const closedP1 = closedSlaTickets.length ? closedSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p1') || p.includes('critical')
+  }).length : 0
+  const closedP2 = closedSlaTickets.length ? closedSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p2') || p.includes('high')
+  }).length : 0
+  const closedP3 = closedSlaTickets.length ? closedSlaTickets.filter(t => {
     const p = normalize(t.priority)
     return p.includes('p3') || p.includes('moderate')
   }).length : 0
@@ -224,13 +285,13 @@ const RCADashboard = () => {
       priorityLine: { p3: totalP3, p2: totalP2, p1: totalP1, isDynamic: true }
     },
     {
-      title: 'Active Tickets',
-      value: activeTicketsValue.toString(),
+      title: 'New Tickets',
+      value: newTicketsValue.toString(),
       subtitleColor: 'text-blue-600',
       icon: <FiAlertTriangle className="text-2xl text-blue-600" />,
       bgColor: 'bg-white',
       borderColor: 'border-gray-200',
-      priorityLine: { p1: activeP1, p2: activeP2, p3: activeP3, isDynamic: true }
+      priorityLine: { p1: newP1, p2: newP2, p3: newP3, isDynamic: true }
     }
   ]
 
@@ -651,46 +712,79 @@ const RCADashboard = () => {
           </div>
         </div>
 
-        {/* Summary Cards Section - only Total Tickets and Active Tickets, responsive 1/2 layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {summaryData.map((item, index) => (
-            <Card key={index} className={`bg-white border border-black shadow-sm rounded-lg hover:shadow-md transition-shadow duration-200`}>
-              <CardContent className="p-6 flex flex-col items-center justify-center min-h-[160px]">
-                {/* Title centered */}
-                <p className="font-semibold text-gray-700 text-lg text-center">{item.title}</p>
-
-                {/* Large centered value */}
-                <p className="text-5xl font-bold text-gray-900 mt-2 text-center" aria-label={`${item.title} count`}>{item.value}</p>
-
-                {/* Divider */}
-                <div className="w-full border-t border-gray-100 my-4" />
-
-                {/* Priority counts horizontally */}
-                {item.priorityLine ? (
-                  <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-1 text-sm text-gray-700 font-medium">
-                      <span className="inline-block w-2 h-2 rounded-full bg-green-500" aria-hidden="true" />
-                      <span>P3</span>
-                      <span className="font-semibold text-gray-900 ml-2">{item.priorityLine.p3}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-sm text-gray-700 font-medium">
-                      <span className="inline-block w-2 h-2 rounded-full bg-orange-400" aria-hidden="true" />
-                      <span>P2</span>
-                      <span className="font-semibold text-gray-900 ml-2">{item.priorityLine.p2}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-sm text-gray-700 font-medium">
-                      <span className="inline-block w-2 h-2 rounded-full bg-red-500" aria-hidden="true" />
-                      <span>P1</span>
-                      <span className="font-semibold text-gray-900 ml-2">{item.priorityLine.p1}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="h-6" />
-                )}
-
+        {/* Summary Cards Section - show five statistic cards in a single responsive row */}
+        <div className="mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {/* Total Tickets (existing) */}
+            <Card className={`bg-white border border-gray-200 shadow-sm rounded-xl hover:shadow-md transition-shadow duration-200 p-5`}> 
+              <CardContent className="p-0 flex flex-col items-start">
+                <p className="font-semibold text-gray-700 text-sm">Total Tickets</p>
+                <p className="text-3xl md:text-4xl font-bold text-gray-900 mt-2">{totalTicketsValue.toString()}</p>
+                <div className="w-full border-t border-gray-100 my-3" />
+                <div className="flex items-center gap-4 text-sm text-gray-700">
+                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500"/>P3<span className="font-semibold ml-1">{totalP3}</span></div>
+                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-orange-400"/>P2<span className="font-semibold ml-1">{totalP2}</span></div>
+                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500"/>P1<span className="font-semibold ml-1">{totalP1}</span></div>
+                </div>
               </CardContent>
             </Card>
-          ))}
+
+            {/* New Tickets (replaces Active Tickets) */}
+            <Card className={`bg-white border border-gray-200 shadow-sm rounded-xl hover:shadow-md transition-shadow duration-200 p-5`}> 
+              <CardContent className="p-0 flex flex-col items-start">
+                <p className="font-semibold text-gray-700 text-sm">New Tickets</p>
+                <p className="text-3xl md:text-4xl font-bold text-gray-900 mt-2">{newTicketsValue.toString()}</p>
+                <div className="w-full border-t border-gray-100 my-3" />
+                <div className="flex items-center gap-4 text-sm text-gray-700">
+                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500"/>P1<span className="font-semibold ml-1">{newP1}</span></div>
+                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-orange-400"/>P2<span className="font-semibold ml-1">{newP2}</span></div>
+                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500"/>P3<span className="font-semibold ml-1">{newP3}</span></div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Open Tickets (dynamic from SLA slice) */}
+            <Card className={`bg-white border border-gray-200 shadow-sm rounded-xl hover:shadow-md transition-shadow duration-200 p-5`}> 
+              <CardContent className="p-0 flex flex-col items-start">
+                <p className="font-semibold text-gray-700 text-sm">Open Tickets</p>
+                <p className="text-3xl md:text-4xl font-bold text-gray-900 mt-2">{openTicketsCount}</p>
+                <div className="w-full border-t border-gray-100 my-3" />
+                <div className="flex items-center gap-4 text-sm text-gray-700">
+                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500"/>P1<span className="font-semibold ml-1">{openP1}</span></div>
+                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-orange-400"/>P2<span className="font-semibold ml-1">{openP2}</span></div>
+                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500"/>P3<span className="font-semibold ml-1">{openP3}</span></div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Resolved Tickets (dynamic from SLA slice) */}
+            <Card className={`bg-white border border-gray-200 shadow-sm rounded-xl hover:shadow-md transition-shadow duration-200 p-5`}> 
+              <CardContent className="p-0 flex flex-col items-start">
+                <p className="font-semibold text-gray-700 text-sm">Resolved Tickets</p>
+                <p className="text-3xl md:text-4xl font-bold text-gray-900 mt-2">{resolvedTicketsCount}</p>
+                <div className="w-full border-t border-gray-100 my-3" />
+                <div className="flex items-center gap-4 text-sm text-gray-700">
+                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500"/>P3<span className="font-semibold ml-1">{resolvedP3}</span></div>
+                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-orange-400"/>P2<span className="font-semibold ml-1">{resolvedP2}</span></div>
+                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500"/>P1<span className="font-semibold ml-1">{resolvedP1}</span></div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Closed Tickets (dynamic from SLA slice) */}
+            <Card className={`bg-white border border-gray-200 shadow-sm rounded-xl hover:shadow-md transition-shadow duration-200 p-5`}> 
+              <CardContent className="p-0 flex flex-col items-start">
+                <p className="font-semibold text-gray-700 text-sm">Closed Tickets</p>
+                <p className="text-3xl md:text-4xl font-bold text-gray-900 mt-2">{closedTicketsCount}</p>
+                <div className="w-full border-t border-gray-100 my-3" />
+                <div className="flex items-center gap-4 text-sm text-gray-700">
+                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500"/>P3<span className="font-semibold ml-1">{closedP3}</span></div>
+                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-orange-400"/>P2<span className="font-semibold ml-1">{closedP2}</span></div>
+                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500"/>P1<span className="font-semibold ml-1">{closedP1}</span></div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
 

@@ -100,16 +100,15 @@ const Dashboard = () => {
   // Provide descriptive tooltip text per card
   const getCardInfoText = (title) => {
     switch (title) {
-      case 'TOTAL RCAs':
-        return 'Total number of root cause analysis records.'
+      case 'TOTAL TICKETS':
+        return 'Overall count of all incidents logged across the ITSM system.'
       case 'ACTIVE INVESTIGATIONS':
-        return 'Total number of tickets which are in investigation stage.'
+        return 'Tickets currently being reviewed to identify and fix root causes.'
       case 'SYSTEM HEALTH':
-        return 'System service health details.'
-      case 'SLA BREACHED':
-        return 'Total no tickets breached sla.'
-      case 'CRITICAL ISSUES':
-        return 'Tickets which are priortirised as p1 and p2.'
+        return 'Current operational status of all connected systems and services.'
+      case 'SLA BREACHES':
+        return 'Tickets that exceeded their defined SLA resolution timelines.'
+      
       
     }
   }
@@ -485,7 +484,7 @@ const Dashboard = () => {
   // Dynamic stats based on SLA data with trends
   const stats = [
     { 
-      title: 'TOTAL RCAs', 
+      title: 'TOTAL TICKETS', 
       value: slaLoading ? '...' : slaError ? 'Error' : statsWithTrends.totalRcas.value.toString(), 
       trend: statsWithTrends.totalRcas.trend,
       dailyData: statsWithTrends.totalRcas.dailyData,
@@ -505,7 +504,7 @@ const Dashboard = () => {
       barType: 'vertical'
     },
     { 
-      title: 'SLA BREACHED', 
+      title: 'SLA BREACHES', 
       // Prefer breached count from Redux metrics when available, then derived counts, then local websocket metrics
       value: (globalSlaMetrics?.breached ?? derivedSlaCounts?.breached ?? slaMetrics?.breached ?? statsWithTrends.slaBreached.value) ?? 0,
       trend: statsWithTrends.slaBreached.trend,
@@ -889,7 +888,7 @@ const Dashboard = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
         >
-          {stat.title === 'TOTAL RCAs' || stat.title === 'SLA BREACHED' ? (
+          {stat.title === 'TOTAL TICKETS' || stat.title === 'SLA BREACHED' ? (
                  <>
                    <div className="flex items-center justify-between mb-4">
                      <div className="flex items-center space-x-2">
@@ -936,7 +935,7 @@ const Dashboard = () => {
                   {stat.showBars && (
                      <div className="space-y-2">
                        
-                       {/* Line Chart for TOTAL RCAs */}
+                       {/* Line Chart for TOTAL TICKETS */}
                        <div className="relative h-16">
                          <svg className="w-full h-full" viewBox="0 0 200 60">
                            <defs>
@@ -995,7 +994,7 @@ const Dashboard = () => {
                   {/* debug UI removed */}
                  </>
                ) : (
-                 // Full dark theme for other cards (matching TOTAL RCAs)
+                 // Full dark theme for other cards (matching TOTAL TICKETS card above)
                  <>
                    <div className="flex items-center justify-between mb-4">
                      <div className="flex items-center space-x-2">
@@ -1034,7 +1033,7 @@ const Dashboard = () => {
                      <div className="space-y-2">
                        
                        {stat.barType === 'vertical' ? (
-                         // Minimal Line Chart for Active Investigations (same as TOTAL RCAs)
+                         // Minimal Line Chart for Active Investigations (same as TOTAL TICKETS)
                          <div className="relative h-16">
                            <svg className="w-full h-full" viewBox="0 0 200 60">
                              <defs>
