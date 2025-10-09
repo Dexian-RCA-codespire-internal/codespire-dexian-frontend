@@ -9,7 +9,7 @@ import SessionManager from './components/SessionManager'
 
 function AppContent() {
   // Initialize WebSocket connection and get notification handlers
-   useWebSocketOnly(import.meta.env.VITE_BACKEND_URL);
+   useWebSocketOnly(import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081');
 
   return (
     <>

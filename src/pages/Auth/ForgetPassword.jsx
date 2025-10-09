@@ -79,7 +79,7 @@ export default function ForgetPassword() {
                     alt="Dexian Logo" 
                     className="w-12 h-12 object-contain"
                   />
-                  <span className="text-2xl font-bold text-[#2b8f88]">Dexian</span>
+                  <span className="text-2xl font-bold text-[#2b8f88]">AIResolve360</span>
                 </div>
               </div>
               
@@ -156,8 +156,7 @@ export default function ForgetPassword() {
                         We've sent a password reset link to <strong>{email}</strong>
                       </p>
                       <p className="text-gray-500 text-xs">
-                        Please check your email and click the link to reset your password. 
-                        The link will open in this application and expire in 1 hour.
+                        We’ve sent your reset email. If it isn’t in your inbox, check spam/junk.
                       </p>
                     </div>
 
