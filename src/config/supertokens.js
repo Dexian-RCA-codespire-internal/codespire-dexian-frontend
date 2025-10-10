@@ -5,13 +5,13 @@ import Passwordless from 'supertokens-auth-react/recipe/passwordless';
 import Session from 'supertokens-auth-react/recipe/session';
 
 export const initSuperTokens = () => {
-  console.log('🔧 Initializing Frontend SuperTokens...');
+
   
   SuperTokens.init({
     appInfo: {
       appName: 'Dexian RCA Dashboard',
-      apiDomain: import.meta.env.VITE_API_URL || 'http://localhost:8081',
-      websiteDomain: import.meta.env.VITE_FRONTEND_URL || 'http://localhost:3001',
+      apiDomain: import.meta.env.VITE_API_URL,
+      websiteDomain: import.meta.env.VITE_FRONTEND_URL,
       apiBasePath: '/auth',
       websiteBasePath: '/'
     },
@@ -70,7 +70,7 @@ export const initSuperTokens = () => {
         sessionScope: import.meta.env.VITE_SESSION_DOMAIN || 'localhost',
         // Remove aggressive session expiry handler to prevent loops
         onSessionExpired: () => {
-          console.log('🔒 Session expired event triggered');
+
           // Only dispatch event, don't redirect immediately
           window.dispatchEvent(new CustomEvent('sessionExpired', {
             detail: { reason: 'expired' }
@@ -84,9 +84,8 @@ export const initSuperTokens = () => {
               // Handle session refresh with better error handling
               refreshSession: async function (input) {
                 try {
-                  console.log('🔄 Attempting session refresh...');
-                  const result = await originalImplementation.refreshSession(input);
-                  console.log('✅ Session refreshed successfully');
+              const result = await originalImplementation.refreshSession(input);
+                  
                   
                   // Dispatch refresh success event
                   window.dispatchEvent(new CustomEvent('sessionRefreshed', {
@@ -95,7 +94,7 @@ export const initSuperTokens = () => {
                   
                   return result;
                 } catch (error) {
-                  console.error('❌ Session refresh failed:', error);
+              
                   
                   // Dispatch refresh failed event
                   window.dispatchEvent(new CustomEvent('sessionRefreshFailed', {
@@ -120,11 +119,11 @@ export const initSuperTokens = () => {
                   const result = await originalImplementation.getSession(input);
                   return result;
                 } catch (error) {
-                  console.error('❌ Session validation failed:', error);
+          
                   
                   // Only redirect on unauthorized errors, not on network issues
                   if (error.message.includes('UNAUTHORISED') && !window.location.pathname.includes('/login')) {
-                    console.log('🔒 Unauthorized - redirecting to login');
+              
                     window.location.href = '/login?expired=true';
                   }
                   
@@ -141,12 +140,11 @@ export const initSuperTokens = () => {
       location: {
         ...original.location,
         setHref: (href) => {
-          console.log('🔗 SuperTokens redirect:', href);
+   
           
-          // Fix redirect URLs that point to /auth/login
           if (href.includes('/auth/login')) {
             const fixedHref = href.replace('/auth/login', '/login');
-            console.log('🔧 Fixed redirect URL:', fixedHref);
+      
             window.location.href = fixedHref;
           } else {
             window.location.href = href;

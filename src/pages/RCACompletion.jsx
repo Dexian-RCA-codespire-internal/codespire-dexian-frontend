@@ -96,6 +96,8 @@ const RCACompletion = () => {
     return () => {
       // Remove direct socket listeners only - don't disconnect the socket
       // The WebSocket connection is shared across the app and should persist
+      // Remove direct socket listeners only - don't disconnect the socket
+      // The WebSocket connection is shared across the app and should persist
       const socket = websocketService.getSocket()
       if (socket) {
         socket.off('rca_progress')
@@ -218,6 +220,19 @@ const RCACompletion = () => {
         setStreamingError(null)
         console.log('✅ Connected to WebSocket server:', websocketService.getSocket()?.id)
       }
+      // Check if already connected before attempting to connect
+      if (websocketService.getConnectionStatus()) {
+        console.log('✅ WebSocket already connected, reusing existing connection')
+        setWebsocketConnected(true)
+        setSocketId(websocketService.getSocket()?.id || null)
+        setStreamingError(null)
+      } else {
+        await websocketService.connect()
+        setWebsocketConnected(true)
+        setSocketId(websocketService.getSocket()?.id || null)
+        setStreamingError(null)
+        console.log('✅ Connected to WebSocket server:', websocketService.getSocket()?.id)
+      }
       
       // Set up event listeners
       console.log('🔧 Setting up event listeners...')
@@ -226,6 +241,14 @@ const RCACompletion = () => {
       const socket = websocketService.getSocket()
       if (socket) {
         console.log('🔧 Setting up direct Socket.IO listeners for RCA events...')
+        
+        // Remove any existing listeners first to prevent duplicates
+        socket.off('rca_progress')
+        socket.off('rca_generation')
+        socket.off('rca_chunk')
+        socket.off('rca_streaming')
+        socket.off('rca_complete')
+        socket.off('rca_error')
         
         // Remove any existing listeners first to prevent duplicates
         socket.off('rca_progress')
@@ -270,6 +293,7 @@ const RCACompletion = () => {
       }
       
       // Also set up websocketService listeners for other events
+      websocketService.off('disconnect', handleDisconnect) // Remove first to prevent duplicates
       websocketService.off('disconnect', handleDisconnect) // Remove first to prevent duplicates
       websocketService.on('disconnect', handleDisconnect)
       console.log('✅ Event listeners set up successfully')
@@ -413,6 +437,7 @@ const RCACompletion = () => {
       try {
         await connectWebSocket()
         // Wait a bit for connection to be fully established
+        // Wait a bit for connection to be fully established
         await new Promise(resolve => setTimeout(resolve, 500))
       } catch (error) {
         console.error('❌ Failed to connect WebSocket:', error)
@@ -422,11 +447,14 @@ const RCACompletion = () => {
     }
     
     // Verify connection after potential connect attempt
+    // Verify connection after potential connect attempt
     if (!websocketService.getConnectionStatus()) {
       console.error('❌ WebSocket connection failed')
       setStreamingError('Unable to establish server connection. Please try again.')
       return
     }
+    
+    console.log('✅ WebSocket verified connected, proceeding with RCA generation')
     
     console.log('✅ WebSocket verified connected, proceeding with RCA generation')
 

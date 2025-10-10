@@ -406,6 +406,7 @@ const RootCauseAnalysisStep = ({
   }, [currentTicket, stepData, similarTickets])
 
   // Restore root cause analysis data from stepData when component mounts
+  // Restore root cause analysis data from stepData when component mounts
   useEffect(() => {
     if (stepData?.rootCauseAnalysis) {
       console.log('RootCauseAnalysisStep: Restoring root cause analysis from stepData:', stepData.rootCauseAnalysis)
