@@ -992,7 +992,10 @@ Confidence: ${solution.confidence || 0}%`
                     }`}
                     onClick={() => handleSolutionSelect(solution)}
                   >
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start justify-between"      onClick={(e) => {
+                          e.stopPropagation()
+                          toggleSolutionExpansion(solutionId)
+                        }}>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           {getCategoryIcon(solution.category)}

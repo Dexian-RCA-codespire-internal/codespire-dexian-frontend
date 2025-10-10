@@ -39,6 +39,32 @@ const ImpactAssessmentStep = ({
   // Use the custom hook for text enhancement
   const { enhanceText, isLoading: isEnhancing, error: enhancementError } = useTextEnhancement()
 
+  // Ensure default values are set if none exist
+  useEffect(() => {
+    if (currentStep === 2 && stepData) {
+      // Set default impact level if not set
+      if (!stepData.impact_level_step2 && !impactLevel) {
+   
+        const defaultImpactLevel = 'sev3' // Sev 3 - Normal Impact
+        setImpactLevel(defaultImpactLevel)
+        setStepData((prevData) => ({
+          ...prevData,
+          impact_level_step2: defaultImpactLevel
+        }))
+      }
+      
+      // Set default department if not set
+      if (!stepData.department_affected_step2 && !departmentAffected) {
+      const defaultDepartment = 'it_operations' // IT Operations
+        setDepartmentAffected(defaultDepartment)
+        setStepData((prevData) => ({
+          ...prevData,
+          department_affected_step2: defaultDepartment
+        }))
+      }
+    }
+  }, [currentStep, stepData, impactLevel, departmentAffected, setStepData])
+
   // Load existing dropdown values when stepData changes
   useEffect(() => {
     if (stepData) {
@@ -63,9 +89,8 @@ const ImpactAssessmentStep = ({
           const firstAssessment = stepData.impact_assessments_step2[0];
           
           // Auto-populate description
-          if (firstAssessment.impactAssessment) {
-            console.log('ImpactAssessmentStep: Auto-populating description from first assessment:', firstAssessment.impactAssessment);
-            onResponseChange(firstAssessment.impactAssessment);
+          if (firstAssessment.impacts) {
+                     onResponseChange(firstAssessment.impacts);
           }
           
           // Auto-populate dropdown fields if they're not already set
@@ -133,6 +158,17 @@ const ImpactAssessmentStep = ({
       console.log('ImpactAssessmentStep: Reset API call flag (left step 2)')
     }
   }, [currentStep])
+
+  // Ensure stepData is updated when dropdown values change
+  useEffect(() => {
+    if (currentStep === 2 && (impactLevel || departmentAffected)) {
+      setStepData((prevData) => ({
+        ...prevData,
+        impact_level_step2: impactLevel || prevData.impact_level_step2,
+        department_affected_step2: departmentAffected || prevData.department_affected_step2
+      }))
+    }
+  }, [impactLevel, departmentAffected, currentStep, setStepData])
 
   // Generate impact assessment when component mounts (only for step 2)
   useEffect(() => {
@@ -244,9 +280,8 @@ const ImpactAssessmentStep = ({
                 }
                 
                 // Set the impact assessment description from first assessment
-                if (firstAssessment.impactAssessment) {
-                  console.log('ImpactAssessmentStep: Setting impact assessment text:', firstAssessment.impactAssessment)
-                  onResponseChange(firstAssessment.impactAssessment)
+                if (firstAssessment.impacts) {
+                 onResponseChange(firstAssessment.impacts)
                 }
               }
             }
@@ -304,7 +339,7 @@ const ImpactAssessmentStep = ({
 
   // Handle clicking on impact assessment
   const handleImpactAssessmentClick = (assessment) => {
-    onResponseChange(assessment.impactAssessment);
+    onResponseChange(assessment.impacts);
     
     // Update dropdowns based on selected assessment
     const impactLevelMap = {
@@ -573,11 +608,11 @@ const ImpactAssessmentStep = ({
 
                     </div>
                     <div className="text-sm text-gray-700 leading-relaxed mb-3 line-clamp-3 font-medium">
-                      {assessment.impactAssessment}
+                      {assessment.impacts}
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="text-xs text-gray-500">
-                        Confidence: <span className="font-semibold text-gray-700">{assessment.confidence}%</span>
+                        AI-Generated Impact Assessment
                       </div>
                       <div className="text-xs text-blue-600 font-semibold">
                         Click to apply

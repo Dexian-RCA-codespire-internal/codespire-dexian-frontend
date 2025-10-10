@@ -8,6 +8,7 @@ import { FormattedReport } from '../components/ui/FormattedReport'
 import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/skeleton'
 import KnowledgeBaseModal from '../components/ui/KnowledgeBaseModal'
+import { useToast } from '../contexts/ToastContext'
 import { 
   FiFileText, 
   FiUsers, 
@@ -28,6 +29,7 @@ const RCACompletion = () => {
   const { id, ticketId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
+  const { success, error: showError, info, warning } = useToast()
   const [technicalReport, setTechnicalReport] = useState('')
   const [customerSummary, setCustomerSummary] = useState('')
   
@@ -489,7 +491,26 @@ const RCACompletion = () => {
     try {
       setSaving(true)
       
-      // First, save the RCA report to the resolved ticket
+      // Just show the modal - don't save anything yet
+      // Saving will happen when user clicks the modal save button
+      setSaving(false)
+      setShowKBModal(true)
+      
+    } catch (err) {
+      console.error('❌ Error in handleSave:', err)
+      showError('Failed to open save dialog', {
+        title: 'Unexpected Error',
+        duration: 5000
+      })
+      setSaving(false)
+    }
+  }
+
+  const handleCreateKnowledgeBase = async (shouldCreateKB = true) => {
+    try {
+      setCreatingKB(true)
+      
+      // First, always save the RCA report to the resolved ticket
       const reportData = {
         rcaReport: technicalReport,
         customerFriSummery: customerSummary,
@@ -511,25 +532,24 @@ const RCACompletion = () => {
         
       } catch (saveError) {
         console.error('❌ Failed to save RCA report:', saveError)
-        setError('Failed to save RCA report to database')
-        setSaving(false)
+        showError('Failed to save RCA report to database', {
+          title: 'Save Failed',
+          duration: 5000
+        })
+        setCreatingKB(false)
         return
       }
       
-      // Show Knowledge Base creation modal
-      setSaving(false)
-      setShowKBModal(true)
-      
-    } catch (err) {
-      console.error('❌ Error in handleSave:', err)
-      setError('Failed to save reports')
-      setSaving(false)
-    }
-  }
-
-  const handleCreateKnowledgeBase = async () => {
-    try {
-      setCreatingKB(true)
+      if (!shouldCreateKB) {
+        // User chose to save RCA only, close modal and show success
+        setShowKBModal(false)
+        success('RCA reports saved successfully!', {
+          title: 'Save Complete',
+          duration: 3000
+        })
+        setCreatingKB(false)
+        return
+      }
       
       // Get the latest resolved ticket data or use current ticket data
       const currentTicketData = resolvedTicketData || ticketData
@@ -608,11 +628,21 @@ const RCACompletion = () => {
       
       // Close modal and show success message
       setShowKBModal(false)
-      alert('Knowledge Base entry created successfully! This solution is now available for future reference.')
+      success('RCA saved and Knowledge Base entry created successfully!', {
+        title: 'Knowledge Base Created',
+        duration: 4000
+      })
+      info('This solution is now searchable for future reference.', {
+        title: 'Available for Search',
+        duration: 3000
+      })
       
     } catch (error) {
       console.error('❌ Failed to create Knowledge Base:', error)
-      alert(`Failed to create Knowledge Base: ${error.message}`)
+      showError(`Failed to create Knowledge Base: ${error.message}`, {
+        title: 'Knowledge Base Creation Failed',
+        duration: 5000
+      })
     } finally {
       setCreatingKB(false)
     }
@@ -620,20 +650,36 @@ const RCACompletion = () => {
 
   const handleKBModalCancel = () => {
     setShowKBModal(false)
-    // Show a simple success message for just saving the RCA report
-    alert('RCA reports saved successfully!')
+    // Don't show any toast when canceling - user chose not to save
   }
 
   const handleUpdateTicket = async () => {
-    const resolveResponse = await ticketService.resolveTicket({
-      rootCause: customerSummary,
-      ticket: ticketData
-    })
-    
-    console.log('Ticket resolved successfully:', resolveResponse)
-    
-    // Show success message and navigate
-    alert('RCA completed successfully! Ticket has been resolved.')
+    try {
+      const resolveResponse = await ticketService.resolveTicket({
+        rootCause: customerSummary,
+        ticket: ticketData
+      })
+      
+      console.log('Ticket resolved successfully:', resolveResponse)
+      
+      // Show success message and navigate
+      success('RCA completed successfully! Ticket has been resolved.', {
+        title: 'Ticket Resolved',
+        duration: 4000
+      })
+      
+      // Navigate after a short delay to allow user to see the toast
+      setTimeout(() => {
+        navigate(-1)
+      }, 2000)
+      
+    } catch (error) {
+      console.error('❌ Failed to update ticket:', error)
+      showError('Failed to resolve ticket in ServiceNow', {
+        title: 'Ticket Update Failed',
+        duration: 5000
+      })
+    }
   }
 
   const handleBack = () => {
@@ -918,15 +964,9 @@ const RCACompletion = () => {
             className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-all shadow-sm"
           >
             <FiSave className="w-4 h-4" />
-            <span>{saving ? 'Saving...' : 'Save RCA'}</span>
+            <span>{saving ? 'Saving...' : 'Save Now'}</span>
           </button>
-          <button
-            onClick={handleUpdateTicket}
-            disabled={saving || streaming || (!technicalReport && !customerSummary)}
-            className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-all shadow-sm border border-blue-700"
-          >
-            <span>Update {ticketData?.source || 'ServiceNow'}</span>
-          </button>
+
         </div>
 
         {/* Knowledge Base Modal */}

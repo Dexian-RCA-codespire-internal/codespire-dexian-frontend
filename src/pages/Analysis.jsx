@@ -180,52 +180,18 @@ const Analysis = () => {
         console.log('No RCA resolved data found for ticket:', ticketId)
         setHasExistingRcaData(false)
         
-        // If no existing RCA data found, trigger AI generation for steps that need it
-        if (ticketData) {
-          console.log('No existing RCA data found. Triggering AI generation for steps that need it.')
-          
-          // Generate problem statement if not already generated
-          if (!hasAttemptedGeneration) {
-            console.log('Triggering problem statement generation...')
-            generateProblemStatement(ticketData)
-          } else {
-            console.log('Problem statement generation already attempted, skipping...')
-          }
-          
-          // Generate impact assessment if not already generated  
-          if (!hasAttemptedImpactGeneration) {
-            console.log('Triggering impact assessment generation...')
-            generateImpactAssessment(ticketData)
-          } else {
-            console.log('Impact assessment generation already attempted, skipping...')
-          }
-        }
+        // Don't trigger AI generation here to prevent infinite loops
+        // AI generation will be triggered by the RCAWorkflow component when user interacts with it
+        console.log('No existing RCA data found. AI generation will be triggered when user interacts with the workflow.')
       }
     } catch (err) {
       console.log('RCA resolved data not found or error:', err.message)
       setRcaDataError(err.message)
       setHasExistingRcaData(false)
       
-      // If no existing RCA data found (likely a 404), trigger AI generation for steps that need it
-      if (ticketData) {
-        console.log('RCA resolved data not found. Triggering AI generation for steps that need it.')
-        
-        // Generate problem statement if not already generated
-        if (!hasAttemptedGeneration) {
-          console.log('Triggering problem statement generation...')
-          generateProblemStatement(ticketData)
-        } else {
-          console.log('Problem statement generation already attempted, skipping...')
-        }
-        
-        // Generate impact assessment if not already generated  
-        if (!hasAttemptedImpactGeneration) {
-          console.log('Triggering impact assessment generation...')
-          generateImpactAssessment(ticketData)
-        } else {
-          console.log('Impact assessment generation already attempted, skipping...')
-        }
-      }
+      // Don't trigger AI generation here to prevent infinite loops
+      // AI generation will be triggered by the RCAWorkflow component when user interacts with it
+      console.log('RCA resolved data not found. AI generation will be triggered when user interacts with the workflow.')
     } finally {
       setIsLoadingRcaData(false)
     }
@@ -379,7 +345,7 @@ const Analysis = () => {
     if (ticketId && ticketData && !hasExistingRcaData && !isLoadingRcaData) {
       fetchRcaResolvedData(ticketId)
     }
-  }, [ticketId, ticketData, hasExistingRcaData, isLoadingRcaData])
+  }, [ticketId, ticketData]) // Removed hasExistingRcaData and isLoadingRcaData to prevent infinite loops
 
   // Set response data when existing RCA data is loaded and current step data exists
   useEffect(() => {
@@ -394,13 +360,59 @@ const Analysis = () => {
     }
   }, [hasExistingRcaData, rcaResolvedData, stepData.rca_workflow_steps, rcaStep, analysisResponse])
 
+  // Trigger AI generation for step 1 when appropriate
+  useEffect(() => {
+    // Only trigger if:
+    // 1. We have ticket data
+    // 2. We're on step 1
+    // 3. No existing RCA data
+    // 4. Haven't attempted generation yet
+    // 5. Not currently generating
+    // 6. Current step response is empty
+    if (
+      ticketData && 
+      rcaStep === 1 && 
+      !hasExistingRcaData && 
+      !hasAttemptedGeneration && 
+      !isGeneratingProblemStatement &&
+      (!analysisResponse || analysisResponse.trim().length === 0) &&
+      (!stepData.rca_workflow_steps?.[0] || stepData.rca_workflow_steps[0].trim().length === 0)
+    ) {
+      console.log('Triggering initial problem statement generation for new ticket')
+      generateProblemStatement(ticketData)
+    }
+  }, [ticketData, rcaStep, hasExistingRcaData, hasAttemptedGeneration, isGeneratingProblemStatement, analysisResponse, stepData.rca_workflow_steps])
+
+  // Trigger AI generation for step 2 when appropriate  
+  useEffect(() => {
+    // Only trigger if:
+    // 1. We have ticket data
+    // 2. We're on step 2
+    // 3. No existing RCA data
+    // 4. Haven't attempted impact generation yet
+    // 5. Not currently generating
+    // 6. Current step response is empty
+    if (
+      ticketData && 
+      rcaStep === 2 && 
+      !hasExistingRcaData && 
+      !hasAttemptedImpactGeneration && 
+      !isGeneratingImpactAssessment &&
+      (!analysisResponse || analysisResponse.trim().length === 0) &&
+      (!stepData.rca_workflow_steps?.[1] || stepData.rca_workflow_steps[1].trim().length === 0)
+    ) {
+      console.log('Triggering initial impact assessment generation for new ticket')
+      generateImpactAssessment(ticketData)
+    }
+  }, [ticketData, rcaStep, hasExistingRcaData, hasAttemptedImpactGeneration, isGeneratingImpactAssessment, analysisResponse, stepData.rca_workflow_steps])
+
   // Populate stepData from RCA resolved data when available
   useEffect(() => {
     if (hasExistingRcaData && rcaResolvedData?.ticket?.resolution_steps) {
       console.log('Populating stepData from RCA resolved data')
-
+      
       const resolutionSteps = rcaResolvedData.ticket.resolution_steps
-      const newWorkflowSteps = [...stepData.rca_workflow_steps]
+      const newWorkflowSteps = [...(stepData.rca_workflow_steps || ['', '', '', ''])]
 
       // Populate step 1 (Problem Statement)
       if (resolutionSteps.problem_statement?.completed && resolutionSteps.problem_statement.problemStatement) {
@@ -659,105 +671,103 @@ const Analysis = () => {
       console.log('Impact analysis already exists in RCA resolved data, skipping generation')
       return
     }
-    
+
     console.log('Generating impact assessment...')
 
     try {
       setIsGeneratingImpactAssessment(true)
       setHasAttemptedImpactGeneration(true)
       
-      // Check if we have the required data from previous steps
-      if (stepData.rca_workflow_steps[0]) {
-        const requestData = {
-          problemStatement: stepData.rca_workflow_steps[0],
-          timelineContext: stepData.rca_workflow_steps[0] // Use problem statement as context since timeline is removed
+
+      const requestData = {
+        shortDescription: ticket.short_description || ticket.shortDescription || '',
+        description: ticket.description || '',
+        category: ticket.category || '',
+        subcategory: ticket.subcategory || ticket.sub_category || ''
+      }
+  
+      const response = await aiService.impactAssessment.analyze(requestData)
+      
+      if (response.success && response.data && response.data.impactAssessments) {
+        // Store the impact assessments
+        setImpactAssessments(response.data.impactAssessments)
+        
+        // Save impact assessments to stepData for persistence
+        const updatedStepData = {
+          ...stepData,
+          impact_assessments_step2: response.data.impactAssessments
         }
+        setStepData(updatedStepData)
         
-        const response = await aiService.impactAssessment.analyze(requestData)
+        console.log('Impact assessments generated successfully:', response.data.impactAssessments)
         
-        if (response.success && response.data && response.data.impactAssessments) {
-          // Store the impact assessments
-          setImpactAssessments(response.data.impactAssessments)
-          
-          // Save impact assessments to stepData for persistence
-          const updatedStepData = {
-            ...stepData,
-            impact_assessments_step2: response.data.impactAssessments
-          }
-          setStepData(updatedStepData)
-          
-          console.log('Impact assessments generated successfully:', response.data.impactAssessments)
-          
-          // Save generated impact assessment to database immediately
-          if (ticketId && !hasExistingRcaData && !rcaResolvedData?.ticket?.resolution_steps?.impact_analysis?.completed && response.data.impactAssessments.length > 0) {
-            console.log('Saving generated impact assessment to database...')
-            try {
-              const firstAssessment = response.data.impactAssessments[0]
-              
-              // Map AI values to our dropdown values
-              const impactLevelMap = {
-                'Sev 1 - Critical Impact': 'Critical',
-                'Sev 2 - Major Impact': 'Major',
-                'Sev 3 - Normal Impact': 'Normal',
-                'Sev 4 - Minor Impact': 'Minor'
-              }
-              
-              const departmentMap = {
-                'Customer Support': 'Customer Support',
-                'Sales': 'Sales',
-                'IT Operations': 'IT Operations',
-                'Finance': 'Finance',
-                'Human Resources': 'Human Resources',
-                'Engineering': 'Engineering',
-                'Other': 'Other'
-              }
-              
-              const impactAnalysisData = {
-                impactLevel: impactLevelMap[firstAssessment.severity] || firstAssessment.severity || 'Critical',
-                departmentAffected: departmentMap[firstAssessment.departmentAffected] || firstAssessment.departmentAffected || 'Engineering',
-                impacts: [firstAssessment.impactAssessment] || response.data.impactAssessments.map(ia => ia.impactAssessment)
-              }
-              
-              const saveResponse = await rcaService.updateImpactAnalysis({
-                ticketId,
-                data: impactAnalysisData
-              })
-              
-              console.log('Impact assessment saved to database:', saveResponse)
-              
-              // Update local RCA resolved data state
-              if (saveResponse.success && saveResponse.ticket) {
-                setRcaResolvedData(saveResponse)
-                setHasExistingRcaData(true)
-              }
-              
-              // Also update the step data with the mapped values
-              setStepData(prevData => ({
-                ...prevData,
-                impact_level_step2: impactAnalysisData.impactLevel,
-                department_affected_step2: impactAnalysisData.departmentAffected,
-                rca_workflow_steps: [
-                  prevData.rca_workflow_steps[0] || '',
-                  firstAssessment.impactAssessment,
-                  prevData.rca_workflow_steps[2] || '',
-                  prevData.rca_workflow_steps[3] || ''
-                ]
-              }))
-              
-              // Set the response for the UI
-              if (firstAssessment.impactAssessment) {
-                setAnalysisResponse(firstAssessment.impactAssessment)
-              }
-              
-            } catch (error) {
-              console.error('Error saving generated impact assessment:', error)
+        // Save generated impact assessment to database immediately
+        if (ticketId && !hasExistingRcaData && !rcaResolvedData?.ticket?.resolution_steps?.impact_analysis?.completed && response.data.impactAssessments.length > 0) {
+          console.log('Saving generated impact assessment to database...')
+          try {
+            const firstAssessment = response.data.impactAssessments[0]
+            
+            // Map AI values to our dropdown values
+            const impactLevelMap = {
+              'Sev 1 - Critical Impact': 'Critical',
+              'Sev 2 - Major Impact': 'Major',
+              'Sev 3 - Normal Impact': 'Normal',
+              'Sev 4 - Minor Impact': 'Minor'
             }
+            
+            const departmentMap = {
+              'Customer Support': 'Customer Support',
+              'Sales': 'Sales',
+              'IT Operations': 'IT Operations',
+              'Finance': 'Finance',
+              'Human Resources': 'Human Resources',
+              'Engineering': 'Engineering',
+              'Other': 'Other'
+            }
+            
+            const impactAnalysisData = {
+              impactLevel: impactLevelMap[firstAssessment.impactLevel] || firstAssessment.impactLevel || 'Critical',
+              departmentAffected: departmentMap[firstAssessment.department] || firstAssessment.department || 'Engineering',
+              impacts: [firstAssessment.impacts] || response.data.impactAssessments.map(ia => ia.impacts)
+            }
+            
+            const saveResponse = await rcaService.updateImpactAnalysis({
+              ticketId,
+              data: impactAnalysisData
+            })
+            
+            console.log('Impact assessment saved to database:', saveResponse)
+            
+            // Update local RCA resolved data state
+            if (saveResponse.success && saveResponse.ticket) {
+              setRcaResolvedData(saveResponse)
+              setHasExistingRcaData(true)
+            }
+            
+            // Also update the step data with the mapped values
+            setStepData(prevData => ({
+              ...prevData,
+              impact_level_step2: impactAnalysisData.impactLevel,
+              department_affected_step2: impactAnalysisData.departmentAffected,
+              rca_workflow_steps: [
+                prevData.rca_workflow_steps[0] || '',
+                firstAssessment.impacts,
+                prevData.rca_workflow_steps[2] || '',
+                prevData.rca_workflow_steps[3] || ''
+              ]
+            }))
+            
+            // Set the response for the UI
+            if (firstAssessment.impacts) {
+              setAnalysisResponse(firstAssessment.impacts)
+            }
+            
+          } catch (error) {
+            console.error('Error saving generated impact assessment:', error)
           }
-        } else {
-          console.warn('Impact assessment API returned unsuccessful response:', response)
         }
       } else {
-        console.log('No problem statement available for impact assessment generation')
+        console.warn('Impact assessment API returned unsuccessful response:', response)
       }
     } catch (error) {
       console.error('Error generating impact assessment:', error)
@@ -797,6 +807,52 @@ const Analysis = () => {
     // No navigation needed - user can complete resolution here
     console.log('Resolution completed for ticket:', ticketId)
   }
+
+  // Trigger AI generation for step 1 when appropriate
+  useEffect(() => {
+    // Only trigger if:
+    // 1. We have ticket data
+    // 2. We're on step 1
+    // 3. No existing RCA data
+    // 4. Haven't attempted generation yet
+    // 5. Not currently generating
+    // 6. Current step response is empty
+    if (
+      ticketData && 
+      rcaStep === 1 && 
+      !hasExistingRcaData && 
+      !hasAttemptedGeneration && 
+      !isGeneratingProblemStatement &&
+      (!analysisResponse || analysisResponse.trim().length === 0) &&
+      (!stepData.rca_workflow_steps?.[0] || stepData.rca_workflow_steps[0].trim().length === 0)
+    ) {
+      console.log('Triggering initial problem statement generation for new ticket')
+      generateProblemStatement(ticketData)
+    }
+  }, [ticketData, rcaStep, hasExistingRcaData, hasAttemptedGeneration, isGeneratingProblemStatement, analysisResponse, stepData.rca_workflow_steps])
+
+  // Trigger AI generation for step 2 when appropriate  
+  useEffect(() => {
+    // Only trigger if:
+    // 1. We have ticket data
+    // 2. We're on step 2
+    // 3. No existing RCA data
+    // 4. Haven't attempted impact generation yet
+    // 5. Not currently generating
+    // 6. Current step response is empty
+    if (
+      ticketData && 
+      rcaStep === 2 && 
+      !hasExistingRcaData && 
+      !hasAttemptedImpactGeneration && 
+      !isGeneratingImpactAssessment &&
+      (!analysisResponse || analysisResponse.trim().length === 0) &&
+      (!stepData.rca_workflow_steps?.[1] || stepData.rca_workflow_steps[1].trim().length === 0)
+    ) {
+      console.log('Triggering initial impact assessment generation for new ticket')
+      generateImpactAssessment(ticketData)
+    }
+  }, [ticketData, rcaStep, hasExistingRcaData, hasAttemptedImpactGeneration, isGeneratingImpactAssessment, analysisResponse, stepData.rca_workflow_steps])
 
   // RCA Workflow Data
   const rcaSteps = [
@@ -933,12 +989,48 @@ const Analysis = () => {
           break
         
         case 2: // Impact Assessment
+          // Map dropdown values to display values that backend expects
+          const impactLevelDisplayMap = {
+            'sev1': 'Sev 1 - Critical Impact',
+            'sev2': 'Sev 2 - Major Impact',
+            'sev3': 'Sev 3 - Normal Impact',
+            'sev4': 'Sev 4 - Minor Impact'
+          }
+          
+          const departmentDisplayMap = {
+            'customer_support': 'Customer Support',
+            'sales': 'Sales',
+            'it_operations': 'IT Operations',
+            'finance': 'Finance',
+            'hr': 'Human Resources',
+            'other': 'Other'
+          }
+          
           const impactAnalysisData = {
-            impactLevel: stepDataToSave.impact_level_step2 || '',
-            departmentAffected: stepDataToSave.department_affected_step2 || '',
+            impactLevel: impactLevelDisplayMap[stepDataToSave.impact_level_step2] || stepDataToSave.impact_level_step2 || '',
+            departmentAffected: departmentDisplayMap[stepDataToSave.department_affected_step2] || stepDataToSave.department_affected_step2 || '',
             impacts: stepDataToSave.rca_workflow_steps?.[1] ? 
               stepDataToSave.rca_workflow_steps[1].split('\n').filter(impact => impact.trim()) : 
               analysisResponse.split('\n').filter(impact => impact.trim())
+          }
+
+          
+          // Validation check before API call
+          if (!impactAnalysisData.impactLevel || !impactAnalysisData.departmentAffected) {
+            console.error('❌ Missing required fields for impact analysis:', {
+              impactLevel: impactAnalysisData.impactLevel,
+              departmentAffected: impactAnalysisData.departmentAffected,
+              fullStepData: stepDataToSave
+            })
+            
+            // Provide default values if missing
+            if (!impactAnalysisData.impactLevel) {
+              impactAnalysisData.impactLevel = 'Sev 3 - Normal Impact' // Default impact level
+            }
+            
+            if (!impactAnalysisData.departmentAffected) {
+              impactAnalysisData.departmentAffected = 'IT Operations' // Default department
+          }
           }
           response = await rcaService.updateImpactAnalysis({
             ticketId,
