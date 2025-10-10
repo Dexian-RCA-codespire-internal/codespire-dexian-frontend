@@ -1,5 +1,5 @@
  
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { FiAlertTriangle, FiInfo, FiWifi, FiWifiOff, FiAlertTriangle as FiAlertTriangleIcon, FiRefreshCw, FiChevronDown } from "react-icons/fi";
@@ -186,6 +186,9 @@ const Dashboard = () => {
   // Update statsWithTrends when pingStatusData changes
   // Use Redux SLA data for charting. If store is empty, request a full fetch.
   const slaData = useSelector(selectSLAData)
+  // Track previous SLA ticket statuses to derive status-change events
+  const prevSlaStatusRef = useRef(new Map())
+  const [ticketEvents, setTicketEvents] = useState([])
   // Prefer authoritative metrics from Redux slice (may be updated by server/websocket)
   const globalSlaMetricsForCard = useSelector(selectSLAMetrics)
 
@@ -196,6 +199,93 @@ const Dashboard = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Derive ticket status-change events by diffing the SLA slice across updates
+  useEffect(() => {
+    try {
+      if (!Array.isArray(slaData)) return
+
+      const newEvents = []
+      const currentMap = new Map()
+
+      slaData.forEach(ticket => {
+        const id = ticket.ticketId || ticket.ticket_id || ticket._id || ticket.id
+        const status = (ticket.status || '').toString()
+        currentMap.set(id, status)
+
+        const prevStatus = prevSlaStatusRef.current.get(id)
+        if (typeof prevStatus === 'undefined') {
+          // newly seen ticket
+          // create a 'created' event only if ticket has a creation timestamp
+          const createdAt = ticket.createdAt || ticket.created || ticket.opened_time || ticket.openedAt || ticket.opened
+          if (createdAt) {
+            newEvents.push({
+              id: `ticket-created-${id}-${createdAt}`,
+              kind: 'ticket-created',
+              ticketId: id,
+              title: `Ticket ${id} created`,
+              message: ticket.short_description || ticket.title || '',
+              createdAt: new Date(createdAt).toISOString(),
+              payload: ticket
+            })
+          }
+        } else if (prevStatus !== status) {
+          // status changed
+          const updatedAt = ticket.updatedAt || ticket.updated || ticket.modifiedAt || new Date().toISOString()
+          newEvents.push({
+            id: `ticket-status-${id}-${updatedAt}`,
+            kind: 'ticket-status',
+            ticketId: id,
+            title: `Ticket ${id} status changed`,
+            message: `${prevStatus || 'unknown'} → ${status || 'unknown'}`,
+            from: prevStatus,
+            to: status,
+            createdAt: new Date(updatedAt).toISOString(),
+            payload: ticket
+          })
+        }
+      })
+
+      if (newEvents.length > 0) {
+        // prepend newest events and keep a bounded list
+        setTicketEvents(prev => {
+          const merged = [...newEvents, ...prev]
+          return merged.slice(0, 50)
+        })
+      }
+
+      // update prev map
+      prevSlaStatusRef.current = currentMap
+    } catch (err) {
+      // ignore
+      console.error('Error deriving ticket events:', err)
+    }
+  }, [slaData])
+
+  // Combine notifications and derived ticketEvents into a single activity feed
+  const activityItems = useMemo(() => {
+    const normNotifications = Array.isArray(notifications) ? notifications.map(n => ({
+      id: n._id || n.id || `notif-${Math.random().toString(36).slice(2,8)}`,
+      kind: 'notification',
+      createdAt: new Date(n.createdAt || n.created || n.timestamp || Date.now()).toISOString(),
+      title: n.title || n.subject || (typeof n.message === 'string' ? n.message.split('\n')[0] : 'Notification'),
+      message: typeof n.message === 'string' ? n.message : '',
+      payload: n
+    })) : []
+
+    const normTicketEvents = Array.isArray(ticketEvents) ? ticketEvents.map(e => ({
+      id: e.id,
+      kind: e.kind || 'ticket',
+      createdAt: e.createdAt || new Date().toISOString(),
+      title: e.title,
+      message: e.message,
+      payload: e.payload || null
+    })) : []
+
+    const merged = [...normNotifications, ...normTicketEvents]
+    merged.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return merged.slice(0, 3)
+  }, [notifications, ticketEvents])
 
   // Build seriesDaily and chartData from `slaData` whenever data or timeRange changes
   useEffect(() => {
@@ -371,19 +461,19 @@ const Dashboard = () => {
   setDerivedSlaCounts({ breached: breachedCount })
 
       // Also sync these into statsWithTrends so small cards show derived values
-      setStatsWithTrends(prev => ({
-        ...prev,
-        activeInvestigations: {
-          ...prev.activeInvestigations,
-          value: activeCount,
-          dailyData: prev.activeInvestigations?.dailyData || []
-        },
-        criticalIssues: {
-          ...prev.criticalIssues,
-          value: criticalCount,
-          dailyData: prev.criticalIssues?.dailyData || []
-        }
-      }))
+      // setStatsWithTrends(prev => ({
+      //   ...prev,
+      //   activeInvestigations: {
+      //     ...prev.activeInvestigations,
+      //     value: activeCount,
+      //     dailyData: prev.activeInvestigations?.dailyData || []
+      //   },
+      //   criticalIssues: {
+      //     ...prev.criticalIssues,
+      //     value: criticalCount,
+      //     dailyData: prev.criticalIssues?.dailyData || []
+      //   }
+      // }))
 
       // Compute last-7-days mini-graphs and week-over-week percent change per user request
       const WEEK_DAYS = 7
@@ -495,7 +585,7 @@ const Dashboard = () => {
     },
     { 
       title: 'ACTIVE INVESTIGATIONS', 
-      value: slaLoading ? '...' : slaError ? 'Error' : statsWithTrends.activeInvestigations.value.toString(), 
+      value: slaLoading ? '...' : slaError ? 'Error' : statsWithTrends.activeInvestigations.value, 
       trend: statsWithTrends.activeInvestigations.trend,
       dailyData: statsWithTrends.activeInvestigations.dailyData,
       icon: AiOutlineLineChart, 
@@ -612,14 +702,14 @@ const Dashboard = () => {
           })
 
           // Keep the small-card trends in sync with fetched SLA metrics
-          setStatsWithTrends(prev => ({
-            ...prev,
-            activeInvestigations: {
-              ...prev.activeInvestigations,
-              value: activeTickets,
-              dailyData: prev.activeInvestigations?.dailyData || []
-            }
-          }))
+          // setStatsWithTrends(prev => ({
+          //   ...prev,
+          //   activeInvestigations: {
+          //     ...prev.activeInvestigations,
+          //     value: activeTickets,
+          //     dailyData: prev.activeInvestigations?.dailyData || []
+          //   }
+          // }))
           
           setSlaLoading(false)
           return
@@ -1568,59 +1658,43 @@ const Dashboard = () => {
                 Retry
               </Button>
           </div>
-          ) : notifications.slice(0, 3).length === 0 ? (
+          ) : activityItems.length === 0 ? (
             <div className="text-center py-8">
               <div className="text-gray-500 text-sm">No recent activity</div>
-          </div>
+            </div>
           ) : (
-            notifications.slice(0, 3).map((notification, index) => (
-              <div key={notification._id || index} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+            activityItems.map((item) => (
+              <div key={item.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
                 <div className={`w-2 h-2 rounded-full ${
-                  notification.type === 'error' ? 'bg-red-500' :
-                  notification.type === 'warning' ? 'bg-yellow-500' :
-                  notification.type === 'success' ? 'bg-green-500' :
-                  'bg-blue-500'
+                  item.kind === 'notification' ? 'bg-blue-500' :
+                  item.kind === 'ticket-status' ? 'bg-yellow-500' :
+                  item.kind === 'ticket-created' ? 'bg-green-500' : 'bg-gray-400'
                 }`}></div>
-                 <div className="flex-1">
-                   <span className="text-sm text-gray-700">
-                     {(() => {
-                       // Extract SLA type from notification data
-                       const slaTypes = ['breached', 'warning', 'critical', 'expired', 'pending'];
-                       const notificationText = notification.title || notification.subject || notification.message || '';
-                       
-                       // Try to extract SLA type from notification content
-                       let slaType = 'pending'; // default
-                       for (const type of slaTypes) {
-                         if (notificationText.toLowerCase().includes(type)) {
-                           slaType = type;
-                           break;
-                         }
-                       }
-                       
-                       // Calculate dynamic time based on notification timestamp
-                       const notificationTime = new Date(notification.createdAt || new Date())
-                       const now = new Date()
-                       const diffInHours = Math.floor((now - notificationTime) / (1000 * 60 * 60))
-                       const diffInMinutes = Math.floor(((now - notificationTime) / (1000 * 60)) % 60)
-                       
-                       // Generate realistic time remaining based on SLA type
-                       let hoursRemaining, minutesRemaining
-                       if (slaType === 'breached') {
-                         hoursRemaining = Math.max(0, 24 - diffInHours)
-                         minutesRemaining = Math.max(0, 60 - diffInMinutes)
-                       } else if (slaType === 'critical') {
-                         hoursRemaining = Math.max(0, 4 - diffInHours)
-                         minutesRemaining = Math.max(0, 60 - diffInMinutes)
-                       } else {
-                         hoursRemaining = Math.max(0, 8 - diffInHours)
-                         minutesRemaining = Math.max(0, 60 - diffInMinutes)
-                       }
-                       
-                       return `SLA ${slaType} - ${hoursRemaining}h ${minutesRemaining}m remaining`
-                     })()}
-                   </span>
-          </div>
-          </div>
+                <div className="flex-1">
+                  <div className="text-sm text-gray-700 font-medium">{item.title}</div>
+                  {item.message && (
+                    <div className="text-sm text-gray-500 mt-1 truncate" title={item.message}>{item.message}</div>
+                  )}
+
+                  {item.payload && (
+                    <pre className="text-xs text-gray-500 mt-2 max-h-28 overflow-auto bg-gray-50 p-2 rounded">{JSON.stringify(item.payload, null, 2)}</pre>
+                  )}
+
+                  <div className="text-xs text-gray-400 mt-2">
+                    {(() => {
+                      const t = new Date(item.createdAt || Date.now())
+                      const diffMs = Date.now() - t.getTime()
+                      const mins = Math.floor(diffMs / 60000)
+                      if (mins < 1) return 'just now'
+                      if (mins < 60) return `${mins}m ago`
+                      const hrs = Math.floor(mins / 60)
+                      if (hrs < 24) return `${hrs}h ago`
+                      const days = Math.floor(hrs / 24)
+                      return `${days}d ago`
+                    })()}
+                  </div>
+                </div>
+              </div>
             ))
           )}
         </div>

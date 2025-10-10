@@ -13,6 +13,7 @@ import { useSelector } from 'react-redux'
 import { selectSLAData } from '../store/slaSlice'
 import { ticketService } from '../api/services/ticketService.js'
 import { useLocation } from 'react-router-dom'
+import TicketModal from '../components/TicketModal'
 
 
 const RCADashboard = () => {
@@ -273,6 +274,45 @@ const RCADashboard = () => {
     const p = normalize(t.priority)
     return p.includes('p3') || p.includes('moderate')
   }).length : 0
+
+  /*
+  Closed Tickets card (reserved for future use):
+
+  <Card className={`bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 h-full`}>
+    <CardContent className="p-0 flex flex-col justify-between h-full">
+      <p className="text-sm font-semibold text-gray-700">Closed Tickets</p>
+      <div className="text-4xl md:text-5xl font-bold text-gray-900 mt-2">{closedTicketsCount}</div>
+
+      <div className="w-full mt-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-gray-600">P1</div>
+          <div className="text-xs text-gray-600">{closedTicketsCount ? Math.round((closedP1 / closedTicketsCount) * 100) : 0}%</div>
+        </div>
+        <div className="w-full bg-gray-100 rounded-full h-2">
+          <div className="bg-red-500 h-2 rounded-full" style={{ width: `${closedTicketsCount ? Math.round((closedP1 / closedTicketsCount) * 100) : 0}%` }} />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-gray-600">P2</div>
+          <div className="text-xs text-gray-600">{closedTicketsCount ? Math.round((closedP2 / closedTicketsCount) * 100) : 0}%</div>
+        </div>
+        <div className="w-full bg-gray-100 rounded-full h-2">
+          <div className="bg-orange-400 h-2 rounded-full" style={{ width: `${closedTicketsCount ? Math.round((closedP2 / closedTicketsCount) * 100) : 0}%` }} />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-gray-600">P3</div>
+          <div className="text-xs text-gray-600">{closedTicketsCount ? Math.round((closedP3 / closedTicketsCount) * 100) : 0}%</div>
+        </div>
+        <div className="w-full bg-gray-100 rounded-full h-2">
+          <div className="bg-green-500 h-2 rounded-full" style={{ width: `${closedTicketsCount ? Math.round((closedP3 / closedTicketsCount) * 100) : 0}%` }} />
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+
+  End Closed Tickets card
+  */
 
   const summaryData = [
     {
@@ -576,6 +616,20 @@ const RCADashboard = () => {
   // Use tickets directly from backend - no frontend filtering needed
   const filteredCases = rcaCases
 
+  // Modal state for viewing ticket details
+  const [isTicketModalOpen, setIsTicketModalOpen] = useState(false)
+  const [selectedTicket, setSelectedTicket] = useState(null)
+
+  const openTicketModal = (ticket) => {
+    setSelectedTicket(ticket)
+    setIsTicketModalOpen(true)
+  }
+
+  const closeTicketModal = () => {
+    setIsTicketModalOpen(false)
+    setSelectedTicket(null)
+  }
+
   return (
     <div className="min-h-screen bg-white">
       
@@ -714,76 +768,156 @@ const RCADashboard = () => {
 
         {/* Summary Cards Section - show five statistic cards in a single responsive row */}
         <div className="mb-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {/* Total Tickets (existing) */}
-            <Card className={`bg-white border border-gray-200 shadow-sm rounded-xl hover:shadow-md transition-shadow duration-200 p-5`}> 
-              <CardContent className="p-0 flex flex-col items-start">
-                <p className="font-semibold text-gray-700 text-sm">Total Tickets</p>
-                <p className="text-3xl md:text-4xl font-bold text-gray-900 mt-2">{totalTicketsValue.toString()}</p>
-                <div className="w-full border-t border-gray-100 my-3" />
-                <div className="flex items-center gap-4 text-sm text-gray-700">
-                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500"/>P3<span className="font-semibold ml-1">{totalP3}</span></div>
-                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-orange-400"/>P2<span className="font-semibold ml-1">{totalP2}</span></div>
-                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500"/>P1<span className="font-semibold ml-1">{totalP1}</span></div>
+            <Card className={`bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 h-full`}> 
+              <CardContent className="p-0 flex flex-col justify-between h-full">
+                <p className="text-sm font-semibold text-gray-700">Total Tickets</p>
+                <div className="text-4xl md:text-5xl font-bold text-gray-900 mt-2">{totalTicketsValue}</div>
+
+                <div className="w-full mt-4 space-y-3">
+                  {/* P1 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P1</div>
+                    <div className="text-xs text-gray-600">{totalTicketsValue ? Math.round((totalP1 / totalTicketsValue) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-red-500 h-2 rounded-full transition-all duration-700" style={{ width: `${totalTicketsValue ? Math.round((totalP1 / totalTicketsValue) * 100) : 0}%` }} />
+                  </div>
+
+                  {/* P2 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P2</div>
+                    <div className="text-xs text-gray-600">{totalTicketsValue ? Math.round((totalP2 / totalTicketsValue) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-orange-400 h-2 rounded-full transition-all duration-700" style={{ width: `${totalTicketsValue ? Math.round((totalP2 / totalTicketsValue) * 100) : 0}%` }} />
+                  </div>
+
+                  {/* P3 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P3</div>
+                    <div className="text-xs text-gray-600">{totalTicketsValue ? Math.round((totalP3 / totalTicketsValue) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-green-500 h-2 rounded-full transition-all duration-700" style={{ width: `${totalTicketsValue ? Math.round((totalP3 / totalTicketsValue) * 100) : 0}%` }} />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* New Tickets (replaces Active Tickets) */}
-            <Card className={`bg-white border border-gray-200 shadow-sm rounded-xl hover:shadow-md transition-shadow duration-200 p-5`}> 
-              <CardContent className="p-0 flex flex-col items-start">
-                <p className="font-semibold text-gray-700 text-sm">New Tickets</p>
-                <p className="text-3xl md:text-4xl font-bold text-gray-900 mt-2">{newTicketsValue.toString()}</p>
-                <div className="w-full border-t border-gray-100 my-3" />
-                <div className="flex items-center gap-4 text-sm text-gray-700">
-                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500"/>P1<span className="font-semibold ml-1">{newP1}</span></div>
-                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-orange-400"/>P2<span className="font-semibold ml-1">{newP2}</span></div>
-                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500"/>P3<span className="font-semibold ml-1">{newP3}</span></div>
+            <Card className={`bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 h-full`}> 
+              <CardContent className="p-0 flex flex-col justify-between h-full">
+                <p className="text-sm font-semibold text-gray-700">New Tickets</p>
+                <div className="text-4xl md:text-5xl font-bold text-gray-900 mt-2">{newTicketsValue}</div>
+
+                <div className="w-full mt-4 space-y-3">
+                  {/* P1 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P1</div>
+                    <div className="text-xs text-gray-600">{newTicketsValue ? Math.round((newP1 / newTicketsValue) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-red-500 h-2 rounded-full transition-all duration-700" style={{ width: `${newTicketsValue ? Math.round((newP1 / newTicketsValue) * 100) : 0}%` }} />
+                  </div>
+
+                  {/* P2 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P2</div>
+                    <div className="text-xs text-gray-600">{newTicketsValue ? Math.round((newP2 / newTicketsValue) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-orange-400 h-2 rounded-full transition-all duration-700" style={{ width: `${newTicketsValue ? Math.round((newP2 / newTicketsValue) * 100) : 0}%` }} />
+                  </div>
+
+                  {/* P3 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P3</div>
+                    <div className="text-xs text-gray-600">{newTicketsValue ? Math.round((newP3 / newTicketsValue) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-green-500 h-2 rounded-full transition-all duration-700" style={{ width: `${newTicketsValue ? Math.round((newP3 / newTicketsValue) * 100) : 0}%` }} />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Open Tickets (dynamic from SLA slice) */}
-            <Card className={`bg-white border border-gray-200 shadow-sm rounded-xl hover:shadow-md transition-shadow duration-200 p-5`}> 
-              <CardContent className="p-0 flex flex-col items-start">
-                <p className="font-semibold text-gray-700 text-sm">Open Tickets</p>
-                <p className="text-3xl md:text-4xl font-bold text-gray-900 mt-2">{openTicketsCount}</p>
-                <div className="w-full border-t border-gray-100 my-3" />
-                <div className="flex items-center gap-4 text-sm text-gray-700">
-                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500"/>P1<span className="font-semibold ml-1">{openP1}</span></div>
-                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-orange-400"/>P2<span className="font-semibold ml-1">{openP2}</span></div>
-                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500"/>P3<span className="font-semibold ml-1">{openP3}</span></div>
+            <Card className={`bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 h-full`}> 
+              <CardContent className="p-0 flex flex-col justify-between h-full">
+                <p className="text-sm font-semibold text-gray-700">Open Tickets</p>
+                <div className="text-4xl md:text-5xl font-bold text-gray-900 mt-2">{openTicketsCount}</div>
+
+                <div className="w-full mt-4 space-y-3">
+                  {/* P1 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P1</div>
+                    <div className="text-xs text-gray-600">{openTicketsCount ? Math.round((openP1 / openTicketsCount) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-red-500 h-2 rounded-full transition-all duration-700" style={{ width: `${openTicketsCount ? Math.round((openP1 / openTicketsCount) * 100) : 0}%` }} />
+                  </div>
+
+                  {/* P2 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P2</div>
+                    <div className="text-xs text-gray-600">{openTicketsCount ? Math.round((openP2 / openTicketsCount) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-orange-400 h-2 rounded-full transition-all duration-700" style={{ width: `${openTicketsCount ? Math.round((openP2 / openTicketsCount) * 100) : 0}%` }} />
+                  </div>
+
+                  {/* P3 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P3</div>
+                    <div className="text-xs text-gray-600">{openTicketsCount ? Math.round((openP3 / openTicketsCount) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-green-500 h-2 rounded-full transition-all duration-700" style={{ width: `${openTicketsCount ? Math.round((openP3 / openTicketsCount) * 100) : 0}%` }} />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Resolved Tickets (dynamic from SLA slice) */}
-            <Card className={`bg-white border border-gray-200 shadow-sm rounded-xl hover:shadow-md transition-shadow duration-200 p-5`}> 
-              <CardContent className="p-0 flex flex-col items-start">
-                <p className="font-semibold text-gray-700 text-sm">Resolved Tickets</p>
-                <p className="text-3xl md:text-4xl font-bold text-gray-900 mt-2">{resolvedTicketsCount}</p>
-                <div className="w-full border-t border-gray-100 my-3" />
-                <div className="flex items-center gap-4 text-sm text-gray-700">
-                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500"/>P3<span className="font-semibold ml-1">{resolvedP3}</span></div>
-                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-orange-400"/>P2<span className="font-semibold ml-1">{resolvedP2}</span></div>
-                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500"/>P1<span className="font-semibold ml-1">{resolvedP1}</span></div>
+            <Card className={`bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 h-full`}> 
+              <CardContent className="p-0 flex flex-col justify-between h-full">
+                <p className="text-sm font-semibold text-gray-700">Resolved Tickets</p>
+                <div className="text-4xl md:text-5xl font-bold text-gray-900 mt-2">{resolvedTicketsCount}</div>
+
+                <div className="w-full mt-4 space-y-3">
+                  {/* P1 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P1</div>
+                    <div className="text-xs text-gray-600">{resolvedTicketsCount ? Math.round((resolvedP1 / resolvedTicketsCount) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-red-500 h-2 rounded-full transition-all duration-700" style={{ width: `${resolvedTicketsCount ? Math.round((resolvedP1 / resolvedTicketsCount) * 100) : 0}%` }} />
+                  </div>
+
+                  {/* P2 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P2</div>
+                    <div className="text-xs text-gray-600">{resolvedTicketsCount ? Math.round((resolvedP2 / resolvedTicketsCount) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-orange-400 h-2 rounded-full transition-all duration-700" style={{ width: `${resolvedTicketsCount ? Math.round((resolvedP2 / resolvedTicketsCount) * 100) : 0}%` }} />
+                  </div>
+
+                  {/* P3 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P3</div>
+                    <div className="text-xs text-gray-600">{resolvedTicketsCount ? Math.round((resolvedP3 / resolvedTicketsCount) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-green-500 h-2 rounded-full transition-all duration-700" style={{ width: `${resolvedTicketsCount ? Math.round((resolvedP3 / resolvedTicketsCount) * 100) : 0}%` }} />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Closed Tickets (dynamic from SLA slice) */}
-            <Card className={`bg-white border border-gray-200 shadow-sm rounded-xl hover:shadow-md transition-shadow duration-200 p-5`}> 
-              <CardContent className="p-0 flex flex-col items-start">
-                <p className="font-semibold text-gray-700 text-sm">Closed Tickets</p>
-                <p className="text-3xl md:text-4xl font-bold text-gray-900 mt-2">{closedTicketsCount}</p>
-                <div className="w-full border-t border-gray-100 my-3" />
-                <div className="flex items-center gap-4 text-sm text-gray-700">
-                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500"/>P3<span className="font-semibold ml-1">{closedP3}</span></div>
-                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-orange-400"/>P2<span className="font-semibold ml-1">{closedP2}</span></div>
-                  <div className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500"/>P1<span className="font-semibold ml-1">{closedP1}</span></div>
-                </div>
-              </CardContent>
-            </Card>
+            
           </div>
         </div>
 
@@ -1112,10 +1246,10 @@ const RCADashboard = () => {
                       <th className="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Source
                       </th>
-                      <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-48 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Progress
                       </th>
-                      <th className="w-32 px-8 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-36 px-8 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -1160,7 +1294,7 @@ const RCADashboard = () => {
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap align-middle">
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 pr-6">
                             <div className="flex-1">
                               <div className="flex items-center space-x-2">
                                 <div className="flex-1 bg-gray-200 rounded-full h-2">
@@ -1169,7 +1303,7 @@ const RCADashboard = () => {
                                     style={{ width: `${progress.percentage}%` }}
                                   ></div>
                                 </div>
-                                <span className="text-sm font-medium text-gray-700 min-w-[3rem]">
+                                <span className="text-sm font-medium text-gray-700 min-w-[3rem] w-12 text-right flex-shrink-0">
                                   {progress.percentage}%
                                 </span>
                               </div>
@@ -1184,12 +1318,12 @@ const RCADashboard = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium align-middle">
-                          <div className="flex items-center space-x-1 mr-8">
+                        <td className="px-4 py-4 text-sm font-medium align-middle w-48">
+                          <div className="flex items-center justify-end space-x-2">
                             {progress.percentage === 100 ? (
                               <Button 
                                 size="sm" 
-                                className="bg-gray-500 text-white cursor-not-allowed"
+                                className="bg-gray-500 text-white cursor-not-allowed flex-shrink-0"
                                 disabled
                               >
                                 Resolved
@@ -1197,19 +1331,20 @@ const RCADashboard = () => {
                             ) : (
                               <Button 
                                 size="sm" 
-                                className="bg-green-600 hover:bg-green-700 text-white"
+                                className="bg-green-600 hover:bg-green-700 text-white flex-shrink-0"
                                 onClick={() => navigate(getStageNavigationPath(case_.stage, case_))}
                               >
                                 Resolve
                               </Button>
                             )}
-                            {/* <Button 
+                            <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => navigate(`/complaint/${case_.id}`)}
+                              onClick={() => openTicketModal(case_)}
+                              className="flex-shrink-0"
                             >
                               View
-                            </Button> */}
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -1309,14 +1444,14 @@ const RCADashboard = () => {
                               Resolve
                             </Button>
                           )}
-                          {/* <Button 
+                          <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => navigate(`/complaint/${case_.id}`)}
+                            onClick={() => openTicketModal(case_)}
                             className="text-xs px-3 py-1"
                           >
                             View
-                          </Button> */}
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -1465,6 +1600,8 @@ const RCADashboard = () => {
           )}
         </div>
       </div>
+      {/* Ticket details modal */}
+      <TicketModal ticket={selectedTicket} open={isTicketModalOpen} onClose={closeTicketModal} />
     </div>
   )
 }
