@@ -4,18 +4,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
+import SLASearch from '../components/SLA/SLASearch'
 import { Progress } from '../components/ui/progress'
 import { Checkbox } from '../components/ui/checkbox'
 import { FiSearch, FiCheck, FiAlertTriangle, FiClipboard, FiChevronDown, FiCreditCard, FiChevronLeft, FiChevronRight, FiWifi, FiWifiOff, FiLoader, FiInfo } from 'react-icons/fi'
-import { transformTicketToRCACase } from '../api/rcaService'
 import useWebSocketOnly from '../hooks/useWebSocketOnly'
+import { useSelector } from 'react-redux'
+import { selectSLAData } from '../store/slaSlice'
+import { ticketService } from '../api/services/ticketService.js'
+import { useLocation } from 'react-router-dom'
+import TicketModal from '../components/TicketModal'
 
 
 const RCADashboard = () => {
   const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false)
-  const [showSuggestions, setShowSuggestions] = useState(false)
+    const [showFilterDropdown, setShowFilterDropdown] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [showInfoPopup, setShowInfoPopup] = useState(false)
   const [autoShowReason, setAutoShowReason] = useState(null)
@@ -28,6 +32,9 @@ const RCADashboard = () => {
   })
   const filterDropdownRef = useRef(null)
   const infoPopupRef = useRef(null)
+  const [highlightedTicketId, setHighlightedTicketId] = useState(null)
+  const rowRefs = useRef({})
+  const location = useLocation()
 
   // WebSocket-only hook for all data operations (NO REST API calls)
   const {
@@ -98,11 +105,58 @@ const RCADashboard = () => {
     }
   }, [wsConnected, wsInitialLoad])
 
+  // If URL contains highlightId, try to locate which page contains it and load that page
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const highlightId = params.get('highlightId')
+    const searchQuery = params.get('search')
+    if (!highlightId) return
+
+    // Use backend page-lookup endpoint when available to avoid scanning many pages
+    ;(async () => {
+      try {
+        const perPage = wsPagination.limit || 10
+
+        // First try the backend helper endpoint
+        const pageLookup = await ticketService.findTicketPage({ ticketId: highlightId, filters, pageLimit: perPage })
+        if (pageLookup && pageLookup.success && pageLookup.data && typeof pageLookup.data.page === 'number') {
+          const targetPage = pageLookup.data.page
+          wsGoToPage(targetPage, filters)
+          setHighlightedTicketId(highlightId)
+          return
+        }
+
+        // Fallback: page through REST /tickets until found (limited to 20 pages)
+        let page = 1
+        let found = false
+        let totalPages = 1
+
+        while (!found && page <= 20) {
+          const res = await ticketService.getTickets({ page, limit: perPage, query: searchQuery || highlightId })
+          const list = res && (res.data || res.results) ? (res.data || res.results) : []
+          const index = list.findIndex(t => (t.ticket_id || t.ticketId || t.number) === highlightId)
+          if (index !== -1) {
+            found = true
+            wsGoToPage(page, filters)
+            setHighlightedTicketId(highlightId)
+            break
+          }
+          totalPages = res && res.pagination ? res.pagination.totalPages || totalPages : totalPages
+          if (page >= totalPages) break
+          page += 1
+        }
+      } catch (err) {
+        console.error('Error locating ticket for highlight:', err)
+      }
+    })()
+  }, [location.search, wsConnected])
+
   // Refetch data when filters change (server-side filtering)
   useEffect(() => {
     if (wsConnected && !wsInitialLoad) {
-      console.log('🔍 Filters changed, refetching with server-side filtering:', filters)
-      fetchTickets(1, wsPagination.limit)
+      console.log('🔍 Filters changed, navigating to page 1 with server-side filtering:', filters)
+      // Use websocket goToPage to immediately fetch page 1 with new filters
+      wsGoToPage(1, filters)
     }
   }, [filters, wsConnected, wsInitialLoad])
 
@@ -117,43 +171,167 @@ const RCADashboard = () => {
     wsChangePageSize(newLimit, filters)
   }
 
-  // Summary data - calculated from WebSocket data and statistics
+  // Use SLA slice as authoritative source for totals & priorities
+  const slaData = useSelector(selectSLAData)
+
+  const totalTicketsValue = Array.isArray(slaData) && slaData.length > 0 ? slaData.length : (dataStatistics?.total || wsPagination.totalCount || 0)
+
+  // New SLA tickets: treat status containing 'new' or 'pending' as new tickets
+  const newSlaTickets = Array.isArray(slaData)
+    ? slaData.filter(t => {
+        const s = (t.status || '').toString().toLowerCase()
+        return s.includes('new') || s.includes('pending')
+      })
+    : []
+
+  const newTicketsValue = newSlaTickets.length > 0 ? newSlaTickets.length : (dataStatistics?.new || wsTickets.filter(ticket => ticket.status && (ticket.status.toString().toLowerCase().includes('new') || ticket.status.toString().toLowerCase().includes('pending'))).length)
+
+  const normalize = (v) => (v || '').toString().toLowerCase()
+
+  const totalP1 = Array.isArray(slaData) ? slaData.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p1') || p.includes('critical')
+  }).length : 0
+  const totalP2 = Array.isArray(slaData) ? slaData.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p2') || p.includes('high')
+  }).length : 0
+  const totalP3 = Array.isArray(slaData) ? slaData.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p3') || p.includes('moderate')
+  }).length : 0
+
+  const newP1 = newSlaTickets.length ? newSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p1') || p.includes('critical')
+  }).length : 0
+  const newP2 = newSlaTickets.length ? newSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p2') || p.includes('high')
+  }).length : 0
+  const newP3 = newSlaTickets.length ? newSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p3') || p.includes('moderate')
+  }).length : 0
+
+  // Open tickets: use SLA slice and count tickets whose status indicates 'in progress'
+  const openSlaTickets = Array.isArray(slaData) ? slaData.filter(t => {
+    const s = (t.status || '').toString().toLowerCase()
+    return s.includes('progress') || s.includes('in progress') || s.includes('in-progress') || s.includes('assigned')
+  }) : []
+
+  const openTicketsCount = openSlaTickets.length
+  const openP1 = openSlaTickets.length ? openSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p1') || p.includes('critical')
+  }).length : 0
+  const openP2 = openSlaTickets.length ? openSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p2') || p.includes('high')
+  }).length : 0
+  const openP3 = openSlaTickets.length ? openSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p3') || p.includes('moderate')
+  }).length : 0
+
+  // Resolved tickets: use SLA slice and count tickets whose status indicates 'resolved' or 'closed'
+  // Resolved tickets: use SLA slice and count tickets whose status indicates 'resolved' only
+  const resolvedSlaTickets = Array.isArray(slaData) ? slaData.filter(t => {
+    const s = (t.status || '').toString().toLowerCase()
+    return s.includes('resolved')
+  }) : []
+
+  const resolvedTicketsCount = resolvedSlaTickets.length
+  const resolvedP1 = resolvedSlaTickets.length ? resolvedSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p1') || p.includes('critical')
+  }).length : 0
+  const resolvedP2 = resolvedSlaTickets.length ? resolvedSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p2') || p.includes('high')
+  }).length : 0
+  const resolvedP3 = resolvedSlaTickets.length ? resolvedSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p3') || p.includes('moderate')
+  }).length : 0
+
+  // Closed tickets: use SLA slice and count tickets whose status indicates 'closed'
+  const closedSlaTickets = Array.isArray(slaData) ? slaData.filter(t => {
+    const s = (t.status || '').toString().toLowerCase()
+    return s.includes('closed')
+  }) : []
+
+  const closedTicketsCount = closedSlaTickets.length
+  const closedP1 = closedSlaTickets.length ? closedSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p1') || p.includes('critical')
+  }).length : 0
+  const closedP2 = closedSlaTickets.length ? closedSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p2') || p.includes('high')
+  }).length : 0
+  const closedP3 = closedSlaTickets.length ? closedSlaTickets.filter(t => {
+    const p = normalize(t.priority)
+    return p.includes('p3') || p.includes('moderate')
+  }).length : 0
+
+  /*
+  Closed Tickets card (reserved for future use):
+
+  <Card className={`bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 h-full`}>
+    <CardContent className="p-0 flex flex-col justify-between h-full">
+      <p className="text-sm font-semibold text-gray-700">Closed Tickets</p>
+      <div className="text-4xl md:text-5xl font-bold text-gray-900 mt-2">{closedTicketsCount}</div>
+
+      <div className="w-full mt-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-gray-600">P1</div>
+          <div className="text-xs text-gray-600">{closedTicketsCount ? Math.round((closedP1 / closedTicketsCount) * 100) : 0}%</div>
+        </div>
+        <div className="w-full bg-gray-100 rounded-full h-2">
+          <div className="bg-red-500 h-2 rounded-full" style={{ width: `${closedTicketsCount ? Math.round((closedP1 / closedTicketsCount) * 100) : 0}%` }} />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-gray-600">P2</div>
+          <div className="text-xs text-gray-600">{closedTicketsCount ? Math.round((closedP2 / closedTicketsCount) * 100) : 0}%</div>
+        </div>
+        <div className="w-full bg-gray-100 rounded-full h-2">
+          <div className="bg-orange-400 h-2 rounded-full" style={{ width: `${closedTicketsCount ? Math.round((closedP2 / closedTicketsCount) * 100) : 0}%` }} />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-gray-600">P3</div>
+          <div className="text-xs text-gray-600">{closedTicketsCount ? Math.round((closedP3 / closedTicketsCount) * 100) : 0}%</div>
+        </div>
+        <div className="w-full bg-gray-100 rounded-full h-2">
+          <div className="bg-green-500 h-2 rounded-full" style={{ width: `${closedTicketsCount ? Math.round((closedP3 / closedTicketsCount) * 100) : 0}%` }} />
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+
+  End Closed Tickets card
+  */
+
   const summaryData = [
     {
       title: 'Total Tickets',
-      value: (dataStatistics?.total || wsPagination.totalCount || 0).toString(),
-      subtitle: `${wsTickets.length} on current page`,
+      value: totalTicketsValue.toString(),
       subtitleColor: 'text-green-600',
       icon: <FiCreditCard className="text-2xl text-green-600" />,
       bgColor: 'bg-white',
-      borderColor: 'border-gray-200'
+      borderColor: 'border-gray-200',
+      priorityLine: { p3: totalP3, p2: totalP2, p1: totalP1, isDynamic: true }
     },
     {
-      title: 'Active Tickets',
-      value: (dataStatistics?.open || wsTickets.filter(ticket => ticket.status && !['Closed', 'Resolved', 'Cancelled'].includes(ticket.status)).length).toString(),
-      subtitle: 'Currently open',
+      title: 'New Tickets',
+      value: newTicketsValue.toString(),
       subtitleColor: 'text-blue-600',
       icon: <FiAlertTriangle className="text-2xl text-blue-600" />,
       bgColor: 'bg-white',
-      borderColor: 'border-gray-200'
-    },
-    {
-      title: 'High Priority',
-      value: wsTickets.filter(ticket => ticket.priority === 'P1' || ticket.priority === '1 - Critical' || ticket.priority === '2 - High').length.toString(),
-      subtitle: 'P1 & P2 tickets',
-      subtitleColor: 'text-red-600',
-      icon: <FiClipboard className="text-2xl text-red-600" />,
-      bgColor: 'bg-white',
-      borderColor: 'border-gray-200'
-    },
-    {
-      title: 'Page Info',
-      value: `${wsPagination.currentPage}/${wsPagination.totalPages}`,
-      subtitle: `${wsPagination.limit} per page`,
-      subtitleColor: 'text-gray-600',
-      icon: <FiCheck className="text-2xl text-gray-600" />,
-      bgColor: 'bg-white',
-      borderColor: 'border-gray-200'
+      borderColor: 'border-gray-200',
+      priorityLine: { p1: newP1, p2: newP2, p3: newP3, isDynamic: true }
     }
   ]
 
@@ -318,12 +496,13 @@ const RCADashboard = () => {
   }
 
   // Generate search suggestions based on current data
-  const generateSuggestions = (searchTerm) => {
+  // Local suggestions generator (based on current page results)
+  const localGenerateSuggestions = (searchTerm) => {
     if (!searchTerm.trim()) return []
-    
+
     const term = searchTerm.toLowerCase()
     const suggestions = []
-    
+
     // Get unique values from real tickets only
     const allTitles = [...new Set(wsTickets.map(c => c.short_description || c.title))].filter(Boolean)
     const allSystems = [...new Set(wsTickets.map(c => c.category || c.system))].filter(Boolean)
@@ -331,56 +510,71 @@ const RCADashboard = () => {
     const allStages = [...new Set(wsTickets.map(c => c.stage))].filter(Boolean)
     const allIds = [...new Set(wsTickets.map(c => c._id || c.id))].filter(Boolean)
     const allTicketIds = [...new Set(wsTickets.map(c => c.ticket_id || c.ticketId))].filter(Boolean)
-    
+
     // Search in titles
     allTitles.forEach(title => {
       if (title.toLowerCase().includes(term)) {
-        suggestions.push({ text: title, type: 'Title', field: 'short_description' })
+        suggestions.push({ text: title, type: 'RCA', subtype: 'Title', field: 'short_description' })
       }
     })
-    
+
     // Search in systems
     allSystems.forEach(system => {
       if (system.toLowerCase().includes(term)) {
-        suggestions.push({ text: system, type: 'System', field: 'category' })
+        suggestions.push({ text: system, type: 'RCA', subtype: 'System', field: 'category' })
       }
     })
-    
+
     // Search in sources
     allSources.forEach(source => {
       if (source.toLowerCase().includes(term)) {
-        suggestions.push({ text: source, type: 'Source', field: 'source' })
+        suggestions.push({ text: source, type: 'RCA', subtype: 'Source', field: 'source' })
       }
     })
-    
+
     // Search in stages
     allStages.forEach(stage => {
       if (stage.toLowerCase().includes(term)) {
-        suggestions.push({ text: stage, type: 'Stage', field: 'stage' })
+        suggestions.push({ text: stage, type: 'RCA', subtype: 'Stage', field: 'stage' })
       }
     })
-    
+
     // Search in IDs
     allIds.forEach(id => {
       if (id.toLowerCase().includes(term)) {
-        suggestions.push({ text: id, type: 'RCA ID', field: '_id' })
+        suggestions.push({ text: id, type: 'RCA', subtype: 'RCA ID', field: '_id' })
       }
     })
-    
+
     // Search in Ticket IDs
     allTicketIds.forEach(ticketId => {
       if (ticketId.toLowerCase().includes(term)) {
-        suggestions.push({ text: ticketId, type: 'Ticket ID', field: 'ticket_id' })
+        suggestions.push({ text: ticketId, type: 'RCA', subtype: 'Ticket ID', field: 'ticket_id' })
       }
     })
-    
+
     // Remove duplicates and limit to 8 suggestions
     const uniqueSuggestions = suggestions.filter((suggestion, index, self) => 
-      index === self.findIndex(s => s.text === suggestion.text && s.type === suggestion.type)
+      index === self.findIndex(s => s.text === suggestion.text && s.type === suggestion.type && s.subtype === suggestion.subtype)
     )
-    
-    return uniqueSuggestions.slice(0, 8)
+
+    return uniqueSuggestions.slice(0, 6)
   }
+
+  // Suggestion UI/remote fetch removed — SLASearch is now a simple input that updates filters
+
+  // When tickets are rendered, scroll highlighted ticket into view
+  useEffect(() => {
+    if (!highlightedTicketId) return
+    // find DOM node
+    const el = rowRefs.current[highlightedTicketId]
+    if (el && el.scrollIntoView) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      // briefly highlight via class
+      el.classList.add('ring-2', 'ring-yellow-300')
+      setTimeout(() => el.classList.remove('ring-2', 'ring-yellow-300'), 4000)
+    }
+  }, [wsTickets, highlightedTicketId])
 
   // Function to highlight search terms in text
   const highlightText = (text, searchTerm) => {
@@ -421,6 +615,20 @@ const RCADashboard = () => {
 
   // Use tickets directly from backend - no frontend filtering needed
   const filteredCases = rcaCases
+
+  // Modal state for viewing ticket details
+  const [isTicketModalOpen, setIsTicketModalOpen] = useState(false)
+  const [selectedTicket, setSelectedTicket] = useState(null)
+
+  const openTicketModal = (ticket) => {
+    setSelectedTicket(ticket)
+    setIsTicketModalOpen(true)
+  }
+
+  const closeTicketModal = () => {
+    setIsTicketModalOpen(false)
+    setSelectedTicket(null)
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -558,22 +766,159 @@ const RCADashboard = () => {
           </div>
         </div>
 
-        {/* Summary Cards Section */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {summaryData.map((item, index) => (
-            <Card key={index} className={`${item.bgColor} ${item.borderColor} shadow-sm hover:shadow-md transition-shadow duration-200`}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-600 mb-2">{item.title}</p>
-                    <p className="text-3xl font-bold text-gray-900 mb-2">{item.value}</p>
-                    <p className={`text-sm font-medium ${item.subtitleColor}`}>{item.subtitle}</p>
+        {/* Summary Cards Section - show five statistic cards in a single responsive row */}
+        <div className="mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {/* Total Tickets (existing) */}
+            <Card className={`bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 h-full`}> 
+              <CardContent className="p-0 flex flex-col justify-between h-full">
+                <p className="text-sm font-semibold text-gray-700">Total Tickets</p>
+                <div className="text-4xl md:text-5xl font-bold text-gray-900 mt-2">{totalTicketsValue}</div>
+
+                <div className="w-full mt-4 space-y-3">
+                  {/* P1 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P1</div>
+                    <div className="text-xs text-gray-600">{totalTicketsValue ? Math.round((totalP1 / totalTicketsValue) * 100) : 0}%</div>
                   </div>
-                  <div className="opacity-80">{item.icon}</div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-red-500 h-2 rounded-full transition-all duration-700" style={{ width: `${totalTicketsValue ? Math.round((totalP1 / totalTicketsValue) * 100) : 0}%` }} />
+                  </div>
+
+                  {/* P2 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P2</div>
+                    <div className="text-xs text-gray-600">{totalTicketsValue ? Math.round((totalP2 / totalTicketsValue) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-orange-400 h-2 rounded-full transition-all duration-700" style={{ width: `${totalTicketsValue ? Math.round((totalP2 / totalTicketsValue) * 100) : 0}%` }} />
+                  </div>
+
+                  {/* P3 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P3</div>
+                    <div className="text-xs text-gray-600">{totalTicketsValue ? Math.round((totalP3 / totalTicketsValue) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-green-500 h-2 rounded-full transition-all duration-700" style={{ width: `${totalTicketsValue ? Math.round((totalP3 / totalTicketsValue) * 100) : 0}%` }} />
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          ))}
+
+            {/* New Tickets (replaces Active Tickets) */}
+            <Card className={`bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 h-full`}> 
+              <CardContent className="p-0 flex flex-col justify-between h-full">
+                <p className="text-sm font-semibold text-gray-700">New Tickets</p>
+                <div className="text-4xl md:text-5xl font-bold text-gray-900 mt-2">{newTicketsValue}</div>
+
+                <div className="w-full mt-4 space-y-3">
+                  {/* P1 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P1</div>
+                    <div className="text-xs text-gray-600">{newTicketsValue ? Math.round((newP1 / newTicketsValue) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-red-500 h-2 rounded-full transition-all duration-700" style={{ width: `${newTicketsValue ? Math.round((newP1 / newTicketsValue) * 100) : 0}%` }} />
+                  </div>
+
+                  {/* P2 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P2</div>
+                    <div className="text-xs text-gray-600">{newTicketsValue ? Math.round((newP2 / newTicketsValue) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-orange-400 h-2 rounded-full transition-all duration-700" style={{ width: `${newTicketsValue ? Math.round((newP2 / newTicketsValue) * 100) : 0}%` }} />
+                  </div>
+
+                  {/* P3 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P3</div>
+                    <div className="text-xs text-gray-600">{newTicketsValue ? Math.round((newP3 / newTicketsValue) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-green-500 h-2 rounded-full transition-all duration-700" style={{ width: `${newTicketsValue ? Math.round((newP3 / newTicketsValue) * 100) : 0}%` }} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Open Tickets (dynamic from SLA slice) */}
+            <Card className={`bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 h-full`}> 
+              <CardContent className="p-0 flex flex-col justify-between h-full">
+                <p className="text-sm font-semibold text-gray-700">Open Tickets</p>
+                <div className="text-4xl md:text-5xl font-bold text-gray-900 mt-2">{openTicketsCount}</div>
+
+                <div className="w-full mt-4 space-y-3">
+                  {/* P1 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P1</div>
+                    <div className="text-xs text-gray-600">{openTicketsCount ? Math.round((openP1 / openTicketsCount) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-red-500 h-2 rounded-full transition-all duration-700" style={{ width: `${openTicketsCount ? Math.round((openP1 / openTicketsCount) * 100) : 0}%` }} />
+                  </div>
+
+                  {/* P2 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P2</div>
+                    <div className="text-xs text-gray-600">{openTicketsCount ? Math.round((openP2 / openTicketsCount) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-orange-400 h-2 rounded-full transition-all duration-700" style={{ width: `${openTicketsCount ? Math.round((openP2 / openTicketsCount) * 100) : 0}%` }} />
+                  </div>
+
+                  {/* P3 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P3</div>
+                    <div className="text-xs text-gray-600">{openTicketsCount ? Math.round((openP3 / openTicketsCount) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-green-500 h-2 rounded-full transition-all duration-700" style={{ width: `${openTicketsCount ? Math.round((openP3 / openTicketsCount) * 100) : 0}%` }} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Resolved Tickets (dynamic from SLA slice) */}
+            <Card className={`bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200 p-5 h-full`}> 
+              <CardContent className="p-0 flex flex-col justify-between h-full">
+                <p className="text-sm font-semibold text-gray-700">Resolved Tickets</p>
+                <div className="text-4xl md:text-5xl font-bold text-gray-900 mt-2">{resolvedTicketsCount}</div>
+
+                <div className="w-full mt-4 space-y-3">
+                  {/* P1 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P1</div>
+                    <div className="text-xs text-gray-600">{resolvedTicketsCount ? Math.round((resolvedP1 / resolvedTicketsCount) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-red-500 h-2 rounded-full transition-all duration-700" style={{ width: `${resolvedTicketsCount ? Math.round((resolvedP1 / resolvedTicketsCount) * 100) : 0}%` }} />
+                  </div>
+
+                  {/* P2 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P2</div>
+                    <div className="text-xs text-gray-600">{resolvedTicketsCount ? Math.round((resolvedP2 / resolvedTicketsCount) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-orange-400 h-2 rounded-full transition-all duration-700" style={{ width: `${resolvedTicketsCount ? Math.round((resolvedP2 / resolvedTicketsCount) * 100) : 0}%` }} />
+                  </div>
+
+                  {/* P3 */}
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600">P3</div>
+                    <div className="text-xs text-gray-600">{resolvedTicketsCount ? Math.round((resolvedP3 / resolvedTicketsCount) * 100) : 0}%</div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-green-500 h-2 rounded-full transition-all duration-700" style={{ width: `${resolvedTicketsCount ? Math.round((resolvedP3 / resolvedTicketsCount) * 100) : 0}%` }} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            
+          </div>
         </div>
 
 
@@ -597,51 +942,18 @@ const RCADashboard = () => {
           <div className="relative mb-6 max-w-full" ref={filterDropdownRef}>
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
-                <Input
-                  type="text"
-                  placeholder="Search RCAs by title, RCA ID, Ticket ID, system, source, or stage..."
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value)
-                    setShowSuggestions(e.target.value.trim().length > 0)
-                  }}
-                  onFocus={() => setShowSuggestions(searchTerm.trim().length > 0)}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  className="pl-10"
-                />
-                <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                  <FiSearch className="text-lg" />
+                <div>
+                  <SLASearch
+                    searchTerm={searchTerm}
+                    onSearchChange={(val) => {
+                      const v = val || ''
+                      setSearchTerm(v)
+                      // Update filters.search so server-side filtering is used
+                      setFilters(prev => ({ ...prev, search: v }))
+                    }}
+                  />
                 </div>
                 
-                {/* Search Suggestions Dropdown */}
-                {showSuggestions && generateSuggestions(searchTerm).length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-20 max-h-60 overflow-y-auto">
-                    {generateSuggestions(searchTerm).map((suggestion, index) => (
-                      <div
-                        key={index}
-                        className="px-4 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                        onClick={() => {
-                          setSearchTerm(suggestion.text)
-                          setShowSuggestions(false)
-                        }}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-gray-900">
-                              {highlightText(suggestion.text, searchTerm)}
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {suggestion.type}
-                            </div>
-                          </div>
-                          <Badge className="bg-blue-100 text-blue-800 text-xs">
-                            {suggestion.type}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
               <Button 
                 variant="outline" 
@@ -934,10 +1246,10 @@ const RCADashboard = () => {
                       <th className="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Source
                       </th>
-                      <th className="w-32 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-48 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Progress
                       </th>
-                      <th className="w-32 px-8 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-36 px-8 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -946,8 +1258,13 @@ const RCADashboard = () => {
                     {filteredCases.map((case_, index) => {
                       const isNewTicket = newTickets.some(ticket => ticket.ticketId === case_.ticketId)
                       const progress = calculateRCAProgress(case_)
+                      const rowKey = case_.ticketId || case_.ticket_id || case_._id || case_.id
                       return (
-                        <tr key={index} className={`hover:bg-gray-50 transition-colors h-16 ${isNewTicket ? 'bg-green-50 border-l-4 border-l-green-500' : ''}`}>
+                        <tr
+                          key={index}
+                          ref={(el) => { if (el && rowKey) rowRefs.current[rowKey] = el }}
+                          className={`hover:bg-gray-50 transition-colors h-16 ${isNewTicket ? 'bg-green-50 border-l-4 border-l-green-500' : ''}`}
+                        >
                           <td className="px-6 py-4 whitespace-nowrap align-middle">
                             <div className="flex items-center gap-2">
                               <div className="text-sm font-medium text-gray-900">
@@ -977,7 +1294,7 @@ const RCADashboard = () => {
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap align-middle">
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 pr-6">
                             <div className="flex-1">
                               <div className="flex items-center space-x-2">
                                 <div className="flex-1 bg-gray-200 rounded-full h-2">
@@ -986,7 +1303,7 @@ const RCADashboard = () => {
                                     style={{ width: `${progress.percentage}%` }}
                                   ></div>
                                 </div>
-                                <span className="text-sm font-medium text-gray-700 min-w-[3rem]">
+                                <span className="text-sm font-medium text-gray-700 min-w-[3rem] w-12 text-right flex-shrink-0">
                                   {progress.percentage}%
                                 </span>
                               </div>
@@ -1001,12 +1318,12 @@ const RCADashboard = () => {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium align-middle">
-                          <div className="flex items-center space-x-1 mr-8">
+                        <td className="px-4 py-4 text-sm font-medium align-middle w-48">
+                          <div className="flex items-center justify-end space-x-2">
                             {progress.percentage === 100 ? (
                               <Button 
                                 size="sm" 
-                                className="bg-gray-500 text-white cursor-not-allowed"
+                                className="bg-gray-500 text-white cursor-not-allowed flex-shrink-0"
                                 disabled
                               >
                                 Resolved
@@ -1014,19 +1331,20 @@ const RCADashboard = () => {
                             ) : (
                               <Button 
                                 size="sm" 
-                                className="bg-green-600 hover:bg-green-700 text-white"
+                                className="bg-green-600 hover:bg-green-700 text-white flex-shrink-0"
                                 onClick={() => navigate(getStageNavigationPath(case_.stage, case_))}
                               >
                                 Resolve
                               </Button>
                             )}
-                            {/* <Button 
+                            <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => navigate(`/complaint/${case_.id}`)}
+                              onClick={() => openTicketModal(case_)}
+                              className="flex-shrink-0"
                             >
                               View
-                            </Button> */}
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -1050,8 +1368,13 @@ const RCADashboard = () => {
                 {filteredCases.map((case_, index) => {
                   const isNewTicket = newTickets.some(ticket => ticket.ticketId === case_.ticketId)
                   const progress = calculateRCAProgress(case_)
+                  const cardKey = case_.ticketId || case_.ticket_id || case_._id || case_.id
                   return (
-                    <div key={index} className={`border-b border-gray-200 p-3 last:border-b-0 ${isNewTicket ? 'bg-green-50 border-l-4 border-l-green-500' : ''}`}>
+                    <div
+                      key={index}
+                      ref={(el) => { if (el && cardKey) rowRefs.current[cardKey] = el }}
+                      className={`border-b border-gray-200 p-3 last:border-b-0 ${isNewTicket ? 'bg-green-50 border-l-4 border-l-green-500' : ''}`}
+                    >
                       {/* Header with Ticket ID and Priority */}
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1 min-w-0 pr-2">
@@ -1121,14 +1444,14 @@ const RCADashboard = () => {
                               Resolve
                             </Button>
                           )}
-                          {/* <Button 
+                          <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => navigate(`/complaint/${case_.id}`)}
+                            onClick={() => openTicketModal(case_)}
                             className="text-xs px-3 py-1"
                           >
                             View
-                          </Button> */}
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -1277,6 +1600,8 @@ const RCADashboard = () => {
           )}
         </div>
       </div>
+      {/* Ticket details modal */}
+      <TicketModal ticket={selectedTicket} open={isTicketModalOpen} onClose={closeTicketModal} />
     </div>
   )
 }

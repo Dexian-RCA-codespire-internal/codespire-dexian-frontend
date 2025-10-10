@@ -562,21 +562,13 @@ const PlaybookRecommender = () => {
                </div>
           <div className="flex items-center gap-3">
             <Button 
-              variant="outline" 
-                onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2"
-            >
-              Filter
-              <FiFilter className="text-sm" />
-            </Button>
-            <Button 
               className="bg-green-600 hover:bg-green-700 text-white"
               onClick={handleNewPlaybook}
             >
               <FiPlus className="text-sm mr-2" />
               New Playbook
             </Button>
-              </div>
+          </div>
             </div>
 
         {/* Search Bar with Filter Dropdown */}

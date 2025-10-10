@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useEffect, useCallback } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import { motion } from 'framer-motion'
 import { FiClock, FiAlertTriangle, FiCheckCircle, FiAlertCircle, FiTrendingUp, FiActivity, FiWifi } from 'react-icons/fi'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
@@ -10,48 +11,55 @@ import {
   getSLAStatusColor, 
   getPriorityColor
 } from '../../utils/slaUtils'
+import {
+  fetchSLADashboardData,
+  handleSLAUpdate as handleSLAUpdateAction,
+  selectSLAMetrics,
+  selectSLAData,
+  selectSLALoading,
+  updateWebSocketStatus
+} from '../../store/slaSlice'
 
 const SLADashboardWidget = () => {
-  const [slaMetrics, setSlaMetrics] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [criticalTickets, setCriticalTickets] = useState([])
+  const dispatch = useDispatch()
+  const slaMetrics = useSelector(selectSLAMetrics)
+  const { metrics: loading } = useSelector(selectSLALoading)
+  const criticalTickets = useSelector(state => 
+    selectSLAData(state).filter(ticket => 
+      ticket.slaStatus === 'critical' || ticket.slaStatus === 'breached'
+    )
+  )
 
   // WebSocket handlers for real-time updates
   const handleSLAUpdate = useCallback((updateData) => {
     switch (updateData.type) {
       case 'metrics':
-        setSlaMetrics(prev => ({ ...prev, ...updateData.metrics }))
+        dispatch(handleSLAUpdateAction({ type: 'metrics', data: updateData.metrics }))
         break
       case 'breach':
       case 'critical':
-        // Refresh critical tickets when there's a breach or critical alert
-        fetchCriticalTickets()
+        // Refresh critical tickets and metrics when there's a breach or critical alert
+        dispatch(fetchSLADashboardData())
         break
       case 'refresh':
-        fetchSLAMetrics()
+        dispatch(fetchSLADashboardData())
         break
     }
-  }, [])
+  }, [dispatch])
 
   const handleTicketUpdate = useCallback((ticket, action) => {
-    // Update critical tickets list if the updated ticket affects it
+    // Dispatch ticket update to Redux store
+    dispatch(handleSLAUpdateAction({
+      type: 'ticket',
+      data: ticket,
+      action
+    }))
+    
+    // Refresh dashboard data if it's a critical or breached ticket
     if (ticket.slaInfo && (ticket.slaInfo.status === 'breached' || ticket.slaInfo.status === 'critical')) {
-      setCriticalTickets(prev => {
-        if (action === 'new') {
-          return [ticket, ...prev.slice(0, 2)] // Keep only top 3
-        } else {
-          return prev.map(existing => 
-            existing.ticketId === ticket.ticketId ? ticket : existing
-          )
-        }
-      })
-    } else {
-      // Remove from critical tickets if it no longer qualifies
-      setCriticalTickets(prev => 
-        prev.filter(existing => existing.ticketId !== ticket.ticketId)
-      )
+      dispatch(fetchSLADashboardData())
     }
-  }, [])
+  }, [dispatch])
 
   // Initialize WebSocket connection
   const { isConnected, connect, disconnect } = useSLAWebSocket(
@@ -66,36 +74,18 @@ const SLADashboardWidget = () => {
   // Connect WebSocket on mount
   useEffect(() => {
     connect()
-    return () => disconnect()
-  }, [connect, disconnect])
-
-  // Fetch critical tickets separately
-  const fetchCriticalTickets = async () => {
-    try {
-      const criticalResponse = await slaService.getSLAs({
-        limit: 5,
-        sortBy: 'opened_time',
-        sortOrder: 'asc'
-      })
-      
-      if (criticalResponse.success && criticalResponse.slas) {
-        const urgentTickets = criticalResponse.slas
-          .map(ticket => ({
-            ...ticket,
-            slaInfo: calculateSLATimeLeft(ticket.opened_time, ticket.priority, ticket.status)
-          }))
-          .filter(ticket => 
-            ticket.slaInfo.status === 'breached' || 
-            ticket.slaInfo.status === 'critical'
-          )
-          .slice(0, 3)
-        
-        setCriticalTickets(urgentTickets)
-      }
-    } catch (error) {
-      console.error('Error fetching critical tickets:', error)
+    dispatch(updateWebSocketStatus({ isConnected: true }))
+    return () => {
+      disconnect()
+      dispatch(updateWebSocketStatus({ isConnected: false }))
     }
-  }
+  }, [connect, disconnect, dispatch])
+
+  // Fetch initial data
+  useEffect(() => {
+    dispatch(fetchSLADashboardData())
+  }, [dispatch]);
+    
 
   // Fetch SLA metrics for dashboard
   const fetchSLAMetrics = async () => {
@@ -125,14 +115,22 @@ const SLADashboardWidget = () => {
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="animate-pulse">
-            <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
-            <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {[...Array(2)].map((_, idx) => (
+          <Card key={idx}>
+            <CardContent className="p-6">
+              <div className="animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+                <div className="space-y-2">
+                  <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+                  <div className="h-8 bg-gray-200 rounded w-3/4"></div>
+                  <div className="h-8 bg-gray-200 rounded w-2/3"></div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     )
   }
 

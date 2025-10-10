@@ -98,6 +98,33 @@ export const ticketService = {
     return response.data;
   },
 
+  // Find which page a ticket belongs to given current filters
+  // Backend expected endpoint: GET /tickets/find-by-ticketId?ticketId=INC001&pageLimit=10&...filters
+  // Returns { success: true, data: { page, index, pagination } }
+  findTicketPage: async ({ ticketId, filters = {}, pageLimit = 10 }) => {
+    try {
+      const params = {
+        ticketId,
+        pageLimit,
+        ...(filters.search && { search: filters.search }),
+        ...(filters.source && { source: filters.source }),
+        ...(filters.priority && { priority: filters.priority }),
+        ...(filters.status && { status: filters.status }),
+        ...(filters.dateRange && filters.dateRange.startDate && { startDate: filters.dateRange.startDate }),
+        ...(filters.dateRange && filters.dateRange.endDate && { endDate: filters.dateRange.endDate })
+      }
+
+      const response = await api.get('/tickets/find-by-ticketId', { params })
+      return response.data
+    } catch (err) {
+      // If backend doesn't provide the endpoint, return null for caller to fallback
+      if (err.response && (err.response.status === 404 || err.response.status === 501)) {
+        return null
+      }
+      throw err
+    }
+  },
+
   // Get tickets by source (ServiceNow, Jira, etc.)
   getTicketsBySource: async (source, params = {}) => {
     const apiParams = {

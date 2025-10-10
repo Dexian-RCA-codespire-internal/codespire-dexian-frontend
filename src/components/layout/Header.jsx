@@ -65,11 +65,13 @@ const Header = () => {
 
   const closeUserMenu = () => {
     setIsUserMenuOpen(false);
+    setProfileError(null); // Clear any profile errors when closing menu
   };
 
   const handleLogout = async () => {
     try {
       setIsUserMenuOpen(false);
+      console.log('🚪 Logging out user...');
       
       await logout();
  

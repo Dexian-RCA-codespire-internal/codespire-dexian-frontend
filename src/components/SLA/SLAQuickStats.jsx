@@ -1,68 +1,42 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useEffect, useCallback } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import { motion } from 'framer-motion'
 import { FiClock, FiAlertTriangle, FiCheckCircle, FiAlertCircle, FiWifi } from 'react-icons/fi'
 import { Card, CardContent } from '../ui/card'
-import { slaService } from '../../api/services/slaService'
 import { useSLAWebSocket } from '../../hooks/useSLAWebSocket'
+import {
+  fetchSLAStats,
+  handleSLAUpdate as handleSLAUpdateAction,
+  selectSLAStats,
+  selectSLALoading,
+  updateWebSocketStatus
+} from '../../store/slaSlice'
 
 const SLAQuickStats = ({ refreshTrigger = 0 }) => {
-  const [stats, setStats] = useState({
-    totalTickets: 0,
-    breached: 0,
-    critical: 0,
-    warning: 0,
-    safe: 0,
-    breachRate: 0
-  })
-  const [loading, setLoading] = useState(true)
+  const dispatch = useDispatch()
+  const stats = useSelector(selectSLAStats)
+  const { stats: loading } = useSelector(selectSLALoading)
 
   // WebSocket handlers for real-time updates
   const handleSLAUpdate = useCallback((updateData) => {
     switch (updateData.type) {
       case 'metrics':
-        setStats(prev => ({ ...prev, ...updateData.metrics }))
+      case 'stats':
+        dispatch(handleSLAUpdateAction({
+          type: 'stats',
+          data: updateData.metrics || updateData.stats
+        }))
         break
       case 'refresh':
-        fetchStats()
+        dispatch(fetchSLAStats())
         break
     }
-  }, [])
+  }, [dispatch])
 
-  const handleTicketUpdate = useCallback((ticket, action) => {
-    // Update stats based on ticket changes
-    if (ticket.slaInfo) {
-      setStats(prev => {
-        const newStats = { ...prev }
-        
-        if (action === 'new') {
-          newStats.totalTickets++
-        }
-        
-        // Update status counts based on SLA info
-        switch (ticket.slaInfo.status) {
-          case 'breached':
-            newStats.breached = Math.max(0, (newStats.breached || 0) + (action === 'new' ? 1 : 0))
-            break
-          case 'critical':
-            newStats.critical = Math.max(0, (newStats.critical || 0) + (action === 'new' ? 1 : 0))
-            break
-          case 'warning':
-            newStats.warning = Math.max(0, (newStats.warning || 0) + (action === 'new' ? 1 : 0))
-            break
-          case 'safe':
-            newStats.safe = Math.max(0, (newStats.safe || 0) + (action === 'new' ? 1 : 0))
-            break
-        }
-        
-        // Recalculate breach rate
-        newStats.breachRate = newStats.totalTickets > 0 
-          ? Math.round((newStats.breached / newStats.totalTickets) * 100) 
-          : 0
-        
-        return newStats
-      })
-    }
-  }, [])
+  const handleTicketUpdate = useCallback((ticket) => {
+    // Update stats automatically by fetching fresh stats
+    dispatch(fetchSLAStats())
+  }, [dispatch])
 
   // Initialize WebSocket connection
   const { isConnected, connect, disconnect } = useSLAWebSocket(

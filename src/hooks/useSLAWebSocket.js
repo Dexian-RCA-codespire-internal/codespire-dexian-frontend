@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef, useState } from 'react'
 import webSocketService from '../services/websocketService'
+import { webSocketManager } from '../utils/websocketManager'
 import { calculateSLATimeLeft } from '../utils/slaUtils'
 
 /**
@@ -27,6 +28,8 @@ export const useSLAWebSocket = (onSLAUpdate, onTicketUpdate, options = {}) => {
 
   // Event handler IDs for cleanup
   const eventHandlerIdsRef = useRef([])
+  // Unique id for subscribing to the global WebSocket manager
+  const componentIdRef = useRef(Math.random().toString(36).substr(2, 9))
 
   // Process ticket data and calculate SLA information
   const processTicketForSLA = useCallback((ticketData) => {
@@ -181,7 +184,20 @@ export const useSLAWebSocket = (onSLAUpdate, onTicketUpdate, options = {}) => {
       }
 
       // Connect using existing WebSocket service
-      webSocketService.connect()
+      // Use the same server URL pattern used elsewhere in the app
+      const serverUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081'
+
+      // Register as a subscriber with the global manager and initialize if needed
+      webSocketManager.subscribe(componentIdRef.current)
+      const shouldInitialize = webSocketManager.init(serverUrl)
+      if (shouldInitialize) {
+        webSocketService.connect(serverUrl)
+      } else {
+        // Ensure service connection status is propagated
+        if (!webSocketService.getConnectionStatus()) {
+          webSocketService.connect(serverUrl)
+        }
+      }
 
       // Set up connection status listener
       const connectionId = webSocketService.on('connection', (data) => {
@@ -235,12 +251,18 @@ export const useSLAWebSocket = (onSLAUpdate, onTicketUpdate, options = {}) => {
 
       // Remove all event listeners
       eventHandlerIdsRef.current.forEach(id => {
-        webSocketService.off(id)
+        // off expects (event, callback) but we don't store callbacks here; attempt best-effort removal
+        try { webSocketService.off(id) } catch (e) { /* ignore */ }
       })
       eventHandlerIdsRef.current = []
 
       // Disconnect the WebSocket service
-      webSocketService.disconnect()
+      // Unsubscribe from the global manager and only disconnect the physical socket
+      // when there are no more subscribers.
+      webSocketManager.unsubscribe(componentIdRef.current)
+      if (webSocketManager.cleanup()) {
+        webSocketService.disconnect()
+      }
       setIsConnected(false)
 
     } catch (error) {
