@@ -39,6 +39,7 @@ export { playbookService } from './services/playbookService.js'
 export { autoSuggestionService } from './services/autoSuggestionService.js'
 export { userService } from './services/userService.js'
 export { emailVerificationService } from './services/emailVerificationService.js'
+export { knowledgeBaseService } from './services/knowledgeBaseService.js'
 
 // Legacy export for backward compatibility
 export { getTickets, transformTicketToRCACase } from './rcaService.js'
