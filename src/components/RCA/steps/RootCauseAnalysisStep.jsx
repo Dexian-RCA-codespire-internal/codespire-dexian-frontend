@@ -107,7 +107,7 @@ const RootCauseAnalysisStep = ({
   // Function to analyze root causes using the API
   const analyzeRootCauses = async () => {
     if (isAnalyzing || hasAnalyzed) {
-      console.log('Analysis already in progress or completed, skipping...')
+
       return
     }
 
@@ -146,7 +146,6 @@ const RootCauseAnalysisStep = ({
         }
       }
 
-      console.log('Sending RCA analysis request:', requestData)
       const response = await aiService.rootCauseAnalysis.analyze(requestData)
 
       if (response.success && response.results) {
@@ -205,8 +204,7 @@ const RootCauseAnalysisStep = ({
             
             return newStepData
           })
-          console.log('RootCauseAnalysisStep: Stored root cause analysis in stepData:', rootCauseAnalysisData)
-          console.log('RootCauseAnalysisStep: Updated rca_workflow_steps[2]:', analysisText)
+     
         }
         
         // Update the response in the parent component
@@ -216,7 +214,7 @@ const RootCauseAnalysisStep = ({
         
         // Save to database immediately if this is the first generation
         if (saveStepToDatabase && !hasExistingRcaData && !rcaResolvedData?.ticket?.resolution_steps?.root_cause?.completed && transformedResults.length > 0) {
-          console.log('Saving generated root cause analysis to database...')
+        
           try {
             const saveData = {
               title: topRootCause.rootCause,
@@ -226,7 +224,7 @@ const RootCauseAnalysisStep = ({
             }
             
             await saveStepToDatabase(3, saveData)
-            console.log('Root cause analysis saved to database successfully')
+    
             
           } catch (error) {
             console.error('Error saving generated root cause analysis:', error)
@@ -236,7 +234,7 @@ const RootCauseAnalysisStep = ({
         throw new Error(response.message || 'Failed to analyze root causes')
       }
     } catch (error) {
-      console.error('Error analyzing root causes:', error)
+   
       setAnalysisError(error.message || 'Failed to analyze root causes')
     } finally {
       setIsAnalyzing(false)
@@ -359,10 +357,7 @@ const RootCauseAnalysisStep = ({
         
         return newStepData
       })
-      console.log('RootCauseAnalysisStep: Updated root cause analysis in stepData after edit:', {
-        rootCauses: updatedRootCauses,
-        analysisText
-      })
+
     }
     
     // Update the response in the parent component
@@ -372,7 +367,7 @@ const RootCauseAnalysisStep = ({
     
     // Save to database immediately after editing
     if (saveStepToDatabase && editedRootCause) {
-      console.log('Saving edited root cause analysis to database...')
+
       try {
         const saveData = {
           title: editedRootCause.rootCause,
@@ -381,9 +376,9 @@ const RootCauseAnalysisStep = ({
           confidencePercentage: editedRootCause.confidence
         }
         
-        console.log('Save data payload:', saveData)
+    
         await saveStepToDatabase(3, saveData)
-        console.log('Edited root cause analysis saved to database successfully')
+
         
       } catch (error) {
         console.error('Error saving edited root cause analysis:', error)
@@ -465,24 +460,16 @@ const RootCauseAnalysisStep = ({
 
   // Restore root cause data from existing RCA resolved data
   useEffect(() => {
-    console.log('RootCauseAnalysisStep: Checking for RCA resolved data restoration:', {
-      hasExistingRcaData,
-      hasRcaResolvedData: !!rcaResolvedData,
-      rootCauseCompleted: rcaResolvedData?.ticket?.resolution_steps?.root_cause?.completed,
-      hasStepDataRootCauseAnalysis: !!stepData?.rootCauseAnalysis,
-      currentResponseLength: response?.trim().length || 0
-    })
+
 
     // Prioritize RCA resolved data over stepData.rootCauseAnalysis
     if (hasExistingRcaData && rcaResolvedData?.ticket?.resolution_steps?.root_cause?.completed) {
-      console.log('RootCauseAnalysisStep: Restoring root cause from RCA resolved data:', rcaResolvedData.ticket.resolution_steps.root_cause)
-
+ 
       const rootCauseData = rcaResolvedData.ticket.resolution_steps.root_cause
 
       // Populate the response text area with the analysis text
       if (rootCauseData.analysis && rootCauseData.analysis.trim()) {
-        console.log('RootCauseAnalysisStep: Setting response from RCA resolved data')
-        onResponseChange(rootCauseData.analysis)
+    onResponseChange(rootCauseData.analysis)
       }
 
       // Create root cause object from the resolved data
@@ -510,10 +497,7 @@ const RootCauseAnalysisStep = ({
   useEffect(() => {
     // Don't proceed if we're still loading ticket data or RCA resolved data
     if (!ticketData || isLoadingRcaData) {
-      console.log('RootCauseAnalysisStep: Waiting for data to load...', {
-        hasTicketData: !!ticketData,
-        isLoadingRcaData
-      });
+
       return;
     }
     
@@ -529,19 +513,13 @@ const RootCauseAnalysisStep = ({
     
     // Skip analysis if we have any existing data
     if (hasExistingRcaRootCauseData || hasExistingStepData || hasExistingAnalysisData || hasAnalyzed) {
-      console.log('RootCauseAnalysisStep: Skipping analysis - existing data found:', {
-        hasExistingRcaRootCauseData,
-        hasExistingStepData,
-        hasExistingAnalysisData,
-        hasAnalyzed
-      });
+ 
       return
     }
     
     // Only proceed with analysis if we have ticket data and no existing analysis
     if (currentTicket && !isAnalyzing) {
-      console.log('RootCauseAnalysisStep: Starting auto-analysis with ticket data available');
-      // Auto-analyze after a short delay to show the loading state
+     // Auto-analyze after a short delay to show the loading state
       setTimeout(() => {
         analyzeRootCauses()
       }, 500)

@@ -88,38 +88,30 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
       setLoading(true)
       setError(null)
       
-      console.log('🚀 === STARTING VECTOR-BASED PLAYBOOK SEARCH ===')
-      console.log('📋 Input ticket data:', ticket)
+      
       
       const searchQuery = generateSearchQuery(ticket)
-      console.log('🔍 Generated search query:', searchQuery)
-      console.log('📏 Query length:', searchQuery.length)
+
       
       if (!searchQuery.trim()) {
         console.log('❌ Empty search query generated')
         setError('No searchable content found in ticket data')
         return
       }
-      
-      // PRIMARY: Use vector search to find top matching playbooks
-      console.log('🎯 === PRIMARY: Vector Search for Top Matches ===')
+    
       const vectorSearchOptions = {
         topK: 3, // Get top 3 matches
         minScore: 0.1 // Minimum similarity score threshold
       }
       
-      console.log('🔍 Vector search query:', searchQuery)
-      console.log('🔍 Vector search options:', vectorSearchOptions)
       
       const vectorResponse = await playbookService.searchPlaybooksByVector(searchQuery, vectorSearchOptions)
-      console.log('📚 Vector search response:', vectorResponse)
-      console.log('📊 Vector search results:', vectorResponse.data?.length || 0)
-      console.log('✅ Vector search success:', vectorResponse.success)
+  
       
       let processedPlaybooks = []
       
       if (vectorResponse.success && vectorResponse.data && vectorResponse.data.length > 0) {
-        console.log('✅ Vector search found results:')
+   
         
         // Process all matching playbooks
         const allPlaybooks = vectorResponse.data
@@ -140,31 +132,23 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
         if (highMatchPlaybooks.length > 0) {
           // Show top 3 playbooks with >50% match
           processedPlaybooks = highMatchPlaybooks.slice(0, 3)
-          console.log('✅ Found high match playbooks (>50%), showing top 3')
+       
         } else {
           // Show only the top 1 playbook if no high matches
           processedPlaybooks = allPlaybooks.slice(0, 1)
-          console.log('⚠️ No high match playbooks found, showing only top 1')
+         
         }
         
-        console.log(`📊 ${processedPlaybooks.length > 1 ? 'Top matching playbooks' : 'Best match playbook'}:`)
-        processedPlaybooks.forEach((playbook, index) => {
-          console.log(`  ${index === 0 ? '🏆' : '🥈'} #${index + 1} ${playbook.title}`)
-        })
-        
-        console.log(`🏆 ${processedPlaybooks.length > 1 ? 'Top matches' : 'Best match'}:`, processedPlaybooks.map(p => `${p.title} (${p.match_percentage}%)`).join(', '))
-        
+    
       } else {
         console.log('❌ Vector search returned no results, trying fallback...')
         
         // FALLBACK: Try with short description only
         if (ticket.short_description) {
-          console.log('🔄 Fallback: Trying vector search with short description only...')
           const fallbackResponse = await playbookService.searchPlaybooksByVector(ticket.short_description, vectorSearchOptions)
           
           if (fallbackResponse.success && fallbackResponse.data && fallbackResponse.data.length > 0) {
-            console.log('✅ Fallback vector search found results!')
-            processedPlaybooks = fallbackResponse.data
+           processedPlaybooks = fallbackResponse.data
               .map(playbook => {
                 const actualData = playbook._doc || playbook
                 return {
@@ -189,37 +173,26 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
       
       // Set results
       if (processedPlaybooks.length > 0) {
-        console.log('🔍 Final playbooks to display:', processedPlaybooks.length)
-        console.log(`🏆 ${processedPlaybooks.length > 1 ? 'Top matches' : 'Best match'}:`, processedPlaybooks.map(p => `${p.title} (${p.match_percentage}%)`).join(', '))
         
         setPlaybooks(processedPlaybooks)
         setLastSearched(new Date())
-        console.log(`✅ ${processedPlaybooks.length > 1 ? 'Top matching playbooks' : 'Best match playbook'} set successfully`)
-      } else {
-        console.log('❌ No playbooks found with vector search')
-        setError('No relevant playbooks found for this ticket')
+     } else {
+       setError('No relevant playbooks found for this ticket')
       }
-      
-      console.log('🏁 === VECTOR SEARCH COMPLETE ===')
+ 
     } catch (err) {
-      console.error('❌ === CRITICAL ERROR IN VECTOR SEARCH ===')
-      console.error('❌ Error object:', err)
-      console.error('❌ Error message:', err.message)
+   
       setError(err.message || 'Failed to search playbooks')
     } finally {
       setLoading(false)
-      console.log('🏁 === SEARCH PROCESS COMPLETED ===')
+     
     }
   }
 
   // Auto-search when ticket data changes
   useEffect(() => {
     if (ticketData) {
-      console.log('🎫 PlaybookRecommender received ticket data:', ticketData)
-      console.log('🎫 Ticket ID:', ticketData.ticket_id)
-      console.log('🎫 Short description:', ticketData.short_description)
-      console.log('🎫 Description:', ticketData.description?.substring(0, 100) + '...')
-      console.log('🚀 Starting playbook search with improved query generation...')
+
       
       // Clear previous results when new ticket is loaded
       setPlaybooks([])
@@ -282,15 +255,13 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
         onLoadingChange(true)
       }
       
-      console.log('🔄 Regenerating solution based on selected playbooks:', Array.from(selectedPlaybooks))
-      
+
       // Get selected playbook data
       const selectedPlaybookData = playbooks.filter(p => 
         selectedPlaybooks.has(p.playbook_id || p._id)
       )
       
-      console.log('📋 Selected playbook data:', selectedPlaybookData)
-      
+    
       // Extract playbook IDs
       const playbookIds = selectedPlaybookData.map(p => p.playbook_id || p._id)
       
@@ -317,13 +288,11 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
         playbooks: selectedPlaybookData
       }
       
-      console.log('🎯 Calling solution generation API with payload:', requestPayload)
-      
+   
       // Call solution generation service
       const response = await solutionGenerationService.generateSolution(requestPayload)
       
-      console.log('✅ Solution generation response:', response)
-      
+    
       if (response.success && response.solutions && response.solutions.length > 0) {
         // Send the result to the parent component (like CorrectiveActionsStep does)
         if (onGuidanceResult) {
@@ -334,7 +303,7 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
         for (const playbookId of playbookIds) {
           try {
             await playbookService.incrementUsage(playbookId)
-            console.log('✅ Playbook usage incremented for:', playbookId)
+   
           } catch (err) {
             console.warn('⚠️ Failed to increment playbook usage:', err)
           }
@@ -346,12 +315,12 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
         }
         
       } else {
-        console.log('❌ No solution generated')
+     
         alert('No solution was generated for the selected playbooks.')
       }
       
     } catch (err) {
-      console.error('❌ Error regenerating solution based on playbooks:', err)
+
       setError(err.message || 'Failed to regenerate solution based on selected playbooks')
       alert(`Error: ${err.message || 'Failed to regenerate solution based on selected playbooks'}`)
     } finally {
@@ -370,7 +339,7 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
       // Get current playbook data
       const playbook = playbooks.find(p => p.playbook_id === playbookId)
       if (!playbook) {
-        console.warn(`⚠️ Playbook not found: ${playbookId}`)
+      
         return
       }
       
@@ -401,55 +370,8 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
     }
   }
 
-  // Handle "Use" button click (kept for backward compatibility)
-  const handleUsePlaybook = async (playbookId) => {
-    try {
-      await playbookService.incrementUsage(playbookId)
-      console.log('✅ Playbook usage incremented via Use button:', playbookId)
-      await updateConfidenceScore(playbookId)
-      alert('Playbook usage incremented successfully!')
-    } catch (err) {
-      console.warn('⚠️ Failed to increment playbook usage:', err)
-      alert('Failed to increment playbook usage. Please try again.')
-    }
-  }
 
-  // Browser console test function - you can call this directly in browser console
-  window.testAIGuidanceAPI = async () => {
-    try {
-      const playbookIds = ['PB-000076-2025-09-24T09-06-07-613Z'];
-      const guidanceQuestion = "Check SMTP server status";
-      
-      console.log('🔍 Testing AI Guidance API directly...');
-      console.log('📋 Playbook IDs:', playbookIds);
-      console.log('❓ Question:', guidanceQuestion);
-      
-      const response = await fetch('http://localhost:8081/api/v1/ai/playbook-recommender/search-guidance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          playbookIds: playbookIds,
-          guidanceQuestion: guidanceQuestion
-        })
-      });
-      
-      const data = await response.json();
-      console.log('📊 Direct API Response:', data);
-      
-    } catch (error) {
-      console.error('❌ Direct API Error:', error);
-    }
-  };
 
-  // Test query generation function
-  window.testQueryGeneration = (ticketData) => {
-    console.log('🔍 Testing Query Generation...');
-    console.log('📋 Input ticket:', ticketData);
-    const query = generateSearchQuery(ticketData);
-    console.log('📋 Generated query:', query);
-    console.log('📋 Query length:', query.length);
-    return query;
-  };
 
   // Preprocess AI guidance questions to extract key terms for better matching
   const preprocessAIGuidanceQuestion = (question) => {
@@ -514,130 +436,8 @@ const PlaybookRecommender = ({ ticketData, aiGuidanceQuestion, onGuidanceResult,
     return words;
   };
 
-  // Handle "Get" button click - Search AI guidance in playbook triggers
-  const handleGetGuidance = async () => {
-    if (!playbooks.length || !ticketData) {
-      alert('No playbooks available or ticket data missing')
-      return
-    }
+ 
 
-    try {
-      setGuidanceLoading(true)
-      setError(null)
-      
-    
-      
-      // Extract playbook IDs from current recommendations
-      const playbookIds = playbooks.map(p => p.playbook_id || p._id)
-      
-      // Use AI guidance question from RCA workflow if available, otherwise generate from ticket data
-      let guidanceQuestion
-      
-      if (aiGuidanceQuestion && aiGuidanceQuestion.trim()) {
-        // Use the AI guidance question from the current RCA step
-        let rawQuestion = aiGuidanceQuestion.trim()
-        console.log('🎯 Raw AI guidance question:', rawQuestion)
-        
-        // Preprocess the question to extract key terms for better matching
-        guidanceQuestion = preprocessAIGuidanceQuestion(rawQuestion)
-        console.log('🎯 Processed AI guidance question:', guidanceQuestion)
-      } else {
-        // Fallback: generate from ticket data
-        guidanceQuestion = generateSearchQuery(ticketData)
-        console.log('🔄 Fallback: Generated from ticket data:', guidanceQuestion)
-        
-        // Further simplify for better matching - remove specific terms
-        if (guidanceQuestion.includes('quota exceeded')) {
-          guidanceQuestion = 'email quota'
-          console.log('🔄 Simplified query for better matching:', guidanceQuestion)
-        }
-      }
-      
-      // Debug: Log detailed information
-
-      // Debug: Log request payload
-      const requestPayload = {
-        playbookIds: playbookIds,
-        guidanceQuestion: guidanceQuestion
-      };
-      console.log('📤 Request Payload:', JSON.stringify(requestPayload, null, 2));
-      
-      console.log('🎯 Searching guidance in playbooks:', playbookIds)
-      console.log('❓ Guidance question:', guidanceQuestion)
-      
-      // Call AI service to search guidance in triggers
-      const response = await aiService.playbookRecommender.searchGuidanceInTriggers({
-        playbookIds,
-        guidanceQuestion
-      })
-      
-     
-      
-      if (response.success && response.data) {
-        setAiGuidanceResults(response.data)
-        console.log('🎯 AI guidance results:', response.data)
-        
-        // Send the result to the parent component and increment usage for the specific playbook
-        if (response.data.length > 0) {
-          const bestResult = response.data[0] // Get only the first/best result
-          console.log('🎯 Sending AI guidance result to parent:', bestResult)
-          
-          // Increment usage ONLY for the specific playbook that provided the guidance
-          if (bestResult.playbook_id) {
-            try {
-              await playbookService.incrementUsage(bestResult.playbook_id)
-              console.log('✅ Playbook usage incremented for:', bestResult.playbook_id)
-              console.log('📊 Playbook title:', bestResult.playbook_title)
-              
-              // Update confidence score for this specific playbook only
-              await updateConfidenceScore(bestResult.playbook_id)
-            } catch (err) {
-              console.warn('⚠️ Failed to increment playbook usage:', err)
-            }
-          }
-          
-          // Call the callback function to pass the result to parent
-          if (onGuidanceResult) {
-            onGuidanceResult(bestResult)
-          }
-        } else {
-          console.log('❌ No AI guidance results found')
-          // Still call the callback with null to indicate no results
-          if (onGuidanceResult) {
-            onGuidanceResult(null)
-          }
-        }
-      } else {
-        console.log('❌ No AI guidance results found')
-        alert('No AI guidance actions found for this ticket.')
-      }
-      
-    } catch (err) {
-      console.error('❌ Error searching AI guidance:', err)
-      console.error('❌ Error Response:', err.response?.data);
-      console.error('❌ Error Status:', err.response?.status);
-      setError(err.message || 'Failed to search AI guidance')
-      alert(`Error searching AI guidance: ${err.message || 'Unknown error'}`)
-    } finally {
-      setGuidanceLoading(false)
-    }
-  }
-
-  // Get priority color
-  const getPriorityColor = (priority) => {
-    switch (priority?.toLowerCase()) {
-      case 'critical':
-        return 'bg-red-100 text-red-800'
-      case 'high':
-        return 'bg-orange-100 text-orange-800'
-      case 'medium':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'low':
-        return 'bg-green-100 text-green-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
-  }
 
   // Get search type indicator
   const getSearchTypeIndicator = (searchType) => {

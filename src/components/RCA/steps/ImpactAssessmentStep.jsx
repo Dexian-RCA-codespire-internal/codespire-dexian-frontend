@@ -68,21 +68,21 @@ const ImpactAssessmentStep = ({
   // Load existing dropdown values when stepData changes
   useEffect(() => {
     if (stepData) {
-      console.log('ImpactAssessmentStep: Loading existing data from stepData:', stepData);
+    
       
       if (stepData.impact_level_step2) {
         setImpactLevel(stepData.impact_level_step2)
-        console.log('ImpactAssessmentStep: Restored impact level:', stepData.impact_level_step2);
+
       }
       if (stepData.department_affected_step2) {
         setDepartmentAffected(stepData.department_affected_step2)
-        console.log('ImpactAssessmentStep: Restored department:', stepData.department_affected_step2);
+
       }
       
       // Restore impact assessments if they exist in stepData
       if (stepData.impact_assessments_step2 && Array.isArray(stepData.impact_assessments_step2) && stepData.impact_assessments_step2.length > 0) {
         setImpactAssessments(stepData.impact_assessments_step2);
-        console.log('ImpactAssessmentStep: Restored impact assessments from stepData:', stepData.impact_assessments_step2);
+     
         
         // Auto-populate the first assessment if no response is set yet
         if (stepData.impact_assessments_step2.length > 0 && (!response || !response.trim())) {
@@ -103,7 +103,7 @@ const ImpactAssessmentStep = ({
             }
             const mappedLevel = impactLevelMap[firstAssessment.impactLevel] || 'sev3'
             setImpactLevel(mappedLevel)
-            console.log('ImpactAssessmentStep: Auto-populated impact level:', mappedLevel)
+      
           }
           
           if (!departmentAffected && firstAssessment.department) {
@@ -117,28 +117,22 @@ const ImpactAssessmentStep = ({
             }
             const mappedDepartment = departmentMap[firstAssessment.department] || 'it_operations'
             setDepartmentAffected(mappedDepartment)
-            console.log('ImpactAssessmentStep: Auto-populated department:', mappedDepartment)
+  
           }
         }
         
         // Set the flag to indicate we have existing data (don't call API)
         hasCalledAPI.current = true;
-        console.log('ImpactAssessmentStep: Impact assessments exist, skipping API call');
+
       }
     }
   }, [stepData])
 
-  // Debug: Log when response changes
-  useEffect(() => {
-    console.log('ImpactAssessmentStep: response changed:', response);
-    console.log('ImpactAssessmentStep: response length:', response?.length || 0);
-    console.log('ImpactAssessmentStep: stepData.rca_workflow_steps[1]:', stepData?.rca_workflow_steps?.[1]);
-  }, [response, stepData])
-
+  
   // Load existing impact assessment data from stepData if response is empty
   useEffect(() => {
     if (currentStep === 2 && stepData?.rca_workflow_steps?.[1] && stepData.rca_workflow_steps[1].trim().length > 0 && (!response || response.trim().length === 0)) {
-      console.log('Loading existing impact assessment data from stepData');
+  
       onResponseChange(stepData.rca_workflow_steps[1]);
     }
   }, [currentStep, stepData, response, onResponseChange])
@@ -147,7 +141,7 @@ const ImpactAssessmentStep = ({
   useEffect(() => {
     if (stepData?.impact_assessments_step2 && impactAssessments.length === 0) {
       setImpactAssessments(stepData.impact_assessments_step2);
-      console.log('ImpactAssessmentStep: Restored impact assessments on mount:', stepData.impact_assessments_step2);
+
     }
   }, [stepData?.impact_assessments_step2, impactAssessments.length])
 
@@ -155,7 +149,7 @@ const ImpactAssessmentStep = ({
   useEffect(() => {
     if (currentStep !== 2) {
       hasCalledAPI.current = false
-      console.log('ImpactAssessmentStep: Reset API call flag (left step 2)')
+
     }
   }, [currentStep])
 
@@ -175,10 +169,7 @@ const ImpactAssessmentStep = ({
     const generateImpactAssessment = async () => {
       // Don't proceed if we're still loading ticket data or RCA resolved data
       if (!ticketData || isLoadingRcaData) {
-        console.log('ImpactAssessmentStep: Waiting for data to load...', {
-          hasTicketData: !!ticketData,
-          isLoadingRcaData
-        });
+
         return;
       }
       
@@ -190,24 +181,16 @@ const ImpactAssessmentStep = ({
       const hasExistingData = response && response.trim().length > 0
       const hasExistingDataInStepData = stepData?.rca_workflow_steps?.[1] && stepData.rca_workflow_steps[1].trim().length > 0
       const hasExistingImpactAssessments = impactAssessments.length > 0 || (stepData?.impact_assessments_step2 && stepData.impact_assessments_step2.length > 0)
-      
-      console.log('ImpactAssessmentStep: hasExistingRcaImpactData:', hasExistingRcaImpactData);
-      console.log('ImpactAssessmentStep: hasExistingData:', hasExistingData);
-      console.log('ImpactAssessmentStep: hasExistingDataInStepData:', hasExistingDataInStepData);
-      console.log('ImpactAssessmentStep: hasExistingImpactAssessments:', hasExistingImpactAssessments);
-      console.log('ImpactAssessmentStep: currentStep:', currentStep);
-      console.log('ImpactAssessmentStep: isGeneratingImpactAssessment:', isGeneratingImpactAssessment);
-      console.log('ImpactAssessmentStep: hasAttemptedImpactGeneration:', hasAttemptedImpactGeneration);
-      
+
       // Skip API call if we have existing RCA data for this step
       if (hasExistingRcaImpactData) {
-        console.log('ImpactAssessmentStep: Skipping API call - existing RCA data found');
+
         return
       }
       
        // Only call API if no impact assessments exist yet and we have ticket data
        if (currentStep === 2 && stepData && ticketData && !isGeneratingImpactAssessment && !hasCalledAPI.current && impactAssessments.length === 0 && (!stepData.impact_assessments_step2 || stepData.impact_assessments_step2.length === 0)) {
-        console.log('ImpactAssessmentStep: Calling API to get impact assessments (no existing data found, ticket data available)');
+   
         hasCalledAPI.current = true
         try {
           setIsGeneratingImpactAssessment(true)
@@ -232,12 +215,11 @@ const ImpactAssessmentStep = ({
                 impact_assessments_step2: response.data.impactAssessments
               }))
               
-              console.log('ImpactAssessmentStep: Stored impact assessments:', response.data.impactAssessments)
-              
+       
               // Use the first impact assessment as the default selection
               const firstAssessment = response.data.impactAssessments[0]
               if (firstAssessment) {
-                console.log('ImpactAssessmentStep: Auto-selecting first assessment:', firstAssessment)
+   
                 
                 // Map AI impact level to our dropdown values
                 const impactLevelMap = {
@@ -265,7 +247,7 @@ const ImpactAssessmentStep = ({
                     ...prevData,
                     impact_level_step2: mappedImpactLevel
                   }))
-                  console.log('ImpactAssessmentStep: Set impact level to:', mappedImpactLevel)
+            
                 }
                 
                 // Set the department affected from first assessment
@@ -276,7 +258,7 @@ const ImpactAssessmentStep = ({
                     ...prevData,
                     department_affected_step2: mappedDepartment
                   }))
-                  console.log('ImpactAssessmentStep: Set department to:', mappedDepartment)
+                
                 }
                 
                 // Set the impact assessment description from first assessment
@@ -287,7 +269,7 @@ const ImpactAssessmentStep = ({
             }
           }
         } catch (error) {
-          console.error('Error generating impact assessment:', error)
+     
           alert('Failed to generate AI impact assessment. Please fill in the fields manually.')
         } finally {
           setIsGeneratingImpactAssessment(false)

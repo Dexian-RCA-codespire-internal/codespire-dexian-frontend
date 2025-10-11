@@ -75,31 +75,18 @@ const RCAWorkflow = ({
         // Update the response with enhanced text
         onResponseChange(enhancedText)
         
-        console.log('Text enhanced successfully:', response.data)
+      
       } else {
         alert('Failed to enhance text. Please try again.')
       }
     } catch (error) {
-      console.error('Error enhancing text:', error)
+     
       alert('Failed to enhance text. Please try again.')
     } finally {
       setLoadingFunction(false)
     }
   }
 
-  // Format date for display
-  const formatDate = (dateString) => {
-    if (!dateString) return ''
-    const date = new Date(dateString)
-    return date.toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    })
-  }
 
   return (
     <div className="space-y-5">
