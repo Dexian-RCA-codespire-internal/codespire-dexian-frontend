@@ -1,36 +1,35 @@
+
+
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/Button'
-import { Textarea } from '../components/ui/Textarea'
-import { StreamingTextarea } from '../components/ui/StreamingTextarea'
+import { FormattedReport } from '../components/ui/FormattedReport'
 import { Badge } from '../components/ui/Badge'
 import { Skeleton } from '../components/ui/skeleton'
+import KnowledgeBaseModal from '../components/ui/KnowledgeBaseModal'
+import { useToast } from '../contexts/ToastContext'
 import { 
   FiFileText, 
   FiUsers, 
   FiSave, 
-  FiDownload, 
   FiArrowLeft, 
-  FiEdit3,
   FiCheckCircle,
   FiAlertCircle,
   FiLoader,
-  FiWifi,
-  FiWifiOff,
   FiPlay,
-  FiSquare
+  FiClock,
+  FiDatabase
 } from 'react-icons/fi'
 import websocketService from '../services/websocketService'
-import { rcaService } from '../api'
+import { rcaService, knowledgeBaseService } from '../api'
 import { ticketService } from '../api'
 
 const RCACompletion = () => {
   const { id, ticketId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  
-  // State for the two textareas
+  const { success, error: showError, info, warning } = useToast()
   const [technicalReport, setTechnicalReport] = useState('')
   const [customerSummary, setCustomerSummary] = useState('')
   
@@ -61,6 +60,12 @@ const RCACompletion = () => {
   
   // Ticket data
   const [ticketData, setTicketData] = useState(null)
+  const [resolvedTicketData, setResolvedTicketData] = useState(null)
+  const [isLoadedFromDatabase, setIsLoadedFromDatabase] = useState(false)
+  
+  // Knowledge Base Modal states
+  const [showKBModal, setShowKBModal] = useState(false)
+  const [creatingKB, setCreatingKB] = useState(false)
   
   // Step data from previous RCA workflow
   const [stepData, setStepData] = useState({
@@ -71,12 +76,96 @@ const RCACompletion = () => {
     corrective_actions_step5: ''
   })
 
+  // View mode state for toggling between reports
+  const [viewMode, setViewMode] = useState('technical')
+
   useEffect(() => {
     // Get data from navigation state or fetch from API
     if (location.state?.ticketData) {
       setTicketData(location.state.ticketData)
       setStepData(location.state.stepData || {})
+      
+      // Check if RCA report already exists for this ticket
+      checkExistingRCAReport(location.state.ticketData.ticket_id)
+    } else {
+      // Fetch ticket data if not provided
+      fetchTicketData()
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      // Remove direct socket listeners only - don't disconnect the socket
+      // The WebSocket connection is shared across the app and should persist
+      // Remove direct socket listeners only - don't disconnect the socket
+      // The WebSocket connection is shared across the app and should persist
+      const socket = websocketService.getSocket()
+      if (socket) {
+        socket.off('rca_progress')
+        socket.off('rca_generation')
+        socket.off('rca_chunk')
+        socket.off('rca_streaming')
+        socket.off('rca_complete')
+        socket.off('rca_error')
+      }
+      
+      // Remove websocketService listeners
+      websocketService.off('disconnect', handleDisconnect)
+    }
+  }, [location.state, ticketId])
+
+  const fetchTicketData = async () => {
+    try {
+      setLoading(true)
+
+      // Mock data for now
+      setTimeout(() => {
+        const mockTicketData = {
+          _id: ticketId,
+          ticket_id: 'RCA-001',
+          short_description: 'Payment Gateway Timeout',
+          status: 'In Progress',
+          priority: 'High',
+          category: 'Infrastructure'
+        }
+        setTicketData(mockTicketData)
+        
+        // Check if RCA report already exists
+        checkExistingRCAReport(mockTicketData.ticket_id)
+      }, 1000)
+    } catch (err) {
+      setError('Failed to load ticket data')
       setLoading(false)
+    }
+  }
+
+  const checkExistingRCAReport = async (ticketId) => {
+    try {
+      console.log('🔍 Checking for existing RCA report for ticket:', ticketId)
+      const response = await knowledgeBaseService.getRCAResolvedTicket(ticketId)
+      
+      if (response.success && response.ticket) {
+        console.log('✅ Found existing ticket data:', response.ticket)
+        setResolvedTicketData(response.ticket)
+        
+        // Check if RCA report already exists and is completed
+        const rcaReport = response.ticket.resolution_steps?.rca_report
+        if (rcaReport && rcaReport.completed && (rcaReport.rcaReport || rcaReport.customerFriSummery)) {
+          console.log('📄 Loading existing RCA report from database')
+          setTechnicalReport(rcaReport.rcaReport || '')
+          setCustomerSummary(rcaReport.customerFriSummery || '')
+          setIsLoadedFromDatabase(true) // Mark as loaded from database
+          setLoading(false)
+          
+          // Don't auto-trigger generation if report already exists
+          console.log('✅ RCA report already exists, skipping auto-generation')
+          return
+        }
+      }
+      
+      // If no existing report found, proceed with auto-generation
+      setLoading(false)
+      setIsLoadedFromDatabase(false) // Mark as not loaded from database
+      console.log('📝 No existing RCA report found, proceeding with generation')
       
       // Connect WebSocket first, then auto-trigger streaming API
       connectWebSocket().then(() => {
@@ -93,77 +182,44 @@ const RCACompletion = () => {
         setStreamingError('Failed to connect to WebSocket server')
         setAutoTriggering(false)
       })
-    } else {
-      // Fetch ticket data if not provided
-      fetchTicketData()
-    }
-    
-    // Cleanup on unmount
-    return () => {
-      // Remove direct socket listeners only - don't disconnect the socket
-      // The WebSocket connection is shared across the app and should persist
-      const socket = websocketService.getSocket()
-      if (socket) {
-        socket.off('rca_progress')
-        socket.off('rca_generation')
-        socket.off('rca_chunk')
-        socket.off('rca_streaming')
-        socket.off('rca_complete')
-        socket.off('rca_error')
-      }
       
-      // Remove websocketService listeners
-      websocketService.off('disconnect', handleDisconnect)
-      
-      // ✅ DO NOT disconnect the WebSocket here - it's shared across the application
-      // The WebSocket will be managed by the global service and other components may still need it
-    }
-  }, [location.state, ticketId])
-
-  const fetchTicketData = async () => {
-    try {
-      setLoading(true)
-      // This would be replaced with actual API call
-      // const response = await ticketService.getTicket(ticketId)
-      // setTicketData(response.data)
-      
-      // Mock data for now
-      setTimeout(() => {
-        const mockTicketData = {
-          _id: ticketId,
-          ticket_id: 'RCA-001',
-          short_description: 'Payment Gateway Timeout',
-          status: 'In Progress',
-          priority: 'High',
-          category: 'Infrastructure'
-        }
-        setTicketData(mockTicketData)
-        setLoading(false)
-        
-        // Connect WebSocket first, then auto-trigger streaming API
-        connectWebSocket().then(() => {
-          // Add a small delay to ensure WebSocket is fully ready
-          setAutoTriggering(true)
-          setTimeout(() => {
-            console.log('🔧 Auto-triggering RCA generation from fetchTicketData...')
-            generateRCA().finally(() => {
-              setAutoTriggering(false)
-            })
-          }, 1000) // 1 second delay
-        }).catch((error) => {
-          console.error('❌ Failed to connect WebSocket:', error)
-          setStreamingError('Failed to connect to WebSocket server')
-          setAutoTriggering(false)
-        })
-      }, 1000)
-    } catch (err) {
-      setError('Failed to load ticket data')
+    } catch (error) {
+      console.error('❌ Error checking existing RCA report:', error)
+      // Proceed with auto-generation if check fails
       setLoading(false)
+      setIsLoadedFromDatabase(false) // Mark as not loaded from database
+      
+      connectWebSocket().then(() => {
+        setAutoTriggering(true)
+        setTimeout(() => {
+          console.log('🔧 Auto-triggering RCA generation (fallback)...')
+          generateRCA().finally(() => {
+            setAutoTriggering(false)
+          })
+        }, 1000)
+      }).catch((error) => {
+        console.error('❌ Failed to connect WebSocket:', error)
+        setStreamingError('Failed to connect to WebSocket server')
+        setAutoTriggering(false)
+      })
     }
   }
 
   const connectWebSocket = async () => {
     try {
+      // Check if already connected before attempting to connect
+      if (websocketService.getConnectionStatus()) {
+        console.log('✅ WebSocket already connected, reusing existing connection')
+        setWebsocketConnected(true)
+        setSocketId(websocketService.getSocket()?.id || null)
+        setStreamingError(null)
+      } else {
+        await websocketService.connect()
+        setWebsocketConnected(true)
+        setSocketId(websocketService.getSocket()?.id || null)
+        setStreamingError(null)
+        console.log('✅ Connected to WebSocket server:', websocketService.getSocket()?.id)
+      }
       // Check if already connected before attempting to connect
       if (websocketService.getConnectionStatus()) {
         console.log('✅ WebSocket already connected, reusing existing connection')
@@ -185,6 +241,14 @@ const RCACompletion = () => {
       const socket = websocketService.getSocket()
       if (socket) {
         console.log('🔧 Setting up direct Socket.IO listeners for RCA events...')
+        
+        // Remove any existing listeners first to prevent duplicates
+        socket.off('rca_progress')
+        socket.off('rca_generation')
+        socket.off('rca_chunk')
+        socket.off('rca_streaming')
+        socket.off('rca_complete')
+        socket.off('rca_error')
         
         // Remove any existing listeners first to prevent duplicates
         socket.off('rca_progress')
@@ -230,6 +294,7 @@ const RCACompletion = () => {
       
       // Also set up websocketService listeners for other events
       websocketService.off('disconnect', handleDisconnect) // Remove first to prevent duplicates
+      websocketService.off('disconnect', handleDisconnect) // Remove first to prevent duplicates
       websocketService.on('disconnect', handleDisconnect)
       console.log('✅ Event listeners set up successfully')
       
@@ -270,6 +335,8 @@ const RCACompletion = () => {
         currentTechnicalRCA.current = data.content
         setTechnicalReport(data.content)
         setGeneratingTechnical(false)
+        // Start customer summary generation after technical is complete
+        setGeneratingCustomer(true)
         // Clear chunk tracking when setting complete content
         receivedTechnicalChunks.current.clear()
       }
@@ -310,7 +377,7 @@ const RCACompletion = () => {
     setStreaming(false)
     setProgress(100)
     setGeneratingTechnical(false)
-    setGeneratingCustomer(false)
+    setGeneratingCustomer(false) // Ensure both are set to false on completion
     
     // Clear chunk tracking on completion
     receivedTechnicalChunks.current.clear()
@@ -334,28 +401,22 @@ const RCACompletion = () => {
   const updateProgress = (stage) => {
     const stages = ['starting', 'technical_rca', 'customer_summary']
     const currentIndex = stages.indexOf(stage)
-    const progress = ((currentIndex + 1) / stages.length) * 100
-    setProgress(progress)
-  }
-
-  const handleStreamingData = (data) => {
-    console.log('Received streaming data:', data)
-    
-    if (data.type === 'progress') {
-      setStreamingProgress(data.message)
-    } else if (data.type === 'technical_report') {
-      setTechnicalReport(data.content)
-      setStreamingProgress('Technical report generated successfully!')
-    } else if (data.type === 'customer_summary') {
-      setCustomerSummary(data.content)
-      setStreamingProgress('Customer summary generated successfully!')
-    } else if (data.type === 'complete') {
-      setStreamingProgress('RCA reports generation completed!')
-      setWebsocketConnected(false)
-    } else if (data.error) {
-      setStreamingError(data.error)
-      setWebsocketConnected(false)
+    // More granular progress updates for better UX
+    let progressValue = 0
+    switch (stage) {
+      case 'starting':
+        progressValue = 15
+        break
+      case 'technical_rca':
+        progressValue = 75  // Technical report in progress
+        break
+      case 'customer_summary':
+        progressValue = 100  // Customer summary in progress
+        break
+      default:
+        progressValue = ((currentIndex + 1) / stages.length) * 100
     }
+    setProgress(progressValue)
   }
 
   // WebSocket-based RCA generation using websocketService
@@ -363,26 +424,37 @@ const RCACompletion = () => {
     console.log('🚀 generateRCA called')
     console.log('🔍 WebSocket service status:', websocketService.getConnectionStatus())
     
+    // Reset the loaded from database flag since we're generating new content
+    setIsLoadedFromDatabase(false)
+    
+    // Clear any previous errors
+    setStreamingError(null)
+    
     // Ensure WebSocket is connected before proceeding
     if (!websocketService.getConnectionStatus()) {
       console.log('🔄 WebSocket not connected, establishing connection...')
+      setStreamingProgress('Connecting to server...')
       try {
         await connectWebSocket()
+        // Wait a bit for connection to be fully established
         // Wait a bit for connection to be fully established
         await new Promise(resolve => setTimeout(resolve, 500))
       } catch (error) {
         console.error('❌ Failed to connect WebSocket:', error)
-        setStreamingError('Failed to connect to WebSocket server')
+        setStreamingError('Failed to connect to server. Please try again.')
         return
       }
     }
     
     // Verify connection after potential connect attempt
+    // Verify connection after potential connect attempt
     if (!websocketService.getConnectionStatus()) {
       console.error('❌ WebSocket connection failed')
-      setStreamingError('WebSocket connection failed')
+      setStreamingError('Unable to establish server connection. Please try again.')
       return
     }
+    
+    console.log('✅ WebSocket verified connected, proceeding with RCA generation')
     
     console.log('✅ WebSocket verified connected, proceeding with RCA generation')
 
@@ -416,11 +488,10 @@ const RCACompletion = () => {
     setProgress(0)
     setStreamingError(null)
     setGeneratingTechnical(true)
-    setGeneratingCustomer(true)
+    // Don't set generatingCustomer to true yet - wait for technical to complete
+    setGeneratingCustomer(false)
 
     try {
-      
-      // Make API call using rcaService
       const data = await rcaService.streamRCAGeneration({
         ticketData: ticketDataPayload,
         rcaFields: rcaFieldsPayload,
@@ -444,44 +515,199 @@ const RCACompletion = () => {
     }
   }
 
-
   const handleSave = async () => {
     try {
       setSaving(true)
       
-      // Save both reports
-      const reportData = {
-        ticketId: ticketData?._id,
-        technicalReport,
-        customerSummary,
-        status: 'Completed'
-      }
+      // Just show the modal - don't save anything yet
+      // Saving will happen when user clicks the modal save button
+      setSaving(false)
+      setShowKBModal(true)
       
-      // This would be replaced with actual API call
-      // await ticketService.saveRCAReports(reportData)
-      
-      console.log('Saving RCA reports:', reportData)
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      alert('RCA reports saved successfully!')
     } catch (err) {
-      setError('Failed to save reports')
-    } finally {
+      console.error('❌ Error in handleSave:', err)
+      showError('Failed to open save dialog', {
+        title: 'Unexpected Error',
+        duration: 5000
+      })
       setSaving(false)
     }
   }
+
+  const handleCreateKnowledgeBase = async (shouldCreateKB = true) => {
+    try {
+      setCreatingKB(true)
+      
+      // First, always save the RCA report to the resolved ticket
+      const reportData = {
+        rcaReport: technicalReport,
+        customerFriSummery: customerSummary,
+      }
+      
+      console.log('💾 Saving RCA report to MongoDB:', reportData)
+      
+      try {
+        const saveResponse = await knowledgeBaseService.updateRCAReport(
+          ticketData?.ticket_id || ticketId, 
+          reportData
+        )
+        console.log('✅ RCA report saved successfully:', saveResponse)
+        
+        // Update resolved ticket data with the saved report
+        if (saveResponse.success) {
+          setResolvedTicketData(saveResponse.ticket)
+        }
+        
+      } catch (saveError) {
+        console.error('❌ Failed to save RCA report:', saveError)
+        showError('Failed to save RCA report to database', {
+          title: 'Save Failed',
+          duration: 5000
+        })
+        setCreatingKB(false)
+        return
+      }
+      
+      if (!shouldCreateKB) {
+        // User chose to save RCA only, close modal and show success
+        setShowKBModal(false)
+        success('RCA reports saved successfully!', {
+          title: 'Save Complete',
+          duration: 3000
+        })
+        setCreatingKB(false)
+        return
+      }
+      
+      // Get the latest resolved ticket data or use current ticket data
+      const currentTicketData = resolvedTicketData || ticketData
+      
+      if (!currentTicketData) {
+        throw new Error('No ticket data available for knowledge base creation')
+      }
+      
+      // Prepare knowledge base data according to the API specification
+      const kbData = {
+        ticketId: currentTicketData.ticket_id,
+        category: currentTicketData.category || 'General',
+        subcategory: currentTicketData.subcategory || '',
+        shortDescription: currentTicketData.short_description || '',
+        description: currentTicketData.description || currentTicketData.short_description || '',
+        stepEntries: []
+      }
+      
+      // Map resolution steps to knowledge base step entries
+      const resolutionSteps = currentTicketData.resolution_steps || {}
+      
+      // Problem Statement
+      if (resolutionSteps.problem_statement) {
+        kbData.stepEntries.push({
+          step_name: 'problem_statement',
+          step_outcome: resolutionSteps.problem_statement.problemStatement || stepData.problem_step1 || ''
+        })
+      }
+      
+      // Impact Assessment
+      if (resolutionSteps.impact_analysis) {
+        const impacts = resolutionSteps.impact_analysis.impacts || []
+        const impactSummary = impacts.length > 0 ? impacts.join(', ') : stepData.impact_step3 || ''
+        kbData.stepEntries.push({
+          step_name: 'impact_assessment',
+          step_outcome: impactSummary
+        })
+      }
+      
+      // Root Cause
+      if (resolutionSteps.root_cause) {
+        kbData.stepEntries.push({
+          step_name: 'root_cause',
+          step_outcome: resolutionSteps.root_cause.analysis || stepData.root_cause_step4 || ''
+        })
+      }
+      
+      // Solution (Corrective Actions)
+      if (resolutionSteps.corrective_actions) {
+        const stepsToResolve = resolutionSteps.corrective_actions.stepsToResolve || []
+        const solutionSummary = stepsToResolve.length > 0 
+          ? stepsToResolve.map(step => `${step.title}: ${step.description}`).join('; ')
+          : resolutionSteps.corrective_actions.shortDes || stepData.corrective_actions_step5 || ''
+        
+        kbData.stepEntries.push({
+          step_name: 'solution',
+          step_outcome: solutionSummary
+        })
+      }
+      
+      // Resolution (RCA Report)
+      if (resolutionSteps.rca_report || (technicalReport && customerSummary)) {
+        const resolutionOutcome = resolutionSteps.rca_report?.customerFriSummery || customerSummary || 
+                                 resolutionSteps.rca_report?.rcaReport || technicalReport || ''
+        
+        kbData.stepEntries.push({
+          step_name: 'resolution',
+          step_outcome: resolutionOutcome
+        })
+      }
+      
+      console.log('📚 Creating Knowledge Base with data:', kbData)
+      
+      const kbResponse = await knowledgeBaseService.createKnowledgeBase(kbData)
+      console.log('✅ Knowledge Base created successfully:', kbResponse)
+      
+      // Close modal and show success message
+      setShowKBModal(false)
+      success('RCA saved and Knowledge Base entry created successfully!', {
+        title: 'Knowledge Base Created',
+        duration: 4000
+      })
+      info('This solution is now searchable for future reference.', {
+        title: 'Available for Search',
+        duration: 3000
+      })
+      
+    } catch (error) {
+      console.error('❌ Failed to create Knowledge Base:', error)
+      showError(`Failed to create Knowledge Base: ${error.message}`, {
+        title: 'Knowledge Base Creation Failed',
+        duration: 5000
+      })
+    } finally {
+      setCreatingKB(false)
+    }
+  }
+
+  const handleKBModalCancel = () => {
+    setShowKBModal(false)
+    // Don't show any toast when canceling - user chose not to save
+  }
+
   const handleUpdateTicket = async () => {
-    const resolveResponse = await ticketService.resolveTicket({
-      rootCause: customerSummary,
-      ticket: ticketData
-    })
-    
-    console.log('Ticket resolved successfully:', resolveResponse)
-    
-    // Show success message and navigate
-    alert('RCA completed successfully! Ticket has been resolved.')
+    try {
+      const resolveResponse = await ticketService.resolveTicket({
+        rootCause: customerSummary,
+        ticket: ticketData
+      })
+      
+      console.log('Ticket resolved successfully:', resolveResponse)
+      
+      // Show success message and navigate
+      success('RCA completed successfully! Ticket has been resolved.', {
+        title: 'Ticket Resolved',
+        duration: 4000
+      })
+      
+      // Navigate after a short delay to allow user to see the toast
+      setTimeout(() => {
+        navigate(-1)
+      }, 2000)
+      
+    } catch (error) {
+      console.error('❌ Failed to update ticket:', error)
+      showError('Failed to resolve ticket in ServiceNow', {
+        title: 'Ticket Update Failed',
+        duration: 5000
+      })
+    }
   }
 
   const handleBack = () => {
@@ -490,8 +716,8 @@ const RCACompletion = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+        <div className="max-w-6xl mx-auto">
           <div className="mb-6">
             <Skeleton className="h-8 w-64 mb-2" />
             <Skeleton className="h-4 w-96" />
@@ -521,12 +747,12 @@ const RCACompletion = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <FiAlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+        <div className="text-center bg-white p-8 rounded-lg shadow-md">
+          <FiAlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Error</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <Button onClick={handleBack} variant="outline">
+          <p className="text-gray-600 mb-6">{error}</p>
+          <Button onClick={handleBack} variant="outline" size="sm">
             <FiArrowLeft className="w-4 h-4 mr-2" />
             Go Back
           </Button>
@@ -536,200 +762,250 @@ const RCACompletion = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-1">
+      <div className="max-w-6xl mx-auto">
+        {/* Compact Header */}
         <div className="mb-6">
-          <div className="flex items-center justify-between">
-            <div className='flex items-center space-x-4'>
-            <Button onClick={handleBack} variant="outline">
-                <FiArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBack}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-white rounded-lg transition-all"
+              >
+                <FiArrowLeft className="w-4 h-4" />
+                <span>Back</span>
+              </button>
+              <div className="h-6 w-px bg-gray-300"></div>
               <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">RCA Completion</h1>
-              <p className="text-gray-600">Generate technical report and customer-friendly summary</p>
+                <h1 className="text-xl font-semibold text-gray-900">RCA Completion</h1>
+                <p className="text-xs text-gray-500 mt-0.5">Generate and review comprehensive reports</p>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
-              
-              <Button 
-                onClick={handleSave} 
-                disabled={saving || (!technicalReport && !customerSummary)}
-                className="bg-green-600 hover:bg-green-700 text-white"
+
+            <div className="flex items-center gap-3">
+              {/* View Mode Toggle */}
+              <div className="inline-flex bg-white rounded-lg shadow-sm p-1 border border-gray-200">
+                <button
+                  onClick={() => setViewMode('technical')}
+                  className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    viewMode === 'technical'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+                  }`}
+                >
+                  <FiFileText className="w-3.5 h-3.5" />
+                  <span>Technical</span>
+                </button>
+                <button
+                  onClick={() => setViewMode('customer')}
+                  className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    viewMode === 'customer'
+                      ? 'bg-green-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-green-600 hover:bg-green-50'
+                  }`}
+                >
+                  <FiUsers className="w-3.5 h-3.5" />
+                  <span>Customer</span>
+                </button>
+                <button
+                  onClick={() => setViewMode('both')}
+                  className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    viewMode === 'both'
+                      ? 'bg-purple-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50'
+                  }`}
+                >
+                  <FiFileText className="w-3.5 h-3.5" />
+                  <span>Both</span>
+                </button>
+              </div>
+
+              <button
+                onClick={generateRCA}
+                disabled={streaming || autoTriggering}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-all shadow-sm"
               >
-                <FiSave className="w-4 h-4 mr-2" />
-                {saving ? 'Saving...' : 'Save Reports'}
-              </Button>
+                {streaming || autoTriggering ? (
+                  <>
+                    <FiLoader className="w-4 h-4 animate-spin" />
+                    <span>{autoTriggering ? 'Initializing...' : 'Generating...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <FiPlay className="w-4 h-4" />
+                    <span>Regenerate</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
-
-        {/* Ticket Info */}
-        {ticketData && (
-          <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-1">
-                  {ticketData.short_description}
-                </h2>
-                <div className="flex items-center space-x-4 text-sm text-gray-600">
-                  <span><strong>Ticket ID:</strong> {ticketData.ticket_id}</span>
-                  <span><strong>Status:</strong> {ticketData.status}</span>
-                  <span><strong>Priority:</strong> {ticketData.priority}</span>
-                  <span><strong>Category:</strong> {ticketData.category}</span>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Badge className={`${
-                  ticketData.priority === 'High' ? 'bg-red-100 text-red-800' :
-                  ticketData.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-green-100 text-green-800'
-                }`}>
-                  {ticketData.priority} Priority
-                </Badge>
-                <Badge className="bg-blue-100 text-blue-800">
-                  {ticketData.status}
-                </Badge>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Auto-triggering Status */}
         {autoTriggering && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center justify-center">
-              <FiLoader className="w-5 h-5 text-blue-500 animate-spin mr-3" />
-              <p className="text-blue-700 font-medium">Auto-triggering RCA generation...</p>
-            </div>
-          </div>
-        )}
-
-        {/* Streaming Progress */}
-        {streaming && streamingProgress && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <FiLoader className="w-5 h-5 text-green-500 animate-spin mr-3" />
-                <p className="text-green-700 font-medium">{streamingProgress}</p>
+          <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+            <div className="flex items-center justify-center gap-4">
+              <div className="relative">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                  <FiLoader className="w-6 h-6 text-blue-600 animate-spin" />
+                </div>
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full animate-ping"></div>
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-blue-900">Initializing AI Analysis</h3>
+                <p className="text-sm text-blue-700">Preparing comprehensive analysis...</p>
               </div>
             </div>
           </div>
         )}
 
-
-        {/* Regenerate Button */}
-        {ticketData && (
-          <div className="mb-6 flex justify-end">
-            <Button 
-              onClick={generateRCA}
-              disabled={streaming || !websocketConnected || autoTriggering}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-8"
-            >
-              {streaming ? (
-                <>
-                  <FiLoader className="w-4 h-4 mr-2 animate-spin" />
-                  Generating...
-                </>
-              ) : autoTriggering ? (
-                <>
-                  <FiLoader className="w-4 h-4 mr-2 animate-spin" />
-                  Auto-triggering...
-                </>
-              ) : (
-                <>
-                  <FiPlay className="w-4 h-4 mr-2" />
-                  Regenerate RCA Reports
-                </>
-              )}
-            </Button>
+        {/* Existing RCA Report Loaded Status */}
+        {/* {isLoadedFromDatabase && (technicalReport || customerSummary) && !autoTriggering && !streaming && (
+          <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                <FiDatabase className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-green-900">Existing RCA Report Loaded</h3>
+                
+              </div>
+            </div>
           </div>
-        )}
+        )} */}
 
-
-
-        {/* Two Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Reports Layout */}
+        <div className={`grid gap-4 ${viewMode === 'both' ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
           {/* Technical RCA Report */}
-          <Card className="bg-white shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center text-lg font-semibold text-gray-900">
-                <FiFileText className="w-5 h-5 mr-2 text-blue-500" />
-                Technical RCA Report
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between items-center">
-                <p className="text-sm text-gray-600">
-                  Detailed technical analysis for internal use
-                </p>
-              </div>
-                    <StreamingTextarea
-                      value={technicalReport}
-                      onChange={(e) => setTechnicalReport(e.target.value)}
-                      placeholder="Technical RCA report will be generated here..."
-                      rows={20}
-                      className="font-mono"
-                      streaming={streaming}
-                      generating={generatingTechnical}
-                      streamingProgress={streamingProgress}
-                      type="technical"
-                    />
-            </CardContent>
-          </Card>
+          {(viewMode === 'technical' || viewMode === 'both') && (
+            <Card className="bg-white shadow-sm border border-gray-200">
+              <CardHeader className="pb-3 border-b border-gray-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                      <FiFileText className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">Technical RCA Report</h3>
+                      <p className="text-xs text-gray-500">Detailed analysis for internal use</p>
+                    </div>
+
+
+
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {generatingTechnical && (
+                      <Badge className="bg-blue-50 text-blue-700 text-xs px-2 py-1 font-medium border border-blue-200">
+                        <FiLoader className="w-3 h-3 mr-1 animate-spin" />
+                        Generating
+                      </Badge>
+                    )}
+                    {technicalReport && !generatingTechnical && (
+                      <Badge className="bg-green-50 text-green-700 text-xs px-2 py-1 font-medium border border-green-200">
+                        <FiCheckCircle className="w-3 h-3 mr-1" />
+                        Complete
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-1">
+                <div className="relative">
+                  <FormattedReport
+                    value={technicalReport}
+                    placeholder={generatingTechnical ? "Generating technical analysis..." : "Technical RCA report will be generated here..."}
+                    streaming={streaming}
+                    generating={generatingTechnical}
+                    streamingProgress={streamingProgress}
+                    type="technical"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Customer-Friendly Summary */}
-          <Card className="bg-white shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center text-lg font-semibold text-gray-900">
-                <FiUsers className="w-5 h-5 mr-2 text-green-500" />
-                Customer-Friendly Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between items-center">
-                <p className="text-sm text-gray-600">
-                  Simplified summary for customer communication
-                </p>
-              </div>
-                    <StreamingTextarea
-                      value={customerSummary}
-                      onChange={(e) => setCustomerSummary(e.target.value)}
-                      placeholder="Customer-friendly summary will be generated here..."
-                      rows={20}
-                      streaming={streaming}
-                      generating={generatingCustomer}
-                      streamingProgress={streamingProgress}
-                      type="customer"
-                    />
-            </CardContent>
-          </Card>
+          {(viewMode === 'customer' || viewMode === 'both') && (
+            <Card className="bg-white shadow-sm border border-gray-200">
+              <CardHeader className="pb-3 border-b border-gray-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center">
+                      <FiUsers className="w-4 h-4 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">Customer-Friendly Summary</h3>
+                      <p className="text-xs text-gray-500">Simplified for customer communication</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {generatingCustomer && (
+                      <Badge className="bg-green-50 text-green-700 text-xs px-2 py-1 font-medium border border-green-200">
+                        <FiLoader className="w-3 h-3 mr-1 animate-spin" />
+                        Generating
+                      </Badge>
+                    )}
+                    {customerSummary && !generatingCustomer && (
+                      <Badge className="bg-green-50 text-green-700 text-xs px-2 py-1 font-medium border border-green-200">
+                        <FiCheckCircle className="w-3 h-3 mr-1" />
+                        Complete
+                      </Badge>
+                    )}
+                    {!generatingCustomer && !customerSummary && generatingTechnical && (
+                      <Badge className="bg-yellow-50 text-yellow-700 text-xs px-2 py-1 font-medium border border-yellow-200">
+                        <FiClock className="w-3 h-3 mr-1" />
+                        Queued
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="relative">
+                  <FormattedReport
+                    value={customerSummary}
+                    placeholder={
+                      generatingCustomer
+                        ? "Generating customer-friendly summary..."
+                        : generatingTechnical
+                          ? "Waiting for technical analysis..."
+                          : "Customer-friendly summary will be generated here..."
+                    }
+                    streaming={streaming}
+                    generating={generatingCustomer}
+                    streamingProgress={streamingProgress}
+                    type="customer"
+                    waitingFor={generatingTechnical && !generatingCustomer ? "technical" : null}
+                    otherReportGenerating={generatingTechnical}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Footer Actions */}
-        <div className="mt-6 flex justify-center gap-8">
-          <div className="flex items-center space-x-4">
-            <Button 
-              onClick={handleSave} 
-              disabled={saving || streaming || (!technicalReport && !customerSummary)}
-              className="bg-green-600 hover:bg-green-700 text-white px-8"
-            >
-              <FiSave className="w-4 h-4 mr-2" />
-              {saving ? 'Saving...' : 'Save & Complete RCA'}
-            </Button>
-          </div>
-          <div>
-            <Button 
-            onClick={handleUpdateTicket} 
-            variant="outline" 
-            className='bg-blue-500 hover:bg-blue-600 text-white px-8'
+        <div className="mt-6 flex flex-col sm:flex-row justify-end items-center gap-3">
+          <button
+            onClick={handleSave}
             disabled={saving || streaming || (!technicalReport && !customerSummary)}
-            >
-              Update {ticketData?.source} Ticket
-            </Button>
-          </div>
+            className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-all shadow-sm"
+          >
+            <FiSave className="w-4 h-4" />
+            <span>{saving ? 'Saving...' : 'Save Now'}</span>
+          </button>
+
         </div>
+
+        {/* Knowledge Base Modal */}
+        <KnowledgeBaseModal
+          open={showKBModal}
+          onOpenChange={setShowKBModal}
+          onConfirm={handleCreateKnowledgeBase}
+          onCancel={handleKBModalCancel}
+          isCreating={creatingKB}
+          ticketData={ticketData}
+        />
       </div>
     </div>
   )

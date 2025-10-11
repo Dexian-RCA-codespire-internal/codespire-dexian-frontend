@@ -51,7 +51,7 @@ const RCADashboard = () => {
     prevPage: wsPrevPage,
     goToPage: wsGoToPage,
     changePageSize: wsChangePageSize
-  } = useWebSocketOnly(import.meta.env.VITE_BACKEND_URL)
+  } = useWebSocketOnly(import.meta.env.VITE_BACKEND_URL || 'http://localhost:8081')
 
   // Handle click outside to close filter dropdown and info popup
   useEffect(() => {
@@ -181,7 +181,30 @@ const RCADashboard = () => {
   const calculateRCAProgress = (ticket) => {
     if (!ticket) return { percentage: 0, completedSteps: 0, totalSteps: 4, currentStep: 1 }
     
-    // Priority 1: Check rca_workflow_steps array (primary source from API)
+    // Priority 1: Check resolution_steps from database (MongoDB structure)
+    if (ticket.resolution_steps) {
+      const resolutionSteps = ticket.resolution_steps
+      let completedSteps = 0
+      
+      // Check each step for completion
+      if (resolutionSteps.problem_statement?.completed) completedSteps++
+      if (resolutionSteps.impact_analysis?.completed) completedSteps++
+      if (resolutionSteps.root_cause?.completed) completedSteps++
+      if (resolutionSteps.corrective_actions?.completed) completedSteps++
+      
+      const totalSteps = 4
+      const progressPercentage = Math.round((completedSteps / totalSteps) * 100)
+      
+      
+      return {
+        percentage: progressPercentage,
+        completedSteps,
+        totalSteps,
+        currentStep: completedSteps < totalSteps ? completedSteps + 1 : totalSteps
+      }
+    }
+    
+    // Priority 2: Check rca_workflow_steps array (frontend structure)
     if (ticket.rca_workflow_steps && Array.isArray(ticket.rca_workflow_steps)) {
       const completedSteps = ticket.rca_workflow_steps.filter(step => 
         step && step.trim().length > 0

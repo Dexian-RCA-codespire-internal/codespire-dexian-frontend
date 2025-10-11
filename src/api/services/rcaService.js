@@ -126,5 +126,35 @@ export const rcaService = {
       }
     });
     return response.data;
+  },
+
+  // Get RCA resolved ticket data by ticket ID
+  getRCAResolvedTicket: async (ticketId) => {
+    const response = await api.get(`/rca-resolved/${ticketId}`);
+    return response.data;
+  },
+
+  // Update Problem Statement (Step 1)
+  updateProblemStatement: async ({ ticketId, data }) => {
+    const response = await api.post(`/rca-resolved/${ticketId}/problem-statement`, data);
+    return response.data;
+  },
+
+  // Update Impact Analysis (Step 2)
+  updateImpactAnalysis: async ({ ticketId, data }) => {
+    const response = await api.post(`/rca-resolved/${ticketId}/impact-analysis`, data);
+    return response.data;
+  },
+
+  // Update Root Cause (Step 3)
+  updateRootCause: async ({ ticketId, data }) => {
+    const response = await api.post(`/rca-resolved/${ticketId}/root-cause`, data);
+    return response.data;
+  },
+
+  // Update Corrective Actions (Step 4)
+  updateCorrectiveActions: async ({ ticketId, data }) => {
+    const response = await api.post(`/rca-resolved/${ticketId}/corrective-actions`, data);
+    return response.data;
   }
 };
